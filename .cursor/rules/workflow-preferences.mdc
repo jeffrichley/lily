@@ -1,0 +1,11 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Coding workflow-preferences
+
+- Focus on the areas of code relevant to the task
+- Write thorough tests for all major functionality
+- Use test driven development development whenever possible
+- Always thinkk about what other methods and areas of code might be affected by code changes

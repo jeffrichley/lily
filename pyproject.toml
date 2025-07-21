@@ -1,0 +1,120 @@
+[project]
+name = "lily"
+version = "0.1.0"
+description = "AI and agent framework"
+authors = [
+  { name = "Jeff Richley", email = "jeffrichley@gmail.com" }
+]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.11"
+keywords = ["ai", "agents", "framework", "lily"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Software Development :: Libraries",
+  "Typing :: Typed"
+]
+dependencies = [
+    "petal @ git+https://github.com/jeffrichley/petal.git",
+    "rich>=14.0.0",
+    "setuptools>=80.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black>=24.3.0",
+  "ruff>=0.4.0",
+  "pytest>=7.4",
+  "pytest-cov>=4.1",
+  "pytest-asyncio>=0.23.0",
+  "mypy>=1.16.1",
+  "pre-commit>=3.6",
+  "mkdocs-material>=9.5",
+  "pip-audit>=2.6",
+  "ipython>=8.10",
+  "types-requests"
+]
+
+docs = [
+  "sphinx>=7.0.0",
+  "sphinx-rtd-theme>=1.3.0",
+  "sphinx-autodoc-typehints>=1.25.0",
+  "sphinx-copybutton>=0.5.0",
+  "myst-parser>=2.0.0"
+]
+
+test = [
+  "pytest",
+  "pytest-cov",
+  "pytest-asyncio>=0.23.0",
+  "hypothesis"
+]
+
+typecheck = [
+  "mypy",
+  "types-requests"
+]
+
+security = [
+  "pip-audit"
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+skip-magic-trailing-comma = false
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+extend-select = [
+  "E", "F", "I", "N", "B", "Q", "SIM", "C90", "ARG"
+]
+ignore = [
+  "E501",  # Line too long (we use Black's wrapping)
+  "B008"   # Don't call function with mutable default
+]
+
+[tool.mypy]
+files = ["src", "tests", "examples", "scripts"]
+python_version = "3.11"
+warn_return_any = false  # More lenient
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+ignore_missing_imports = true
+exclude = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--cov=src/lily",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--cov-fail-under=80"
+]
