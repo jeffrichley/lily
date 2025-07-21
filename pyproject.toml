@@ -32,6 +32,7 @@ dev = [
   "pytest-asyncio>=0.23.0",
   "mypy>=1.16.1",
   "pre-commit>=3.6",
+  "commitizen>=3.20.0",
   "mkdocs-material>=9.5",
   "pip-audit>=2.6",
   "ipython>=8.10",
@@ -117,4 +118,12 @@ addopts = [
     "--cov-report=html",
     "--cov-report=xml",
     "--cov-fail-under=80"
+]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+tag_format = "v$version"
+version_files = [
+    "pyproject.toml:version"
 ]
