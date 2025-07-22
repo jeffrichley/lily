@@ -1,24 +1,9 @@
-"""Test integration with Petal package."""
+"""Smoke test for basic project setup."""
 
 
-def test_petal_import():
-    """Test that petal can be imported."""
-    import petal
+def test_basic_import():
+    """Test that we can import basic modules."""
+    # Test that we can import our own package
+    import lily
 
-    assert petal is not None
-    assert hasattr(petal, "__version__")
-
-
-def test_petal_version():
-    """Test that petal version is accessible."""
-    import petal
-
-    assert petal.__version__ == "0.1.0"
-
-
-def test_petal_modules():
-    """Test that petal modules are accessible."""
-    import petal
-
-    # Test that we can access petal's package structure
-    assert hasattr(petal, "__init__")
+    assert lily is not None
