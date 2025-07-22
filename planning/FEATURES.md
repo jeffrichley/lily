@@ -153,15 +153,15 @@ Runs WhisperFlow → summarize → extract quotes → draft script → prep vide
 ### 🧙 Scriptwriter Skill
 
 **Description:**
-Turns transcript or idea summaries into full scripts, with support for narrator tone, beat pacing, and persona-based voice tuning. Optionally outputs PRP-ready files.
+Turns transcript or idea summaries into full scripts, with support for narrator tone, beat pacing, and persona-based voice tuning. Optionally outputs thread-ready files.
 **Status:** planned
 **Supported Personas:** chrona
 **Tags:** \[chrona] \[skills] \[voice] \[scripting]
 
-### 🎛 Media-Ready PRP Generator
+### 🎛 Media-Ready Thread Generator
 
 **Description:**
-Generates detailed `prp.md` files for media workflows (e.g., “Render a 30s inspirational video from this script”). Adds annotations for tools (voice, music, video).
+Generates detailed `thread.md` files for media workflows (e.g., “Render a 30s inspirational video from this script”). Adds annotations for tools (voice, music, video).
 **Status:** planned
 **Supported Personas:** chrona
 **Tags:** \[chrona] \[UX] \[prompting] \[agents]

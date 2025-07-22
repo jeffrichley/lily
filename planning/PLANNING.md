@@ -36,7 +36,7 @@ For every task (from CLI, voice, or TUI):
 2. Determine skill or flow to run
 3. Apply active persona (inject prompt metadata)
 4. Execute skill → produce result
-5. Save output to `.lily/prp/<task>/result.md`
+5. Save output to `.lily/threads/<task>/result.md`
 6. Update task tracker (in `.lily/FEATURES_LIST.md` or `.lily/tasks.db`)
 
 Skills and flows can invoke external tools (via MCP), use memory profiles, or trigger voice replies.
@@ -227,7 +227,7 @@ Task status is tracked via:
 All tasks contain:
 
 * `initial.md`
-* `prp.md`
+* `thread.md`
 * `result.md`
 * `logs/`
 

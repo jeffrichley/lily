@@ -21,6 +21,7 @@ dependencies = [
     "petal @ git+https://github.com/jeffrichley/petal.git",
     "rich>=14.0.0",
     "setuptools>=80.9.0",
+    "textual>=4.0.0",
 ]
 
 [project.optional-dependencies]
