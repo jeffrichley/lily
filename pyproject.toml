@@ -36,7 +36,9 @@ dev = [
   "mkdocs-material>=9.5",
   "pip-audit>=2.6",
   "ipython>=8.10",
-  "types-requests"
+  "types-requests",
+  "types-pyyaml>=6.0.12.20250516",
+  "vulture>=2.14",
 ]
 
 docs = [
@@ -56,7 +58,8 @@ test = [
 
 typecheck = [
   "mypy",
-  "types-requests"
+  "types-requests",
+  "types-pyyaml"
 ]
 
 security = [
@@ -78,6 +81,7 @@ skip-magic-trailing-comma = false
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+src = ["src"]
 
 [tool.ruff.lint]
 extend-select = [
@@ -87,6 +91,8 @@ ignore = [
   "E501",  # Line too long (we use Black's wrapping)
   "B008"   # Don't call function with mutable default
 ]
+fixable = ["ALL"]
+unfixable = []
 
 [tool.mypy]
 files = ["src", "tests", "examples", "scripts"]
@@ -106,6 +112,10 @@ strict_equality = true
 ignore_missing_imports = true
 exclude = []
 
+[[tool.mypy.overrides]]
+module = "yaml"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
@@ -119,6 +129,22 @@ addopts = [
     "--cov-report=xml",
     "--cov-fail-under=80"
 ]
+filterwarnings = [
+    "ignore::pydantic.PydanticDeprecatedSince20:langchain_core.*",
+    "ignore::pydantic.PydanticDeprecatedSince20:langchain.*",
+    "ignore::DeprecationWarning:petal.*",
+    "ignore::UserWarning:.*",
+]
+
+[tool.coverage.run]
+source = ["src/lily"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 [tool.commitizen]
 name = "cz_conventional_commits"

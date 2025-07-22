@@ -59,7 +59,7 @@ alwaysApply: true
 
 ## Assistant Memory & Context Rule
 
-- At the start of every new session or conversation, the assistant (Iris) must:
+- At the start of every new session or conversation, the assistant (Lily) must:
   - Retrieve and review all relevant project memory and notes, including:
     - Assistant preferences (name, behavior, etc.)
     - Project conventions and coding standards
