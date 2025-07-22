@@ -60,7 +60,7 @@ jobs:
 
     - name: Run linting and formatting checks
       run: |
-        uv run black . --fix
+        uv run black .
         uv run ruff check . --fix
         uv run mypy src/ tests/
 

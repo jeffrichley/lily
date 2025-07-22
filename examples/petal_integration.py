@@ -1,6 +1,7 @@
 """Example of using Petal within Lily framework."""
 
 import petal
+
 from lily import __version__ as lily_version
 
 
