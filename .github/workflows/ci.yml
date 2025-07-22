@@ -64,6 +64,9 @@ jobs:
         uv run ruff check .
         uv run mypy src/ tests/
 
+    - name: Autofix with Ruff
+      run: uv run ruff check . --fix
+
     - name: Run security audit
       run: uv run pip-audit
 
