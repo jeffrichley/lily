@@ -76,7 +76,6 @@ class FlowExecutor:
 class Resolver:
     def resolve_skill(name: str, context: ProjectContext) -> Path
     def resolve_flow(name: str, context: ProjectContext) -> Path
-    def resolve_tool(name: str, context: ProjectContext) -> ToolSpec
 
 class PersonaManager:
     def load(name: str) -> Persona
@@ -101,6 +100,7 @@ These changes ensure the `.lily/` directory is the canonical project-local brain
 
 ## 📌 Next Steps
 
-* [ ] Scaffold these directories and stub files
-* [ ] Implement `SkillExecutor` and `Resolver`
-* [ ] Wire CLI commands to execute and track `.lily/tasks/<task>`
+* [x] Scaffold these directories and stub files ✅ **Completed 2025-07-22**
+* [x] Implement `Resolver` ✅ **Completed 2025-07-22**
+* [x] Implement `SkillExecutor` ✅ **Completed 2025-07-22**
+* [x] Wire CLI commands to execute and track `.lily/tasks/<task>` ✅ **Completed 2025-07-22**

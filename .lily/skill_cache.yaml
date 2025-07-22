@@ -1,0 +1,17 @@
+/Users/jeffrichley/workspace/ai/dream/lily:
+- description: Summarizes text content
+  kind: atomic
+  name: summarize-text
+  path: /Users/jeffrichley/workspace/ai/dream/lily/.lily/skills/summarize-text.md
+  persona: null
+  tags:
+  - summarization
+  - markdown
+- description: Transcribes audio to text
+  kind: atomic
+  name: transcribe
+  path: /Users/jeffrichley/workspace/ai/dream/lily/.lily/modules/chrona/skills/transcribe.md
+  persona: null
+  tags:
+  - transcription
+  - audio

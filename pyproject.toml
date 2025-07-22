@@ -19,10 +19,16 @@ classifiers = [
 ]
 dependencies = [
     "petal @ git+https://github.com/jeffrichley/petal.git",
+    "pydantic>=2.11.7",
     "rich>=14.0.0",
     "setuptools>=80.9.0",
     "textual>=4.0.0",
+    "typer>=0.16.0",
+    "pyyaml>=6.0",
 ]
+
+[project.scripts]
+lily = "lily.cli.main:main"
 
 [project.optional-dependencies]
 dev = [

@@ -8,12 +8,12 @@ Features are grouped by subsystem and tagged for priority or module alignment.
 
 ## 🧠 CORE ENGINE
 
-* [ ] 🔍 **Skill registry and resolution** `[core]` — Create discovery system that indexes local, module, and global skills with override logic.
+* [x] 🔍 **Skill registry and resolution** `[core]` — Create discovery system that indexes local, module, and global skills with override logic. ✅ **Completed 2025-07-22**
 * [ ] 🔁 **Flow execution controller** `[core]` — Executes multi-step `flow.yaml` files with persona-aware transitions and state handling.
 * [ ] 📂 **Config layer merger** `[core]` — Implement hierarchical loading and merging of `.lily/project.yaml` across directory levels.
 * [ ] 📜 **Flow result logging and backreference system** `[core]` — Store `result.md` in a way that supports search, memory, and reuse.
 * [ ] 🧾 **Task lifecycle tracker + state storage** `[core] [tasks] [UX]` — Build a persistent task state tracker that reflects the todo → in progress → done lifecycle across CLI/TUI.
-* [ ] 🧠 **Skill schema and metadata validator** `[core] [developer] [validation]` — Enforce front matter format for skills and flows (name, tags, kind, persona) for validation and discoverability.
+* [x] 🧠 **Skill schema and metadata validator** `[core] [developer] [validation]` — Enforce front matter format for skills and flows (name, tags, kind, persona) for validation and discoverability. ✅ **Completed 2025-07-22**
 * [ ] 🔍 **Skill / Flow / Task search index** `[UX] [navigation] [index]` — Create fuzzy-searchable registry of skills, flows, and active task specs.
 * [ ] 🧰 **Tool registry schema + resolution system** `[core] [tools]` — Define tool metadata structure and enable tool resolution by skill or flow.
 
@@ -38,7 +38,7 @@ Features are grouped by subsystem and tagged for priority or module alignment.
 
 ## 🖥️ CLI / TUI / GUI
 
-* [ ] 💻 **CLI command router** `[cli]` — Implement `lily run`, `lily run-flow`, `lily skills`, `lily flows`, etc.
+* [x] 💻 **CLI command router** `[cli]` — Implement `lily run`, `lily run-flow`, `lily skills`, `lily flows`, etc. ✅ **Completed 2025-07-22**
 * [ ] 🧮 **Kanban-style TUI MVP** `[tui]` — Initial terminal UI for showing tasks and context panel.
 * [ ] 📑 **Context-aware right panel viewer** `[tui]` — Show `initial.md`, `result.md`, flow state, and memory in TUI.
 

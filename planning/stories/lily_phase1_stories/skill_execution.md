@@ -23,11 +23,10 @@ Enable Lily to run a single skill from CLI, with persona-aware prompt constructi
 ## 🛠 Development Checklist
 
 * [ ] CLI: `lily run <skill-name> [--input file] [--task name]`
-
-  * [ ] Parses and validates arguments
-  * [ ] Auto-generates task name if not given
-* [ ] Skill Resolver: looks in `.lily/skills/`, modules, globals
-* [ ] Skill Validator: checks front matter for required fields
+* [ ] Parses and validates arguments
+* [ ] Auto-generates task name if not given
+* [x] Skill Resolver: looks in `.lily/skills/`, modules, globals ✅ **Completed 2025-07-22**
+* [x] Skill Validator: checks front matter for required fields ✅ **Completed 2025-07-22**
 * [ ] Input Substitutor: replaces `{{ input }}` in skill body
 * [ ] Persona Loader: loads `PERSONAS.yaml`, applies tone/tools/memory
 * [ ] Prompt Constructor: builds prompt from parts
