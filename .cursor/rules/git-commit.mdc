@@ -61,7 +61,7 @@ uv run git add .
 uv run git add filename.py
 
 # Or stage specific directories
-uv run git add src/petal/
+uv run git add src/.../
 ```
 
 ### 3. Verify Staged Changes
