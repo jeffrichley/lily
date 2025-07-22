@@ -61,11 +61,8 @@ jobs:
     - name: Run linting and formatting checks
       run: |
         uv run black --check --diff .
-        uv run ruff check .
+        uv run ruff check . --fix
         uv run mypy src/ tests/
-
-    - name: Autofix with Ruff
-      run: uv run ruff check . --fix
 
     - name: Run security audit
       run: uv run pip-audit
