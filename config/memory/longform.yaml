@@ -1,0 +1,4 @@
+# 📙 longform.yaml
+type: longform
+description: Rolling memory and recursive summaries for extended conversations
+strategy: rolling_summary

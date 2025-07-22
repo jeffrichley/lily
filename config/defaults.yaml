@@ -1,0 +1,15 @@
+# 🛠 defaults.yaml
+
+default_persona: dev
+default_memory_profile: shortform
+default_voice_profile: assistant_dev
+
+skills_path:
+  - .lily/skills/
+  - .lily/modules/*/skills/
+  - ~/.lily/skills/
+
+flows_path:
+  - .lily/flows/
+  - .lily/modules/*/flows/
+  - ~/.lily/flows/

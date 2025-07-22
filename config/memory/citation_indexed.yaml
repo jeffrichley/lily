@@ -1,0 +1,4 @@
+# 📗 citation_indexed.yaml
+type: citation_indexed
+description: Academic memory profile for linking citations to task outputs
+strategy: vector_with_bib_links

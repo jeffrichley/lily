@@ -1,0 +1,146 @@
+# 📌 Lily Patch Additions – Missing Concepts & Enhancements
+
+This document summarizes enhancements to the planning system based on our recent discussion. Each section includes the filename, where to insert the content, and the markdown to paste.
+
+---
+
+## 1. Tool Schema and Discovery Logic
+
+**File:** `planning/PLANNING.md`
+**Insert under:** `Extension Module Loader` or as new section under `Core System`
+
+```markdown
+### 🧰 Tool Registry & Capability Schema
+
+Each tool used by Lily must be registered and described with metadata, either via `tools/registry.yaml` or Python decorators with docstring metadata blocks.
+
+Tool metadata includes:
+- `name`: Unique identifier
+- `description`: Short summary
+- `inputs`: Expected parameters and types
+- `outputs`: Return format or schema
+- `personas`: Optional list of compatible personas
+- `runtime`: MCP, CLI, API, or in-process Python
+
+Tools are resolved in the same hierarchy as skills (project → module → global), and auto-indexed at startup.
+
+Example YAML snippet:
+
+```yaml
+- name: whisperflow
+  description: Transcribes audio to markdown text
+  inputs: [audio_path]
+  outputs: [markdown_transcript]
+  runtime: mcp
+  personas: [chrona, research]
+```
+```
+
+---
+
+## 2. Flow Variable / Parameter Injection
+
+**File:** `planning/PLANNING.md`
+**Insert under:** `Flow Orchestration`
+
+```markdown
+#### 🔁 Variable Injection Between Steps
+
+Flow steps can reference previous outputs using Jinja-style syntax (`{{ step_id.result }}`). Supported variables:
+
+- `{{ skill_name.result }}` — Output from named step
+- `{{ memory.key }}` — Stored memory snapshot
+- `{{ input }}` — Initial input passed into flow
+
+Variables are resolved before skill invocation. Invalid or missing references will raise a resolution error.
+```
+
+---
+
+## 3. Rework Loop Behavior
+
+**File:** `planning/PLANNING.md`
+**Insert under:** Task Lifecycle (or create new)
+
+```markdown
+### ♻️ Rework Triggering and Flow
+
+Each skill or flow step may return a `rework_required: true` flag (either from LLM signal or validator tool). Lily will:
+1. Mark the task as `♻️ Needs Rework`
+2. Prompt user for correction (via CLI/TUI or voice)
+3. Re-run the skill or offer to edit `initial.md`
+
+Rework strategy can be declared in skill metadata:
+
+```yaml
+rework_strategy: "manual" | "auto_retry" | "suggest_fix"
+```
+
+If auto-retry is used, Lily may use a debug-style pattern to self-correct and reattempt.
+```
+
+---
+
+## 4. Output Validation Layer
+
+**File:** `planning/PLANNING.md`
+**Insert under:** `Skill Execution Engine` or create new `Output Validation` section
+
+```markdown
+### ✅ Output Validation Layer
+
+Lily supports post-run validation of `result.md` files.
+
+Validation options:
+- Markdown section headers required (e.g., `## Summary`, `## Quotes`)
+- Regex checks for key phrases
+- Length or format checks
+- Tool-based semantic analysis (future)
+
+Each skill may include a validator block in its front matter:
+
+```yaml
+validator:
+  required_headers: ["## Summary", "## Key Quotes"]
+  max_length: 800
+  requires: ["AI-generated", "main point"]
+```
+```
+
+---
+
+## 5. Project Snapshot / Export
+
+**File:** `planning/PLANNING.md`
+**Insert under:** `CLI / TUI / GUI` section
+
+```markdown
+### 📦 Project Export & Archive System
+
+Lily supports exporting `.lily/` project directories as snapshot bundles. Export targets include:
+- All `initial.md`, `result.md`, `flow.yaml`, and persona memory
+- Optional zip packaging
+- Export to `archive/` or user-defined path
+
+CLI command:
+```bash
+lily export --include result.md --to archive/
+```
+
+This supports collaboration, reproducibility, and long-term storage.
+```
+
+---
+
+## 6. Add to TODOS.md
+
+**File:** `planning/TODOS.md`
+**Paste at end under appropriate sections:**
+
+```markdown
+- [ ] 🧰 Tool registry schema + resolution system `[core] [tools]` — Define tool metadata structure and enable tool resolution by skill or flow.
+- [ ] 💡 Flow variable injection + step linkage `[core] [flows]` — Allow dynamic reference to earlier outputs using `{{ step.result }}` syntax in flows.
+- [ ] ♻️ Rework triggering system `[core] [UX]` — Enable Lily to mark tasks as needing rework and optionally auto-retry or suggest fixes.
+- [ ] ✅ Output validator layer `[core] [validation]` — Add markdown/result.md post-process validation via front matter rules or plugins.
+- [ ] 📦 Project export command `[UX] [infra]` — CLI tool to package `.lily/` into reusable snapshots or zip archives.
+```

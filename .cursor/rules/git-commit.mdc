@@ -1,154 +1,38 @@
 ---
 alwaysApply: true
 ---
-## Using Commitizen (Recommended)
+# Git Workflow Guide
 
-### Interactive Mode (For Manual Commits)
-```bash
-# Use this when making commits manually:
-uv run git cz
-# Then answer the prompts for type, scope, description, etc.
-```
+If the user tells you to 'stuffit', they mean to run through this process.
+(if the user says 'prestuff', they mean to run black, ruff, and mypy)
 
-### Manual Mode (For Automation - Used by "stuffit")
-```bash
-# Used by automated workflows like "stuffit":
-uv run git commit -m "feat: Add new feature"
-# Format is still enforced by pre-commit hooks
-```
+**IMPORTANT:**
+All commands in this guide use [`uv`](https://github.com/astral-sh/uv) to ensure they run inside your project’s virtual environment, regardless of your platform (Mac, Linux, or Windows).
 
-### Version Management
-```bash
-# Bump version manually
-uv run cz bump
-
-# Or let Commitizen handle it automatically:
-# feat: commits → minor version bump (0.1.0 → 0.2.0)
-# fix: commits → patch version bump (0.1.0 → 0.1.1)
-# docs/style/refactor/test/chore/ci/build: no version bump
-```
+- No need to manually activate your virtual environment—just use `uv run <command>` as shown below.
 
 ---
 
-## Commit Message Requirements
+## Quick Commands Reference
 
-**REQUIRED: Use conventional commit format** - this is enforced by pre-commit hooks:
-
-```bash
-# ❌ This will FAIL - missing conventional commit format:
-uv run git commit -m "Add agent factory"
-
-# ✅ This will PASS - proper conventional commit format:
-uv run git commit -m "feat: Add agent factory with automatic namespace support
-
-- Add AgentFactory.create_agent() method with optional resolver
-- Implement automatic 'agent:' prefix for agent tools
-- Add comprehensive test coverage for agent integration
-- Update config to use agent key as agent name
-- Support both sync and async agent creation
-- Add validation for agent configuration parameters"
-```
-
-**Required Commit Message Structure:**
-```
-type(scope): brief description
-
-- Detailed bullet point 1
-- Detailed bullet point 2
-- Detailed bullet point 3
-- Any important notes or breaking changes
-```
-
-**Required Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`, `build`
-
-**Note:** Pre-commit hooks will reject commits that don't follow this format.
-
----
-
-## Feature Branch Workflow
-
-### Create and Switch to Feature Branch
-```bash
-uv run git checkout -b feature/agent-factory
-```
-
-### Work on Feature
+### Stage All Changes
 ```bash
 uv run git add .
-uv run git cz  # Use interactive mode for better commits
-```
-
-### Push Feature Branch
-```bash
-uv run git push -u origin feature/agent-factory
-```
-
-### Merge to Main (after review)
-```bash
-uv run git checkout main
-uv run git pull origin main
-uv run git merge feature/agent-factory
-uv run git push origin main
-```
-
----
-
-## Troubleshooting
-
-### Fix Corrupted Coverage Files
-```bash
-rm -f .coverage*
-uv run git add .
-uv run git commit -m "fix: Clean up corrupted coverage files"
-```
-
-### Undo Last Commit
-```bash
-# Keep changes
-uv run git reset --soft HEAD~1
-
-# Discard changes
-uv run git reset --hard HEAD~1
 ```
 
 ### Check Status
 ```bash
-# Commit history
-uv run git log --oneline -10
-
-# Remote branches
-uv run git branch -r
-
-# Remote status
-uv run git remote -v
-```
-
-### Stage and Check Changes
-```bash
-# Stage all changes
-uv run git add .
-
-# Or stage specific files/directories
-uv run git add filename.py
-uv run git add src/lily/
-
-# Verify staged changes
 uv run git status
-uv run git diff --cached
 ```
 
----
-
-## Common Patterns
-
-### Atomic Commits
+### Commit Changes
 ```bash
-# Stage related changes together
-uv run git add src/lily/core/agent_factory.py
-uv run git cz  # Choose feat: Add agent registration
+uv run git commit -m "descriptive commit message"
+```
 
-uv run git add tests/lily/test_agent_factory.py
-uv run git cz  # Choose test: Add agent factory tests
+### Push to Remote
+```bash
+uv run git push origin main
 ```
 
 ### Pull Latest Changes
@@ -156,22 +40,172 @@ uv run git cz  # Choose test: Add agent factory tests
 uv run git pull origin main
 ```
 
----
+## Complete Workflow
+
+### 1. Check Current Status
+```bash
+uv run git status
+```
+This shows:
+- Current branch
+- Staged changes
+- Unstaged changes
+- Untracked files
+
+### 2. Stage Changes
+```bash
+# Stage all changes
+uv run git add .
+
+# Or stage specific files
+uv run git add filename.py
+
+# Or stage specific directories
+uv run git add src/petal/
+```
+
+### 3. Verify Staged Changes
+```bash
+uv run git status
+uv run git diff --cached
+```
+
+### 4. Commit Changes
+When making the git commit message, please look at the diff between our codebase and the main branch. Analyze this difference to figure out what all has been accomplished.
+
+```bash
+# Simple commit
+uv run git commit -m "Add MCP tool factory with namespace support"
+
+# Or with more detail
+uv run git commit -m "feat: Add MCP tool factory with automatic namespace support
+
+- Add ToolFactory.add_mcp() method with optional resolver
+- Implement automatic 'mcp:' prefix for MCP tools
+- Add comprehensive test coverage for MCP integration
+- Update config to use server key as MCP server name"
+```
+
+### 5. Push to Remote
+```bash
+# Push to current branch
+uv run git push
+
+# Or specify remote and branch
+uv run git push origin main
+```
+
+### 6. Verify Push
+```bash
+# Check remote status
+uv run git remote -v
+
+# Check branch tracking
+uv run git branch -vv
+```
+
+## Feature Branch Workflow
+
+### Create and Switch to Feature Branch
+```bash
+uv run git checkout -b feature/mcp-tool-factory
+```
+
+### Work on Feature
+```bash
+# Make changes, then stage and commit
+uv run git add .
+uv run git commit -m "feat: Add MCP tool factory"
+```
+
+### Push Feature Branch
+```bash
+uv run git push -u origin feature/mcp-tool-factory
+```
+
+### Merge to Main (after review)
+```bash
+uv run git checkout main
+uv run git pull origin main
+uv run git merge feature/mcp-tool-factory
+uv run git push origin main
+```
+
+## Troubleshooting
+
+### Fix Corrupted Coverage Files
+If pre-commit hooks fail with coverage errors, clean up corrupted coverage data:
+```bash
+rm -f .coverage*
+uv run git add .
+uv run git commit --no-verify -m "your commit message"
+```
+
+### Undo Last Commit (keep changes)
+```bash
+uv run git reset --soft HEAD~1
+```
+
+### Undo Last Commit (discard changes)
+```bash
+uv run git reset --hard HEAD~1
+```
+
+### Check Commit History
+```bash
+uv run git log --oneline -10
+```
+
+### Check Remote Branches
+```bash
+uv run git branch -r
+```
+
+## Pre-commit Checklist
+
+Before committing, ensure:
+1. All tests pass: `uv run make test`
+2. Code is formatted: `uv run make pristine`
+3. Type checking passes: `uv run make mypy`
+4. Coverage is maintained: `uv run make coverage-check`
+
+## Common Patterns
+
+### Atomic Commits
+```bash
+# Stage related changes together
+uv run git add src/petal/core/tool_factory.py
+uv run git commit -m "feat: Add MCP tool registration"
+
+uv run git add tests/petal/test_tool_factory.py
+uv run git commit -m "test: Add MCP tool factory tests"
+```
+
+### Commit Message Format
+```
+type(scope): description
+
+[optional body]
+
+[optional footer]
+```
+
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
 ## Integration with Makefile
 
-Use these Makefile targets for quality checks:
+Use the Makefile targets for quality checks:
 
 ```bash
 # Run all checks
 uv run make checkit
 
 # Format and lint
-uv run make format
+uv run make pristine
 
 # Run tests
 uv run make test
 
-# Check coverage (fails if below 80%)
-uv run make test-cov-check
+# Check coverage
+uv run make coverage-check
 ```

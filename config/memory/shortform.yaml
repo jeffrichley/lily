@@ -1,0 +1,4 @@
+# 📘 shortform.yaml
+type: shortform
+description: Lightweight memory for short replies and ephemeral state
+strategy: context_only
