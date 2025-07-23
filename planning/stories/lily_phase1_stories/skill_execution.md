@@ -13,39 +13,43 @@ Enable Lily to run a single skill from CLI, with persona-aware prompt constructi
 | **CLI command** (`lily run`) | Parses args, resolves skill, runs agent                       |
 | **Agent or runner**          | Loads front matter, prepares prompt, executes with persona    |
 | **Input injector**           | Substitutes `{{ input }}` into skill                          |
-| **Output handler**           | Saves to `.lily/threads/<name>/result.md`, logs, confirms     |
+| **Output handler**           | Saves to `.lily/threads/<name>/result.md` (if tracked), or returns inline |
 | **Persona loader**           | Loads `PERSONAS.yaml`, injects tone, voice, memory            |
 | **Skill resolver**           | Searches `.lily/skills/`, module, or global for `<name>.md`   |
 | **Error manager**            | Handles missing skill, invalid front matter, failed LLM calls |
+| **Tracking manager**         | Determines if task should be tracked based on front matter or CLI flag |
 
 ---
 
 ## 🛠 Development Checklist
 
-* [ ] CLI: `lily run <skill-name> [--input file] [--task name]`
-* [ ] Parses and validates arguments
-* [ ] Auto-generates task name if not given
+* [x] CLI: `lily run <skill-name> [--input file] [--task name]` ✅ **Completed 2025-07-22**
+* [x] Parses and validates arguments ✅ **Completed 2025-07-22**
+* [ ] Auto-generates task name if not given (shows placeholder "Auto-generated" but no actual generation logic)
 * [x] Skill Resolver: looks in `.lily/skills/`, modules, globals ✅ **Completed 2025-07-22**
 * [x] Skill Validator: checks front matter for required fields ✅ **Completed 2025-07-22**
 * [ ] Input Substitutor: replaces `{{ input }}` in skill body
 * [ ] Persona Loader: loads `PERSONAS.yaml`, applies tone/tools/memory
 * [ ] Prompt Constructor: builds prompt from parts
 * [ ] LLM Executor: runs prompt and captures output
-* [ ] Result Writer: writes `initial.md`, `result.md`, `logs/`
-* [ ] Task Tracker: updates `.lily/FEATURES_LIST.md` or `tasks.db`
+* [ ] Result Writer: writes `initial.md`, `result.md`, `logs/` (only if tracked)
+* [ ] Task Tracker: updates `.lily/FEATURES_LIST.md` or `tasks.db` (only if tracked)
+* [ ] Tracking Manager: checks `tracked: true` in front matter or `--tracked` CLI flag
 * [ ] Test: validate using the `summarize-text` skill and sample.md
 
 ---
 
 ## 🧪 Acceptance Criteria
 
-* [ ] Run `lily run summarize-text --input sample.md`
-* [ ] Output appears in `.lily/threads/summarize-text_<timestamp>/result.md`
+* [ ] Run `lily run summarize-text --input sample.md` (untracked mode by default)
+* [ ] Run `lily run summarize-text --input sample.md --tracked` (tracked mode)
+* [ ] Untracked mode returns result inline with no file outputs
+* [ ] Tracked mode creates `.lily/threads/summarize-text_<timestamp>/result.md`
 * [ ] Output contains a `### Summary` header and relevant content
 * [ ] Persona tone, tools, and memory are respected (if declared)
 * [ ] CLI confirms success with user-friendly message
-* [ ] All required files are created: `initial.md`, `result.md`, `logs/`
-* [ ] FEATURES\_LIST.md or task DB shows ✅ task completion
+* [ ] Tracked mode creates: `initial.md`, `result.md`, `logs/`
+* [ ] Tracked mode updates FEATURES\_LIST.md or task DB with ✅ task completion
 
 ---
 
@@ -56,11 +60,19 @@ lily run summarize-text --input sample.md
 ```
 
 ```text
+# Untracked mode (default)
+✨ Running skill: summarize-text
+🧠 Persona: life
+📥 Input: sample.md (32 lines)
+📤 Result returned inline
+✅ Task complete
+
+# Tracked mode (--tracked flag)
 ✨ Running skill: summarize-text
 🧠 Persona: life
 📥 Input: sample.md (32 lines)
 📤 Output written to .lily/threads/summarize-text-2025-07-22T12-00/result.md
-✅ Task complete
+✅ Task tracked and complete
 ```
 
 ---
@@ -104,7 +116,12 @@ Tools may later be declared in front matter or inferred by persona:
 
 ## 📁 Output Artifacts
 
-* `.lily/threads/<task-name>/initial.md`
-* `.lily/threads/<task-name>/result.md`
-* `.lily/threads/<task-name>/logs/`
-* `.lily/FEATURES_LIST.md` (or task DB log)
+**Untracked Mode (Default):**
+- No file outputs
+- Result returned inline to CLI/TUI
+
+**Tracked Mode (--tracked or tracked: true):**
+- `.lily/threads/<task-name>/initial.md`
+- `.lily/threads/<task-name>/result.md`
+- `.lily/threads/<task-name>/logs/`
+- Updates to `.lily/FEATURES_LIST.md` or `tasks.db`

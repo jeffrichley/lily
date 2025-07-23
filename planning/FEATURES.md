@@ -54,6 +54,14 @@ Lily auto-detects project context by walking upward from the working directory t
 **Supported Personas:** all
 **Tags:** \[core] \[projects] \[context] \[configuration]
 
+### 📋 Task Tracking & Persistence
+
+**Description:**
+Lily supports two execution modes: untracked (default) and tracked. Untracked mode runs skills ephemerally with inline results and no file outputs. Tracked mode creates `.lily/threads/<task>/` directories, saves `initial.md` and `result.md` files, and updates task status in `FEATURES_LIST.md`. Tracked mode is enabled via `tracked: true` in skill/flow front matter or `--tracked` CLI flag. Only tracked tasks support lifecycle management (todo → in_progress → complete → needs_rework).
+**Status:** planned
+**Supported Personas:** all
+**Tags:** \[core] \[tasks] \[persistence] \[tracking] \[workflow]
+
 ---
 
 ## 💬 VOICE INTERACTION
@@ -81,10 +89,10 @@ Lily can speak replies aloud using a selected TTS backend (e.g., Coqui or Eleven
 ### 💻 CLI Command System
 
 **Description:**
-Lily exposes commands like `lily run summarize`, `lily run-flow daily_digest`, `lily skills`, `lily modules`, and `lily persona switch`. CLI output includes markdown previews, error messages, and rework triggers. Optional Bash autocomplete is supported.
+Lily exposes commands like `lily run summarize`, `lily run-flow daily_digest`, `lily skills`, `lily modules`, and `lily persona switch`. CLI output includes markdown previews, error messages, and rework triggers. All commands support `--tracked` flag to enable task persistence. Optional Bash autocomplete is supported.
 **Status:** planned
 **Supported Personas:** all
-**Tags:** \[cli] \[interface] \[developer]
+**Tags:** \[cli] \[interface] \[developer] \[tracking]
 
 ### 🧮 Kanban-Style Terminal UI
 

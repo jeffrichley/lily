@@ -28,7 +28,7 @@ Perfect. Here is the fully revised and zipped-project-compliant MVP doc for **Pr
 | \[ ] `lily write-initial <name>`       | Conversationally create `.lily/prp/<slug>/initial.md` with 4 sections                |             |
 | \[ ] `lily edit-initial <name>`        | Conversationally update any section of the `initial.md`                              |             |
 | \[ ] `lily generate-prp <name>`        | Generates `.lily/prp/<slug>/prp.md` using either a domain template or fallback       |             |
-| \[ ] `lily list-features`              | Displays a table of features and statuses (📝/🔄/♻️/✅)                               |             |
+| \[ ] `lily list-features`              | Displays a table of tracked features and statuses (📝/🔄/♻️/✅) (shows skills but no status emojis) |             |
 | \[ ] Domain Template Lookup            | Check for template at `examples/<slug>/prp.md` before using fallback                 |             |
 | \[ ] Template Variable Replacement     | Fill `{{GOAL}}`, `{{INPUTS}}`, etc., using parsed `initial.md` content               |             |
 | \[ ] Status Emojis                     | Enforce status tracking in `FEATURES_LIST.md` (`📝`, `🔄`, `♻️`, `✅`)                |             |
@@ -39,7 +39,13 @@ Perfect. Here is the fully revised and zipped-project-compliant MVP doc for **Pr
 
 ```bash
 .lily/
-├── FEATURES_LIST.md              # Master list of features and statuses
+├── FEATURES_LIST.md              # Master list of tracked features and statuses
+├── threads/                      # Tracked task workspaces (only created when tracked: true)
+│   ├── summarize-text-2025-01-15T10-30/
+│   │   ├── initial.md            # Original input or goal
+│   │   ├── result.md             # Final AI-generated output
+│   │   └── logs/                 # Execution logs
+│   └── .../
 ├── prp/
 │   ├── export-tool/
 │   │   ├── initial.md            # Authored by user + Lily

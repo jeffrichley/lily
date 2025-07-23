@@ -34,10 +34,11 @@ For every task (from CLI, voice, or TUI):
 
 1. Resolve project context (see section 4)
 2. Determine skill or flow to run
-3. Apply active persona (inject prompt metadata)
-4. Execute skill → produce result
-5. Save output to `.lily/threads/<task>/result.md`
-6. Update task tracker (in `.lily/FEATURES_LIST.md` or `.lily/tasks.db`)
+3. Check if task should be tracked (see section 8)
+4. Apply active persona (inject prompt metadata)
+5. Execute skill → produce result
+6. If tracked: Save output to `.lily/threads/<task>/result.md` and update task tracker
+7. If untracked: Return result inline with no file outputs
 
 Skills and flows can invoke external tools (via MCP), use memory profiles, or trigger voice replies.
 
@@ -193,9 +194,47 @@ All `result.md` can optionally be read aloud, and system messages like "Flow com
 
 ---
 
-## 📋 8. Task Lifecycle
+## 📋 8. Task Lifecycle & Persistence
 
-Each task has a lifecycle managed via state labels:
+### 8.1. Task Tracking Modes
+
+Lily supports two execution modes:
+
+**Untracked Mode (Default):**
+- Ephemeral execution with no file outputs
+- Results returned inline to CLI/TUI
+- No task history or persistence
+- Ideal for quick queries and one-off tasks
+
+**Tracked Mode (Optional):**
+- Creates `.lily/threads/<task>/` directory
+- Saves `initial.md`, `result.md`, and logs
+- Updates task tracker in `FEATURES_LIST.md` or `tasks.db`
+- Enables task lifecycle management
+
+### 8.2. Enabling Tracked Mode
+
+Tracked mode is enabled by:
+
+1. **Skill/Flow Front Matter:** Add `tracked: true` to skill or flow YAML front matter
+2. **CLI Flag:** Use `--tracked` flag with any command
+3. **TUI Setting:** Toggle tracking in TUI preferences
+
+Example skill with tracking enabled:
+```yaml
+---
+name: summarize
+description: Summarizes text content
+tracked: true
+personas: [life, research]
+tags: [summarization, markdown]
+kind: atomic
+---
+```
+
+### 8.3. Task Lifecycle (Tracked Mode Only)
+
+Tracked tasks have a lifecycle managed via state labels:
 
 ```
 [📝 todo] → [🔄 in_progress] → [✅ complete]
@@ -218,18 +257,16 @@ rework_strategy: "manual" | "auto_retry" | "suggest_fix"
 
 If auto-retry is used, Lily may use a debug-style pattern to self-correct and reattempt.
 
-Task status is tracked via:
+### 8.4. Task Persistence Structure
 
-* `.lily/FEATURES_LIST.md`
-* TUI board
-* Optional `tasks.db` for indexed views
+Tracked tasks are stored in:
 
-All tasks contain:
-
-* `initial.md`
-* `thread.md`
-* `result.md`
-* `logs/`
+* `.lily/threads/<task-name>/`
+  * `initial.md` - Original input or goal
+  * `result.md` - Final AI-generated output
+  * `logs/` - Execution logs and metadata
+* `.lily/FEATURES_LIST.md` - Task status tracking
+* Optional `tasks.db` - Indexed task database
 
 ---
 

@@ -19,7 +19,7 @@ Speak results from `result.md` using configured TTS voice.
 
 ## 🧪 Acceptance Criteria
 - [ ] Can be run via CLI (`lily run ...`)
-- [ ] Produces valid output in `.lily/threads/<task>/result.md`
+- [ ] Produces valid output in `.lily/threads/<task>/result.md` (only if tracked)
 - [ ] Persona tone/voice/tool is respected
 - [ ] Works from both fresh and ongoing project directories
 

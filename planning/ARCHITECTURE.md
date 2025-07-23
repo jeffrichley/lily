@@ -14,7 +14,7 @@ project-root/
 │   ├── tools.yaml                 # Tool registry with local overrides
 │   ├── config/                    # Project-level configuration files
 │   │   └── memory/                # Memory profile definitions
-│   ├── tasks/                     # Task-specific workspaces
+│   ├── threads/                   # Task-specific workspaces (tracked mode only)
 │   │   └── <task-name>/
 │   │       ├── initial.md         # User input or goal
 │   │       ├── result.md          # Final AI-generated output
@@ -102,5 +102,5 @@ These changes ensure the `.lily/` directory is the canonical project-local brain
 
 * [x] Scaffold these directories and stub files ✅ **Completed 2025-07-22**
 * [x] Implement `Resolver` ✅ **Completed 2025-07-22**
-* [x] Implement `SkillExecutor` ✅ **Completed 2025-07-22**
+* [ ] Implement `SkillExecutor` (partially implemented - CLI commands exist but no actual execution)
 * [x] Wire CLI commands to execute and track `.lily/tasks/<task>` ✅ **Completed 2025-07-22**
