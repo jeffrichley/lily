@@ -205,3 +205,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Lily
+#  Lily project state and artifacts - project-specific and should not be committed
+.lily/
