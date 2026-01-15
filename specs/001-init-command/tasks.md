@@ -15,8 +15,8 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create project directory structure per implementation plan (src/lily/core/application/commands/, src/lily/core/domain/, src/lily/core/infrastructure/models/, src/lily/ui/cli/, tests/unit/, tests/integration/)
-- [ ] T002 [P] Create __init__.py files in all package directories (src/lily/__init__.py, src/lily/core/__init__.py, src/lily/core/application/__init__.py, src/lily/core/application/commands/__init__.py, src/lily/core/domain/__init__.py, src/lily/core/infrastructure/__init__.py, src/lily/core/infrastructure/models/__init__.py, src/lily/ui/__init__.py, src/lily/ui/cli/__init__.py)
+- [X] T001 Create project directory structure per implementation plan (src/lily/core/application/commands/, src/lily/core/domain/, src/lily/core/infrastructure/models/, src/lily/ui/cli/, tests/unit/, tests/integration/)
+- [X] T002 [P] Create __init__.py files in all package directories (src/lily/__init__.py, src/lily/core/__init__.py, src/lily/core/application/__init__.py, src/lily/core/application/commands/__init__.py, src/lily/core/domain/__init__.py, src/lily/core/infrastructure/__init__.py, src/lily/core/infrastructure/models/__init__.py, src/lily/ui/__init__.py, src/lily/ui/cli/__init__.py)
 
 ---
 
@@ -26,15 +26,15 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 [P] Create StateModel Pydantic model in src/lily/core/infrastructure/models/state.py with fields: phase (str, enum), project_name (str), created_at (datetime), last_updated (datetime), version (str)
-- [ ] T004 [P] Create ArtifactModel Pydantic model in src/lily/core/infrastructure/models/index.py with fields: file_path (str), artifact_type (str, enum: "user-facing" or "system"), last_modified (datetime), hash (str)
-- [ ] T005 [P] Create IndexModel Pydantic model in src/lily/core/infrastructure/models/index.py as list of ArtifactModel
-- [ ] T006 [P] Create ConfigModel Pydantic model in src/lily/core/infrastructure/models/config.py with fields: version (str), project_name (str), created_at (datetime)
-- [ ] T007 [P] Create LogEntryModel Pydantic model in src/lily/core/infrastructure/models/log.py with fields: timestamp (datetime), command (str), action (str, enum: "created", "skipped", "repaired", "failed"), files (list[str]), metadata (dict, optional)
-- [ ] T008 Create Storage class in src/lily/core/infrastructure/storage.py implementing file operations: create_directory(), create_file(), file_exists(), check_permissions(), read_json(), write_json(), append_jsonl(), append_markdown_log(), calculate_hash()
-- [ ] T009 Create Logger class in src/lily/core/infrastructure/storage.py implementing dual-format logging: log_init() method that writes to both log.md and log.jsonl synchronously
-- [ ] T010 Create base Command abstract class in src/lily/core/application/commands/base.py with execute() and validate() abstract methods, and CommandResult protocol
-- [ ] T011 Create CommandResult dataclass in src/lily/core/application/commands/base.py with fields: success (bool), message (str), files_created (list[str]), files_skipped (list[str])
+- [X] T003 [P] Create StateModel Pydantic model in src/lily/core/infrastructure/models/state.py with fields: phase (str, enum), project_name (str), created_at (datetime), last_updated (datetime), version (str)
+- [X] T004 [P] Create ArtifactModel Pydantic model in src/lily/core/infrastructure/models/index.py with fields: file_path (str), artifact_type (str, enum: "user-facing" or "system"), last_modified (datetime), hash (str)
+- [X] T005 [P] Create IndexModel Pydantic model in src/lily/core/infrastructure/models/index.py as list of ArtifactModel
+- [X] T006 [P] Create ConfigModel Pydantic model in src/lily/core/infrastructure/models/config.py with fields: version (str), project_name (str), created_at (datetime)
+- [X] T007 [P] Create LogEntryModel Pydantic model in src/lily/core/infrastructure/models/log.py with fields: timestamp (datetime), command (str), action (str, enum: "created", "skipped", "repaired", "failed"), files (list[str]), metadata (dict, optional)
+- [X] T008 Create Storage class in src/lily/core/infrastructure/storage.py implementing file operations: create_directory(), create_file(), file_exists(), check_permissions(), read_json(), write_json(), append_jsonl(), append_markdown_log(), calculate_hash()
+- [X] T009 Create Logger class in src/lily/core/infrastructure/storage.py implementing dual-format logging: log_init() method that writes to both log.md and log.jsonl synchronously
+- [X] T010 Create base Command abstract class in src/lily/core/application/commands/base.py with execute() and validate() abstract methods, and CommandResult protocol
+- [X] T011 Create CommandResult dataclass in src/lily/core/application/commands/base.py with fields: success (bool), message (str), files_created (list[str]), files_skipped (list[str])
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -48,28 +48,28 @@
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] Create InitCommand class in src/lily/core/application/commands/init.py implementing Command interface with validate() and execute() methods
-- [ ] T013 [US1] Implement validate() method in InitCommand (src/lily/core/application/commands/init.py) to check write permissions and validate project name
-- [ ] T014 [US1] Implement directory creation logic in InitCommand.execute() (src/lily/core/application/commands/init.py) to create .lily/, .lily/runs/, .lily/tasks/, and docs/ directories
-- [ ] T015 [US1] Implement system artifact creation in InitCommand.execute() (src/lily/core/application/commands/init.py): create .lily/state.json with StateModel (phase="DISCOVERY", project_name, created_at, last_updated, version)
-- [ ] T016 [US1] Implement system artifact creation in InitCommand.execute() (src/lily/core/application/commands/init.py): create .lily/config.json with ConfigModel (version, project_name, created_at)
-- [ ] T017 [US1] Implement system artifact creation in InitCommand.execute() (src/lily/core/application/commands/init.py): create .lily/index.json as empty array (IndexModel)
-- [ ] T018 [US1] Implement placeholder file creation in InitCommand.execute() (src/lily/core/application/commands/init.py): create .gitkeep files in .lily/runs/ and .lily/tasks/ directories
-- [ ] T019 [US1] Create ArtifactGenerator base class in src/lily/core/infrastructure/storage.py using Template Method pattern for consistent markdown file generation
-- [ ] T020 [US1] Implement VisionGenerator in src/lily/core/infrastructure/storage.py to create docs/VISION.md with section headers, guidance comments, and empty bullet lists
-- [ ] T021 [US1] Implement GoalsGenerator in src/lily/core/infrastructure/storage.py to create docs/GOALS.md with section headers, guidance comments, and empty bullet lists
-- [ ] T022 [US1] Implement NonGoalsGenerator in src/lily/core/infrastructure/storage.py to create docs/NON_GOALS.md with section headers, guidance comments, and empty bullet lists
-- [ ] T023 [US1] Implement ConstraintsGenerator in src/lily/core/infrastructure/storage.py to create docs/CONSTRAINTS.md with section headers, guidance comments, and empty bullet lists
-- [ ] T024 [US1] Implement AssumptionsGenerator in src/lily/core/infrastructure/storage.py to create docs/ASSUMPTIONS.md with section headers, guidance comments, and empty bullet lists
-- [ ] T025 [US1] Implement OpenQuestionsGenerator in src/lily/core/infrastructure/storage.py to create docs/OPEN_QUESTIONS.md with section headers, guidance comments, and empty bullet lists
-- [ ] T026 [US1] Implement DocsReadmeGenerator in src/lily/core/infrastructure/storage.py to create docs/README.md explaining the purpose of the docs folder
-- [ ] T027 [US1] Implement user-facing artifact creation in InitCommand.execute() (src/lily/core/application/commands/init.py): create all 6 markdown files and docs/README.md using generators
-- [ ] T028 [US1] Implement index.json update logic in InitCommand.execute() (src/lily/core/application/commands/init.py): add all created artifacts to index.json with file_path, artifact_type, last_modified, and hash
-- [ ] T029 [US1] Implement dual-format log entry creation in InitCommand.execute() (src/lily/core/application/commands/init.py): write initial log entry to both .lily/log.md and .lily/log.jsonl using Logger
-- [ ] T030 [US1] Implement console output formatting in InitCommand.execute() (src/lily/core/application/commands/init.py): return InitResult with clear summary listing all files created
-- [ ] T031 [US1] Create CLI entry point in src/lily/ui/cli/main.py using Typer to register `init` command that calls InitCommand
-- [ ] T032 [US1] Implement CLI argument parsing in src/lily/ui/cli/main.py: accept required PROJECT_NAME argument OR --here flag. If --here is specified, use current directory name as project name. If --here is not specified, PROJECT_NAME is required.
-- [ ] T033 [US1] Implement CLI result rendering in src/lily/ui/cli/main.py: format InitResult for console output with success message and file list
+- [X] T012 [US1] Create InitCommand class in src/lily/core/application/commands/init.py implementing Command interface with validate() and execute() methods
+- [X] T013 [US1] Implement validate() method in InitCommand (src/lily/core/application/commands/init.py) to check write permissions and validate project name
+- [X] T014 [US1] Implement directory creation logic in InitCommand.execute() (src/lily/core/application/commands/init.py) to create .lily/, .lily/runs/, .lily/tasks/, and docs/ directories
+- [X] T015 [US1] Implement system artifact creation in InitCommand.execute() (src/lily/core/application/commands/init.py): create .lily/state.json with StateModel (phase="DISCOVERY", project_name, created_at, last_updated, version)
+- [X] T016 [US1] Implement system artifact creation in InitCommand.execute() (src/lily/core/application/commands/init.py): create .lily/config.json with ConfigModel (version, project_name, created_at)
+- [X] T017 [US1] Implement system artifact creation in InitCommand.execute() (src/lily/core/application/commands/init.py): create .lily/index.json as empty array (IndexModel)
+- [X] T018 [US1] Implement placeholder file creation in InitCommand.execute() (src/lily/core/application/commands/init.py): create .gitkeep files in .lily/runs/ and .lily/tasks/ directories
+- [X] T019 [US1] Create ArtifactGenerator base class in src/lily/core/infrastructure/storage.py using Template Method pattern for consistent markdown file generation
+- [X] T020 [US1] Implement VisionGenerator in src/lily/core/infrastructure/storage.py to create docs/VISION.md with section headers, guidance comments, and empty bullet lists
+- [X] T021 [US1] Implement GoalsGenerator in src/lily/core/infrastructure/storage.py to create docs/GOALS.md with section headers, guidance comments, and empty bullet lists
+- [X] T022 [US1] Implement NonGoalsGenerator in src/lily/core/infrastructure/storage.py to create docs/NON_GOALS.md with section headers, guidance comments, and empty bullet lists
+- [X] T023 [US1] Implement ConstraintsGenerator in src/lily/core/infrastructure/storage.py to create docs/CONSTRAINTS.md with section headers, guidance comments, and empty bullet lists
+- [X] T024 [US1] Implement AssumptionsGenerator in src/lily/core/infrastructure/storage.py to create docs/ASSUMPTIONS.md with section headers, guidance comments, and empty bullet lists
+- [X] T025 [US1] Implement OpenQuestionsGenerator in src/lily/core/infrastructure/storage.py to create docs/OPEN_QUESTIONS.md with section headers, guidance comments, and empty bullet lists
+- [X] T026 [US1] Implement DocsReadmeGenerator in src/lily/core/infrastructure/storage.py to create docs/README.md explaining the purpose of the docs folder
+- [X] T027 [US1] Implement user-facing artifact creation in InitCommand.execute() (src/lily/core/application/commands/init.py): create all 6 markdown files and docs/README.md using generators
+- [X] T028 [US1] Implement index.json update logic in InitCommand.execute() (src/lily/core/application/commands/init.py): add all created artifacts to index.json with file_path, artifact_type, last_modified, and hash
+- [X] T029 [US1] Implement dual-format log entry creation in InitCommand.execute() (src/lily/core/application/commands/init.py): write initial log entry to both .lily/log.md and .lily/log.jsonl using Logger
+- [X] T030 [US1] Implement console output formatting in InitCommand.execute() (src/lily/core/application/commands/init.py): return InitResult with clear summary listing all files created
+- [X] T031 [US1] Create CLI entry point in src/lily/ui/cli/main.py using Typer to register `init` command that calls InitCommand
+- [X] T032 [US1] Implement CLI argument parsing in src/lily/ui/cli/main.py: accept required PROJECT_NAME argument OR --here flag. If --here is specified, use current directory name as project name. If --here is not specified, PROJECT_NAME is required.
+- [X] T033 [US1] Implement CLI result rendering in src/lily/ui/cli/main.py: format InitResult for console output with success message and file list
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently. Running `lily init myproject` should create all required files and directories.
 
@@ -83,14 +83,14 @@
 
 ### Implementation for User Story 2
 
-- [ ] T034 [US2] Implement file existence check in InitCommand.execute() (src/lily/core/application/commands/init.py): check if files exist before creating, skip existing files (idempotent behavior)
-- [ ] T035 [US2] Implement missing file detection in InitCommand.execute() (src/lily/core/application/commands/init.py): identify which required artifacts are missing and create only those
-- [ ] T036 [US2] Implement state.json corruption detection in InitCommand.validate() (src/lily/core/application/commands/init.py): validate JSON schema using StateModel, detect corruption
-- [ ] T037 [US2] Implement state.json repair logic in InitCommand.execute() (src/lily/core/application/commands/init.py): recreate corrupted state.json with default values, log repair event
-- [ ] T038 [US2] Implement log entry for skipped files in InitCommand.execute() (src/lily/core/application/commands/init.py): log "skipped" action for existing files in both log formats
-- [ ] T039 [US2] Implement log entry for repaired files in InitCommand.execute() (src/lily/core/application/commands/init.py): log "repaired" action with metadata about corruption in both log formats
-- [ ] T040 [US2] Update InitResult in InitCommand.execute() (src/lily/core/application/commands/init.py): include files_skipped list in result for re-initialization scenarios
-- [ ] T041 [US2] Update console output in src/lily/ui/cli/main.py: display both created and skipped files when re-running init
+- [X] T034 [US2] Implement file existence check in InitCommand.execute() (src/lily/core/application/commands/init.py): check if files exist before creating, skip existing files (idempotent behavior)
+- [X] T035 [US2] Implement missing file detection in InitCommand.execute() (src/lily/core/application/commands/init.py): identify which required artifacts are missing and create only those
+- [X] T036 [US2] Implement state.json corruption detection in InitCommand.validate() (src/lily/core/application/commands/init.py): validate JSON schema using StateModel, detect corruption
+- [X] T037 [US2] Implement state.json repair logic in InitCommand.execute() (src/lily/core/application/commands/init.py): recreate corrupted state.json with default values, log repair event
+- [X] T038 [US2] Implement log entry for skipped files in InitCommand.execute() (src/lily/core/application/commands/init.py): log "skipped" action for existing files in both log formats
+- [X] T039 [US2] Implement log entry for repaired files in InitCommand.execute() (src/lily/core/application/commands/init.py): log "repaired" action with metadata about corruption in both log formats
+- [X] T040 [US2] Update InitResult in InitCommand.execute() (src/lily/core/application/commands/init.py): include files_skipped list in result for re-initialization scenarios
+- [X] T041 [US2] Update console output in src/lily/ui/cli/main.py: display both created and skipped files when re-running init
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently. Running `lily init` multiple times should be idempotent and handle corruption repair.
 
@@ -100,11 +100,11 @@
 
 **Purpose**: Handle error scenarios and edge cases from specification
 
-- [ ] T042 Implement permission validation in InitCommand.validate() (src/lily/core/application/commands/init.py): check write permissions before file operations, fail fast with clear error message
-- [ ] T043 Implement permission error handling in InitCommand.execute() (src/lily/core/application/commands/init.py): catch permission errors, return InitError with failed_paths list
-- [ ] T044 Implement invalid project name validation in InitCommand.validate() (src/lily/core/application/commands/init.py): validate project name for filesystem path compatibility
-- [ ] T045 Implement error logging in InitCommand.execute() (src/lily/core/application/commands/init.py): log "failed" action to both log formats when errors occur
-- [ ] T046 Update CLI error handling in src/lily/ui/cli/main.py: format and display error messages with specific failure reasons and paths
+- [X] T042 Implement permission validation in InitCommand.validate() (src/lily/core/application/commands/init.py): check write permissions before file operations, fail fast with clear error message
+- [X] T043 Implement permission error handling in InitCommand.execute() (src/lily/core/application/commands/init.py): catch permission errors, return InitError with failed_paths list
+- [X] T044 Implement invalid project name validation in InitCommand.validate() (src/lily/core/application/commands/init.py): validate project name for filesystem path compatibility
+- [X] T045 Implement error logging in InitCommand.execute() (src/lily/core/application/commands/init.py): log "failed" action to both log formats when errors occur
+- [X] T046 Update CLI error handling in src/lily/ui/cli/main.py: format and display error messages with specific failure reasons and paths
 
 ---
 
@@ -112,14 +112,14 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T047 [P] Add docstrings to all classes and methods in src/lily/core/application/commands/init.py
-- [ ] T048 [P] Add docstrings to all classes and methods in src/lily/core/infrastructure/storage.py
-- [ ] T049 [P] Add docstrings to all Pydantic models in src/lily/core/infrastructure/models/
-- [ ] T050 Verify deterministic file creation: ensure all file content is deterministic (no random values, fixed timestamps for testing)
-- [ ] T051 Verify idempotency: test that running init multiple times produces consistent results
-- [ ] T051a [P] Add integration test in tests/integration/test_init_integration.py: verify SC-002 artifact count (6 user-facing markdown files + 5 system files + 1 docs README + 2 directory structures = 14 total artifacts)
-- [ ] T052 Performance validation: ensure init completes in under 5 seconds (SC-001)
-- [ ] T053 Verify log synchronization: ensure log.md and log.jsonl contain identical information
+- [X] T047 [P] Add docstrings to all classes and methods in src/lily/core/application/commands/init.py
+- [X] T048 [P] Add docstrings to all classes and methods in src/lily/core/infrastructure/storage.py
+- [X] T049 [P] Add docstrings to all Pydantic models in src/lily/core/infrastructure/models/
+- [X] T050 Verify deterministic file creation: ensure all file content is deterministic (no random values, fixed timestamps for testing)
+- [X] T051 Verify idempotency: test that running init multiple times produces consistent results
+- [X] T051a [P] Add integration test in tests/integration/test_init_integration.py: verify SC-002 artifact count (6 user-facing markdown files + 5 system files + 1 docs README + 2 directory structures = 14 total artifacts)
+- [X] T052 Performance validation: ensure init completes in under 5 seconds (SC-001)
+- [X] T053 Verify log synchronization: ensure log.md and log.jsonl contain identical information
 
 ---
 

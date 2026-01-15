@@ -8,6 +8,8 @@ dependencies = [
     "pydantic>=2.12.5",
     "typer>=0.21.1",
 ]
+[project.scripts]
+lily = "lily.ui.cli.main:main"
 
 [dependency-groups]
 dev = [
