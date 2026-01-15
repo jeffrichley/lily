@@ -14,3 +14,15 @@ quality:
     uv run ruff check --fix .
     uv run mypy src/lily
 
+# Serve documentation site locally
+docs-serve:
+    uv run mkdocs serve
+
+# Build documentation site
+docs-build:
+    uv run mkdocs build
+
+# Clean generated documentation site
+docs-clean:
+    rm -rf site/
+

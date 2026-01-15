@@ -1,0 +1,62 @@
+# MkDocs Configuration for Lily Documentation Site
+# See contracts/mkdocs-config.md for configuration contract details
+
+site_name: Lily Documentation
+site_description: Documentation for the Lily project orchestration framework
+# GitHub Pages configuration - update these URLs with your actual repository
+site_url: https://username.github.io/lily/  # Update with your GitHub Pages URL
+repo_url: https://github.com/username/lily  # Update with your repository URL
+
+# Material theme configuration
+theme:
+  name: material
+  palette:
+    # Light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - search.suggest      # Search suggestions
+    - search.highlight    # Search result highlighting
+    - content.code.copy   # Copy button on code blocks
+    - navigation.tabs     # Tabbed navigation
+    - navigation.sections # Section navigation
+    - navigation.top     # Back to top button
+
+# Plugins configuration
+plugins:
+  - search               # Built-in search functionality
+  - mermaid2             # Mermaid diagram support
+
+# Markdown extensions
+markdown_extensions:
+  - pymdownx.superfences # Enhanced code fence support
+  - pymdownx.highlight   # Syntax highlighting
+  - admonition           # Admonition blocks (note, warning, etc.)
+  - pymdownx.details     # Collapsible details/summary blocks
+  - pymdownx.tabbed      # Tabbed content blocks
+  - attr_list            # Attribute lists for HTML attributes
+  - md_in_html           # Markdown within HTML blocks
+
+# Navigation structure
+# Navigation will auto-populate from docs/ directory structure
+# You can customize the order here if needed
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Architecture: architecture.md
+  - Commands: commands/
+  - Specifications: specs/
+  - Ideas: ideas/
+  - Deployment: deployment.md
+
