@@ -27,7 +27,9 @@ def run_new(
 ) -> None:
     """Create a new run. Optionally attach a work order file."""
     workspace_root = Path.cwd()
-    info = create_run_with_optional_work_order(workspace_root, work_order_path=work_order)
+    info = create_run_with_optional_work_order(
+        workspace_root, work_order_path=work_order
+    )
     console.print(f"Created run [bold]{info.run_id}[/bold]")
     console.print(f"Path: {info.run_root}")
     if info.work_order_ref is not None:

@@ -9,10 +9,10 @@
 
 ## Layer 1 — Contracts and Validation
 
-- Envelope model (universal typed wrapper)
+- [x] Envelope model (universal typed wrapper)
 - [x] ArtifactRef model (stable references + hashes) — *done in Layer 0 Phase B*
-- Schema registry (register artifact types)
-- Validation engine (Pydantic/JSONSchema hooks)
+- [x] Schema registry (register artifact types)
+- [x] Validation engine (Pydantic/JSONSchema hooks)
 
 ## Layer 2 — Execution Graph Runtime
 
@@ -81,10 +81,10 @@ end
 %% Layer 1
 %% =========================
 subgraph L1["Layer 1 - Contracts and Validation"]
-L1A["Envelope Model - universal wrapper"]:::red
+L1A["Envelope Model - universal wrapper"]:::green
 L1B["ArtifactRef Model - stable refs and hashes"]:::green
-L1C["Schema Registry - register artifact types"]:::red
-L1D["Validation Engine - Pydantic JSONSchema hooks"]:::red
+L1C["Schema Registry - register artifact types"]:::green
+L1D["Validation Engine - Pydantic JSONSchema hooks"]:::green
 end
 
 %% =========================

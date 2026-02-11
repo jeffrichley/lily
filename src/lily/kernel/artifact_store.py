@@ -1,4 +1,4 @@
-"""Artifact store: put_json / put_file / get / open_path / list. Phase D: put_file + open_path."""
+"""Artifact store: put_json / put_file / get / open_path / list. Layer 1: put_envelope / get_envelope / get_validated."""
 
 import hashlib
 import json
@@ -8,10 +8,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel
+
 from lily.kernel.artifact_id import generate_artifact_id
 from lily.kernel.artifact_ref import ArtifactRef, StorageKind, ProducerKind
 from lily.kernel.artifact_index import open_index, insert_artifact, list_artifacts
 from lily.kernel.paths import ARTIFACTS_DIR, resolve_artifact_path
+from lily.kernel.envelope import Envelope, EnvelopeMeta
+from lily.kernel.canonical import hash_payload
+from lily.kernel.envelope_validator import EnvelopeValidator
 
 PAYLOAD_JSON = "payload.json"
 PAYLOAD_TXT = "payload.txt"
@@ -285,3 +290,51 @@ class ArtifactStore:
             )
         finally:
             conn.close()
+
+    # --- Layer 1: envelope helpers (additive; do not change existing API) ---
+
+    def put_envelope(
+        self,
+        schema_id: str,
+        payload_model: BaseModel,
+        meta_fields: dict[str, Any],
+        artifact_name: str | None = None,
+    ) -> ArtifactRef:
+        """Build envelope, set payload_sha256, store via put_json. Returns ArtifactRef."""
+        payload_dict = payload_model.model_dump(mode="json")
+        payload_sha256 = hash_payload(payload_dict)
+        created_at = meta_fields.get("created_at")
+        if created_at is None:
+            created_at = datetime.now(UTC)
+        elif isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        meta = EnvelopeMeta(
+            schema_id=schema_id,
+            producer_id=meta_fields.get("producer_id", ""),
+            producer_kind=meta_fields.get("producer_kind", "system"),
+            created_at=created_at,
+            inputs=meta_fields.get("inputs", []),
+            payload_sha256=payload_sha256,
+        )
+        envelope = Envelope(meta=meta, payload=payload_dict)
+        envelope_dict = envelope.model_dump(mode="json")
+        return self.put_json(
+            schema_id,
+            envelope_dict,
+            artifact_name=artifact_name,
+            producer_id=meta.producer_id,
+            producer_kind=ProducerKind(meta.producer_kind),
+            input_artifact_refs=meta.inputs,
+        )
+
+    def get_envelope(self, artifact_ref: ArtifactRef) -> Envelope:
+        """Load artifact JSON and return Envelope[Any]. No validation."""
+        data = self.get(artifact_ref)
+        return Envelope.model_validate(data)
+
+    def get_validated(
+        self, artifact_ref: ArtifactRef, validator: EnvelopeValidator
+    ) -> tuple[EnvelopeMeta, BaseModel]:
+        """Load envelope, validate via EnvelopeValidator, return (meta, payload_model)."""
+        envelope = self.get_envelope(artifact_ref)
+        return validator.validate(envelope)

@@ -1,146 +1,142 @@
-You’re right to call that out. At “kernel” level, Layer 0 isn’t three separate subsystems—it’s **one concrete thing**:
-
-> a *Run Directory + Artifact Store API* with a **Run Manifest** that records identity + provenance.
-
-So yes: “run_id, timestamps, provenance” are **fields**, but we still need to *build* the machinery that creates, persists, and enforces them.
-
-Here’s what Layer 0 actually is, in engineer terms.
+Absolutely. Here are **phases** you can feed to your AI coder that keep Layer 1 kernel-pure (universal), small PRs, and testable.
 
 ---
 
-## Layer 0 = Run Store (filesystem-first)
+# Layer 1 Phases — Contracts & Validation (Kernel)
 
-### What we are building
+## Phase 1.1 — Core types: Envelope + SchemaId (no registry yet)
 
-1. **A deterministic run folder layout**
-2. **A RunManifest file** written at run creation
-3. **An ArtifactStore API** that writes/reads artifacts and records provenance automatically
+**Goal:** Introduce a universal “typed envelope” container that can wrap any payload, but do not attempt dynamic validation yet.
 
-That’s it.
+**Deliverables**
 
-Everything else in higher layers relies on this.
+* `SchemaId` / `ArtifactType` convention (string like `work_order.v1`)
+* `EnvelopeMeta` model with:
 
----
+  * `schema_id` (or `artifact_type`)
+  * `schema_version` (int, if you want both; otherwise derive version from schema_id)
+  * `producer_id`
+  * `producer_kind` (`tool|llm|human|system`)
+  * `created_at`
+  * `inputs` (list of `ArtifactRef` or artifact IDs)
+  * `payload_sha256` (hash of canonical payload bytes)
+* `Envelope[T]` generic Pydantic model:
 
-## 0.1 Run folder layout (the “filesystem contract”)
+  * `meta: EnvelopeMeta`
+  * `payload: T`
 
-We define a single canonical structure. Example:
+**Rules**
 
-```
-.iris/
-  runs/
-    <run_id>/
-      run_manifest.json
-      artifacts/
-      logs/
-      tmp/
-```
+* Envelope is **pure data** (no IO, no registry, no DB changes).
+* Payload hash uses canonical serialization for JSON payloads (deterministic).
 
-Rules:
+**Tests**
 
-* the kernel owns everything under `.iris/runs/<run_id>/`
-* artifacts are written only through the ArtifactStore API (not ad-hoc file writes)
-* `tmp/` can be wiped anytime
-
-This is “a thing to make” because the kernel must create this reliably and consistently.
+* Round-trip serialize/deserialize `Envelope[dict]`
+* Payload hash deterministic given same payload
 
 ---
 
-## 0.2 Run identity (implemented as RunManifest)
+## Phase 1.2 — Canonical serialization + hashing utilities
 
-We create a `run_manifest.json` at run start. It contains:
+**Goal:** Make hashing/signing reliable and consistent across the system.
 
-* `run_id` (uuid or sortable id)
-* `created_at`, `updated_at`
-* `kernel_version`
-* `status` (created/running/failed/succeeded)
-* `work_order_ref` (even if work_order is not finalized yet)
-* `workspace_snapshot` (optional later; path, git commit, etc.)
+**Deliverables**
 
-This is not just “properties” — it’s the **authoritative record** that lets you:
+* Utility: `canonical_json_bytes(obj) -> bytes` (sorted keys, stable separators, UTF-8)
+* Utility: `sha256_bytes(data) -> str`
+* Utility: `hash_payload(payload) -> str`
 
-* resume runs
-* audit what happened
-* reproduce behavior
+  * If payload is JSON-like → canonical JSON hash
+  * If payload is bytes/file → hash bytes (but file hashing is Layer 0 already)
 
-So the “thing to build” is:
+**Tests**
 
-* a RunManifest schema
-* creation/update logic
-* atomic writes (no half-written manifests)
+* Canonical JSON bytes stable across key order
+* Hash changes when payload changes
+* Hash stable across runs for same payload
 
 ---
 
-## 0.3 Artifact store (implemented as an API + on-disk indexing)
+## Phase 1.3 — Schema Registry v1 (Pydantic-first)
 
-The ArtifactStore provides a small set of operations:
+**Goal:** Provide a registry that maps `schema_id` → Pydantic model type, so kernel can validate envelopes at boundaries.
 
-* `put(kind, payload, metadata) -> ArtifactRef`
-* `get(artifact_ref) -> payload`
-* `list(run_id, filters...) -> [ArtifactRef]`
-* `open_path(artifact_ref) -> filepath` (for big blobs like zip/video)
+**Deliverables**
 
-On disk, it writes:
+* `SchemaRegistry` class with:
 
-* the artifact payload (JSON, text, binary)
-* a sidecar metadata file OR a central index
+  * `register(schema_id: str, model: type[BaseModel])`
+  * `get(schema_id: str) -> type[BaseModel]`
+  * `validate(schema_id: str, payload_obj: Any) -> BaseModel`
+* Prevent duplicate schema registrations unless explicitly overridden.
+* A small built-in registry initialization point (no plugin packs yet).
 
-**Important:** the store, not the agent, records:
+**Tests**
 
-* who produced it (`producer_id`)
-* what inputs were used (`input_artifact_refs`)
-* when it was created
-* content hash
-
-This makes provenance automatic and non-optional.
+* Register/get works
+* Duplicate register raises
+* Validate returns model instance
+* Validate fails with clear error for wrong shape
 
 ---
 
-## 0.4 Provenance metadata (implemented as Artifact metadata + lineage)
+## Phase 1.4 — Envelope validation at the boundary (EnvelopeValidator)
 
-Provenance isn’t its own module at Layer 0. It’s:
+**Goal:** Kernel validates “Envelope + payload conforms to schema” without knowing domain semantics.
 
-* fields in `ArtifactRef` / artifact metadata
-* written automatically by ArtifactStore
-* later rendered into a “provenance graph” (Layer 5-ish)
+**Deliverables**
 
-At Layer 0 we only need:
+* `EnvelopeValidator` that:
 
-* record `producer`, `inputs`, `timestamp`, `hash`
-* ensure artifacts are immutable once written (or versioned)
+  * checks envelope meta required fields
+  * verifies payload hash matches `payload_sha256`
+  * validates payload using `SchemaRegistry`
+* returns a validated payload model instance (typed)
 
-So the “thing to build” is the metadata model + write behavior.
+**Tests**
 
----
-
-# The Layer 0 deliverables (concrete)
-
-If I turn Layer 0 into a checklist of “things to make,” it becomes:
-
-* [ ] **RunId generator** (uuid or time-sortable)
-* [ ] **Run directory creator** (`.iris/runs/<run_id>/...`)
-* [ ] **RunManifest schema + writer** (create/update)
-* [ ] **ArtifactRef schema** (id, kind, path, hash, created_at, producer, inputs)
-* [ ] **ArtifactStore** (put/get/list)
-* [ ] **Atomic write utilities** (write temp then rename)
-* [ ] **Indexing strategy** (simple `artifacts/index.jsonl` to start)
-
-That’s the actual engineering work.
+* Fails on wrong hash
+* Fails on missing schema
+* Fails on invalid payload
+* Passes for valid envelope + payload
 
 ---
 
-## Why Layer 0 matters (skeptic framing)
+## Phase 1.5 — Integrate with Layer 0 ArtifactStore (optional but recommended)
 
-If we don’t do Layer 0 cleanly, every later layer becomes “it depends”:
+**Goal:** Make ArtifactStore capable of storing **enveloped artifacts** and validating them on `get()`.
 
-* resume won’t work
-* routing won’t be reproducible
-* gates won’t be auditable
-* plugins won’t be debuggable
-* you’ll lose trust
+**Deliverables**
 
-Layer 0 is boring on purpose.
+* Add optional methods (do not break existing):
+
+  * `put_envelope(schema_id, payload_model, meta, artifact_name=None) -> ArtifactRef`
+
+    * stores JSON with `{meta, payload}`
+    * computes payload hash
+    * writes artifact via Layer 0 (put_json)
+  * `get_envelope(artifact_ref) -> Envelope[Any]`
+  * `get_validated(artifact_ref, registry) -> BaseModel` (validated payload)
+* Keep this universal. No domain-specific schemas.
+
+**Tests**
+
+* Put/get envelope roundtrip
+* get_validated enforces schema + hash
 
 ---
 
-If you want, next we can do the same “convert bullet properties into buildable things” for **Layer 1**, but staying disciplined: still kernel-only, still universal.
+# Guardrails to include in your prompt
+
+* **No domain schemas** in Layer 1 PRs (only example toy schema for tests, like `EchoPayload`).
+* **No plugin system** yet (that’s Layer 6). Registry can be “in-process.”
+* **No JSONSchema generation** yet unless it’s trivial; start Pydantic-first.
+
+---
+
+# One-liner you can paste to your AI coder (summary)
+
+“Implement Layer 1 in phases: Envelope models → canonical hashing → SchemaRegistry (Pydantic) → EnvelopeValidator → optional ArtifactStore envelope helpers; keep it kernel-only and add tests for each phase.”
+
+If you want, I can turn the above into a single **copy/paste prompt** (like the one you used for `lily run new`) that instructs the coder to implement **Phase 1.1 only** as the next PR.

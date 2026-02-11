@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-import pytest
 
 from lily.kernel import read_manifest, get_manifest_path, RunStatus
 from lily.kernel.paths import IRIS_DIR, RUNS_DIR, ARTIFACTS_DIR, LOGS_DIR, TMP_DIR
@@ -42,7 +41,9 @@ def test_create_run_with_work_order_sets_ref_and_stores_artifact(
     work_order_file = workspace_root / "wo.txt"
     work_order_file.write_text("work order content")
 
-    info = create_run_with_optional_work_order(workspace_root, work_order_path=work_order_file)
+    info = create_run_with_optional_work_order(
+        workspace_root, work_order_path=work_order_file
+    )
     assert info.work_order_ref is not None
     assert info.work_order_ref.run_id == info.run_id
     assert info.work_order_ref.artifact_id

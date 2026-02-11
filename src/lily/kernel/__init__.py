@@ -24,6 +24,10 @@ from lily.kernel.run import (
 from lily.kernel.artifact_id import generate_artifact_id
 from lily.kernel.artifact_ref import ArtifactRef, StorageKind, ProducerKind
 from lily.kernel.artifact_store import ArtifactStore
+from lily.kernel.envelope import Envelope, EnvelopeMeta
+from lily.kernel.canonical import canonical_json_bytes, hash_payload, sha256_bytes
+from lily.kernel.schema_registry import SchemaRegistry, SchemaRegistryError
+from lily.kernel.envelope_validator import EnvelopeValidator, EnvelopeValidationError
 
 __all__ = [
     "generate_run_id",
@@ -46,4 +50,13 @@ __all__ = [
     "StorageKind",
     "ProducerKind",
     "ArtifactStore",
+    "Envelope",
+    "EnvelopeMeta",
+    "canonical_json_bytes",
+    "hash_payload",
+    "sha256_bytes",
+    "SchemaRegistry",
+    "SchemaRegistryError",
+    "EnvelopeValidator",
+    "EnvelopeValidationError",
 ]
