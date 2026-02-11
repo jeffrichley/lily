@@ -1,5 +1,9 @@
 # Justfile for Lily project
 
+# Windows uses PowerShell, Unix-like systems use sh
+set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
+set shell := ["sh", "-cu"]
+
 # Run all tests
 test:
     uv run pytest
