@@ -37,10 +37,11 @@
 
 ## Layer 5 — Observability and Reproducibility
 
-- Structured run logs (step timings, stdout/stderr)
-- Provenance graph (who produced what from what)
-- Replay controls (rerun step N, gates-only)
-- Snapshot metadata (env fingerprints, uv lock hash, etc.)
+- [x] Structured run logs (step timings, stdout/stderr)
+- [x] Provenance graph (who produced what from what)
+- [x] Replay controls (rerun step N, gates-only)
+- [x] Snapshot metadata (env fingerprints, uv lock hash, etc.)
+- [x] Artifact replacement (replace ID, record provenance, downstream reset)
 
 ## Layer 6 — Extension Points
 
@@ -121,10 +122,10 @@ end
 %% Layer 5
 %% =========================
 subgraph L5["Layer 5 - Observability and Reproducibility"]
-L5A["Structured Run Logs - step timing, status"]:::red
-L5B["Provenance Graph - artifact lineage"]:::red
-L5C["Replay Controls - rerun step N, gates-only"]:::red
-L5D["Environment Fingerprints - python, uv lock hash"]:::red
+L5A["Structured Run Logs - step timing, status"]:::green
+L5B["Provenance Graph - artifact lineage"]:::green
+L5C["Replay Controls - rerun step N, gates-only"]:::green
+L5D["Environment Fingerprints - python, uv lock hash"]:::green
 end
 
 %% =========================

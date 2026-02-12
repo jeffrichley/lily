@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, model_validator
 
 
 class RoutingActionType(str, Enum):
@@ -36,9 +36,15 @@ class RoutingCondition(BaseModel):
             return False
         if self.gate_status is not None and context.gate_status != self.gate_status:
             return False
-        if self.retry_exhausted is not None and context.retry_exhausted != self.retry_exhausted:
+        if (
+            self.retry_exhausted is not None
+            and context.retry_exhausted != self.retry_exhausted
+        ):
             return False
-        if self.policy_violation is not None and context.policy_violation != self.policy_violation:
+        if (
+            self.policy_violation is not None
+            and context.policy_violation != self.policy_violation
+        ):
             return False
         if self.step_id is not None and context.step_id != self.step_id:
             return False

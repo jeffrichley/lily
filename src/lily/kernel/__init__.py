@@ -54,6 +54,7 @@ from lily.kernel.policy_models import (
     SafetyPolicy,
     register_policy_schemas,
 )
+from lily.kernel.artifact_replacement import replace_artifact
 from lily.kernel.rerun import rerun_from
 from lily.kernel.routing_models import (
     RoutingAction,
@@ -61,7 +62,6 @@ from lily.kernel.routing_models import (
     RoutingCondition,
     RoutingContext,
     RoutingEngine,
-    RoutingRule,
 )
 from lily.kernel.runner import run_graph
 from lily.kernel.run_state import (
@@ -134,6 +134,7 @@ __all__ = [
     "RoutingEngine",
     "RoutingRule",
     "run_graph",
+    "replace_artifact",
     "rerun_from",
     "RunState",
     "RunStatus",

@@ -23,7 +23,9 @@ def test_matching_rule_triggers_correct_action():
         RoutingRule(
             rule_id="r1",
             when=RoutingCondition(step_status="failed", retry_exhausted=False),
-            action=RoutingAction(type=RoutingActionType.RETRY_STEP, reason="retry once"),
+            action=RoutingAction(
+                type=RoutingActionType.RETRY_STEP, reason="retry once"
+            ),
         ),
     ]
     result = RoutingEngine.evaluate(context, rules)
@@ -52,7 +54,9 @@ def test_rule_order_respected():
 
 def test_default_behavior_when_no_rules_match():
     """Default: step failed + retry_exhausted -> abort; else retry; step succeeded -> continue."""
-    ctx_failed_retries_left = RoutingContext(step_status="failed", retry_exhausted=False)
+    ctx_failed_retries_left = RoutingContext(
+        step_status="failed", retry_exhausted=False
+    )
     ctx_failed_exhausted = RoutingContext(step_status="failed", retry_exhausted=True)
     ctx_succeeded = RoutingContext(step_status="succeeded")
 

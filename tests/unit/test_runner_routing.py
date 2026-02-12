@@ -70,7 +70,9 @@ def test_abort_run_sets_run_failed(tmp_path: Path):
         RoutingRule(
             rule_id="abort_on_fail",
             when=RoutingCondition(step_status="failed"),
-            action=RoutingAction(type=RoutingActionType.ABORT_RUN, reason="step failed"),
+            action=RoutingAction(
+                type=RoutingActionType.ABORT_RUN, reason="step failed"
+            ),
         ),
     ]
     graph = GraphSpec(

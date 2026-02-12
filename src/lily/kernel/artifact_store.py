@@ -12,7 +12,12 @@ from pydantic import BaseModel
 
 from lily.kernel.artifact_id import generate_artifact_id
 from lily.kernel.artifact_ref import ArtifactRef, StorageKind, ProducerKind
-from lily.kernel.artifact_index import open_index, insert_artifact, list_artifacts
+from lily.kernel.artifact_index import (
+    get_artifact_by_id,
+    open_index,
+    insert_artifact,
+    list_artifacts,
+)
 from lily.kernel.paths import ARTIFACTS_DIR, resolve_artifact_path
 from lily.kernel.envelope import Envelope, EnvelopeMeta
 from lily.kernel.canonical import hash_payload
@@ -273,6 +278,17 @@ class ArtifactStore:
         if not path.exists():
             raise FileNotFoundError(f"Artifact file not found: {path}")
         return path
+
+    def get_ref(self, artifact_id: str) -> ArtifactRef | None:
+        """Look up ArtifactRef by artifact_id. Returns None if not found or wrong run."""
+        conn = open_index(self._workspace_root)
+        try:
+            ref = get_artifact_by_id(conn, artifact_id)
+            if ref is None or ref.run_id != self._run_id:
+                return None
+            return ref
+        finally:
+            conn.close()
 
     def list(
         self,

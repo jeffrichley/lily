@@ -14,7 +14,7 @@ from lily.kernel import (
     register_policy_schemas,
 )
 from lily.kernel.policy_models import POLICY_VIOLATION_SCHEMA_ID
-from lily.kernel.schema_registry import SchemaRegistry, SchemaRegistryError
+from lily.kernel.schema_registry import SchemaRegistry
 
 
 def test_valid_payload_passes():

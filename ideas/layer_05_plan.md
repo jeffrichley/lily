@@ -61,18 +61,18 @@ Capture reproducibility metadata at run start.
 
 ## Tasks
 
-- [ ] Add `environment_snapshot.v1` schema:
+- [x] Add `environment_snapshot.v1` schema:
   - python_version
   - platform
   - kernel_version
   - uv_lock_hash (optional)
   - timestamp
-- [ ] Register schema in SchemaRegistry
-- [ ] Implement `capture_environment_snapshot()`:
+- [x] Register schema in SchemaRegistry
+- [x] Implement `capture_environment_snapshot()`:
   - Collect python version
   - Collect platform info
   - Compute uv.lock hash if file exists
-- [ ] At run creation (Layer 0 or Runner start):
+- [x] At run creation (Layer 0 or Runner start):
   - Create envelope
   - Store via ArtifactStore
   - Record reference in RunState
@@ -81,19 +81,19 @@ Capture reproducibility metadata at run start.
 
 ## Tests
 
-- [ ] `tests/unit/test_environment_snapshot.py`
-  - [ ] Envelope validates
-  - [ ] Snapshot fields populated
-  - [ ] uv_lock_hash optional
-  - [ ] Stored artifact retrievable
+- [x] `tests/unit/test_environment_snapshot.py`
+  - [x] Envelope validates
+  - [x] Snapshot fields populated
+  - [x] uv_lock_hash optional
+  - [x] Stored artifact retrievable
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Snapshot stored once per run
-- [ ] RunState references snapshot artifact
-- [ ] Tests pass
+- [x] Snapshot stored once per run
+- [x] RunState references snapshot artifact
+- [x] Tests pass
 
 ---
 
@@ -106,40 +106,40 @@ Expand StepRunRecord to include structured provenance.
 
 ## Tasks
 
-- [ ] Extend `StepRunRecord` with:
+- [x] Extend `StepRunRecord` with:
   - input_artifact_hashes
   - output_artifact_hashes
   - duration_ms
   - executor_summary
   - gate_result_ids
   - policy_violation_ids
-- [ ] Update Runner:
+- [x] Update Runner:
   - Before step:
     - resolve input artifact hashes
   - After step:
     - resolve output artifact hashes
     - compute duration
     - record executor summary
-- [ ] Ensure data persisted via atomic RunState write
+- [x] Ensure data persisted via atomic RunState write
 
 ---
 
 ## Tests
 
-- [ ] `tests/unit/test_step_provenance.py`
-  - [ ] Input hashes recorded
-  - [ ] Output hashes recorded
-  - [ ] Duration populated
-  - [ ] Gate IDs attached
-  - [ ] Policy IDs attached
+- [x] `tests/unit/test_step_provenance.py`
+  - [x] Input hashes recorded
+  - [x] Output hashes recorded
+  - [x] Duration populated
+  - [x] Gate IDs attached
+  - [x] Policy IDs attached
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Provenance fields persisted
-- [ ] No regression in Runner behavior
-- [ ] Tests pass
+- [x] Provenance fields persisted
+- [x] No regression in Runner behavior
+- [x] Tests pass
 
 ---
 
@@ -152,33 +152,33 @@ Stabilize and formalize replay behavior.
 
 ## Tasks
 
-- [ ] Implement `re_run_from(step_id)` utility:
+- [x] Implement `re_run_from(step_id)` utility:
   - Reset downstream steps to pending
   - Clear produced_artifact_ids in affected StepRunRecords
   - Preserve logs
-- [ ] Ensure:
+- [x] Ensure:
   - Replay does not delete artifacts
   - Replay preserves previous attempts for audit
-- [ ] Update Runner to support:
+- [x] Update Runner to support:
   - Running after reset without corruption
 
 ---
 
 ## Tests
 
-- [ ] `tests/unit/test_replay_behavior.py`
-  - [ ] Downstream reset correct
-  - [ ] Upstream steps unaffected
-  - [ ] Artifacts remain on disk
-  - [ ] Run completes successfully after replay
+- [x] `tests/unit/test_replay_behavior.py`
+  - [x] Downstream reset correct
+  - [x] Upstream steps unaffected
+  - [x] Artifacts remain on disk
+  - [x] Run completes successfully after replay
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Replay deterministic
-- [ ] No artifact deletion
-- [ ] Tests pass
+- [x] Replay deterministic
+- [x] No artifact deletion
+- [x] Tests pass
 
 ---
 
@@ -191,13 +191,13 @@ Allow running gates without executing steps.
 
 ## Tasks
 
-- [ ] Add Runner mode: `dry_run_gates=True`
-- [ ] In this mode:
+- [x] Add Runner mode: `dry_run_gates=True`
+- [x] In this mode:
   - Skip step execution
   - Execute only gates for existing artifacts
   - Produce GateResult envelopes
   - Do NOT mutate StepRunRecord status
-- [ ] Ensure:
+- [x] Ensure:
   - Dry-run does not create step outputs
   - Dry-run does not modify artifact store (except GateResults)
 
@@ -205,19 +205,19 @@ Allow running gates without executing steps.
 
 ## Tests
 
-- [ ] `tests/unit/test_dry_run_gates.py`
-  - [ ] Gates execute
-  - [ ] Step status unchanged
-  - [ ] GateResults stored
-  - [ ] No step execution logs created
+- [x] `tests/unit/test_dry_run_gates.py`
+  - [x] Gates execute
+  - [x] Step status unchanged
+  - [x] GateResults stored
+  - [x] No step execution logs created
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Dry-run mode works
-- [ ] Step state preserved
-- [ ] Tests pass
+- [x] Dry-run mode works
+- [x] Step state preserved
+- [x] Tests pass
 
 ---
 
@@ -230,48 +230,48 @@ Allow replacing an artifact and continuing.
 
 ## Tasks
 
-- [ ] Add `artifact_replacement.v1` schema:
+- [x] Add `artifact_replacement.v1` schema:
   - original_artifact_id
   - replacement_artifact_id
   - reason
   - timestamp
-- [ ] Register schema
-- [ ] Implement `replace_artifact(old_id, new_id, reason)`
+- [x] Register schema
+- [x] Implement `replace_artifact(old_id, new_id, reason)`
   - Store replacement envelope
   - Update RunState references
   - Trigger downstream reset
-- [ ] Ensure provenance chain preserved
+- [x] Ensure provenance chain preserved
 
 ---
 
 ## Tests
 
-- [ ] `tests/unit/test_artifact_replacement.py`
-  - [ ] Replacement envelope stored
-  - [ ] Downstream steps reset
-  - [ ] Provenance chain intact
+- [x] `tests/unit/test_artifact_replacement.py`
+  - [x] Replacement envelope stored
+  - [x] Downstream steps reset
+  - [x] Provenance chain intact
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Replacement tracked via envelope
-- [ ] Replay works after replacement
-- [ ] Tests pass
+- [x] Replacement tracked via envelope
+- [x] Replay works after replacement
+- [x] Tests pass
 
 ---
 
 # Global Done Criteria (Layer 5)
 
-- [ ] Environment snapshot captured at run start
-- [ ] StepRunRecord expanded with provenance fields
-- [ ] Artifact hashes recorded deterministically
-- [ ] Replay from step works safely
-- [ ] Dry-run gates supported
-- [ ] Optional artifact replacement supported
-- [ ] All new schemas registered
-- [ ] All tests pass
-- [ ] No domain logic introduced
+- [x] Environment snapshot captured at run start
+- [x] StepRunRecord expanded with provenance fields
+- [x] Artifact hashes recorded deterministically
+- [x] Replay from step works safely
+- [x] Dry-run gates supported
+- [x] Optional artifact replacement supported
+- [x] All new schemas registered
+- [x] All tests pass
+- [x] No domain logic introduced
 
 ---
 

@@ -72,7 +72,10 @@ def check_write_paths(
 
     for path in modified_paths:
         path_res = str(Path(path).resolve())
-        skip = any(_is_under(path_res, ex) or path_res == str(Path(ex).resolve()) for ex in exclude_resolved)
+        skip = any(
+            _is_under(path_res, ex) or path_res == str(Path(ex).resolve())
+            for ex in exclude_resolved
+        )
         if skip:
             continue
         for deny in deny_resolved:

@@ -128,6 +128,17 @@ def insert_artifact(conn: sqlite3.Connection, ref: ArtifactRef) -> None:
     )
 
 
+def get_artifact_by_id(
+    conn: sqlite3.Connection, artifact_id: str
+) -> ArtifactRef | None:
+    """Look up a single artifact by artifact_id. Returns None if not found."""
+    cur = conn.execute("SELECT * FROM artifacts WHERE artifact_id = ?", (artifact_id,))
+    row = cur.fetchone()
+    if row is None:
+        return None
+    return _row_to_ref(row)
+
+
 def list_artifacts(
     conn: sqlite3.Connection,
     run_id: str,

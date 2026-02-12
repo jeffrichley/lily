@@ -102,6 +102,7 @@ def test_statuses_reset_as_expected():
     assert result.step_records["a"].finished_at is None
     assert result.step_records["a"].last_error is None
     assert result.step_records["a"].produced_artifact_ids == []
-    assert result.step_records["a"].log_paths == {}
+    # Layer 5: log_paths preserved for audit
+    assert result.step_records["a"].log_paths == {"stdout": "/tmp/out"}
     assert result.step_records["b"].status == StepStatus.PENDING
     assert result.step_records["b"].attempts == 0

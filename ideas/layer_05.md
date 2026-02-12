@@ -236,16 +236,16 @@ Defer:
 
 Layer 5 is complete when:
 
-- [ ] environment_snapshot.v1 schema implemented
-- [ ] Environment snapshot stored at run start
-- [ ] StepRunRecord includes input/output hashes
-- [ ] Executor summaries recorded
-- [ ] Gate + policy results attached to step record
-- [ ] Re-run from step works without deleting artifacts
-- [ ] Dry-run gates supported
-- [ ] Provenance reconstruction possible via structured data
-- [ ] All tests pass
-- [ ] No domain-specific logic introduced
+- [x] environment_snapshot.v1 schema implemented
+- [x] Environment snapshot stored at run start
+- [x] StepRunRecord includes input/output hashes
+- [x] Executor summaries recorded
+- [x] Gate + policy results attached to step record
+- [x] Re-run from step works without deleting artifacts
+- [x] Dry-run gates supported
+- [x] Provenance reconstruction possible via structured data
+- [x] All tests pass
+- [x] No domain-specific logic introduced
 
 ---
 

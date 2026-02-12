@@ -47,6 +47,15 @@ class StepRunRecord(BaseModel):
     produced_artifact_ids: list[str] = Field(default_factory=list)
     log_paths: dict[str, str] = Field(default_factory=dict)
     gate_results: list[str] = Field(default_factory=list)
+    # Layer 5 provenance
+    input_artifact_hashes: dict[str, str] = Field(
+        default_factory=dict
+    )  # artifact_id -> sha256
+    output_artifact_hashes: dict[str, str] = Field(default_factory=dict)
+    duration_ms: int | None = None
+    executor_summary: dict[str, Any] = Field(default_factory=dict)
+    gate_result_ids: list[str] = Field(default_factory=list)
+    policy_violation_ids: list[str] = Field(default_factory=list)
 
 
 class RunState(BaseModel):
@@ -61,6 +70,9 @@ class RunState(BaseModel):
     escalation_reason: str | None = None
     escalation_step_id: str | None = None
     forced_next_step_id: str | None = None  # for goto_step routing
+    environment_snapshot_ref: str | None = (
+        None  # Layer 5: artifact_id of environment_snapshot.v1
+    )
 
     def to_file_dict(self) -> dict[str, Any]:
         """Serialize for JSON file."""

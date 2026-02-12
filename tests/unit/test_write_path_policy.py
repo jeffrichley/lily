@@ -26,8 +26,9 @@ def test_writing_to_allowed_path_passes(workspace_root: Path):
                 executor=ExecutorSpec(
                     kind="local_command",
                     argv=[
-                        "python", "-c",
-                        "from pathlib import Path; p = Path('tmp/out.txt'); p.parent.mkdir(exist_ok=True); p.write_text('ok')"
+                        "python",
+                        "-c",
+                        "from pathlib import Path; p = Path('tmp/out.txt'); p.parent.mkdir(exist_ok=True); p.write_text('ok')",
                     ],
                     cwd=".",
                 ),
@@ -57,8 +58,9 @@ def test_writing_to_denied_path_triggers_violation(workspace_root: Path):
                 executor=ExecutorSpec(
                     kind="local_command",
                     argv=[
-                        "python", "-c",
-                        "from pathlib import Path; Path('protected/forbidden.txt').write_text('x')"
+                        "python",
+                        "-c",
+                        "from pathlib import Path; Path('protected/forbidden.txt').write_text('x')",
                     ],
                     cwd=str(run_root),
                 ),
@@ -90,8 +92,9 @@ def test_policy_violation_envelope_stored_on_write_denied(workspace_root: Path):
                 executor=ExecutorSpec(
                     kind="local_command",
                     argv=[
-                        "python", "-c",
-                        "from pathlib import Path; Path('denied/x.txt').write_text('x')"
+                        "python",
+                        "-c",
+                        "from pathlib import Path; Path('denied/x.txt').write_text('x')",
                     ],
                     cwd=str(run_root),
                 ),

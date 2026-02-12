@@ -6,10 +6,20 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from lily.kernel.artifact_store import ArtifactStore
+from lily.kernel.env_snapshot import (
+    ENVIRONMENT_SNAPSHOT_SCHEMA_ID,
+    capture_environment_snapshot,
+    register_observability_schemas,
+)
 from lily.kernel.executors.local_command import run_local_command
 from lily.kernel.gate_engine import execute_gate
 from lily.kernel.gate_models import register_gate_schemas
-from lily.kernel.graph_models import ExecutorSpec, GraphSpec, StepSpec, topological_order
+from lily.kernel.graph_models import (
+    ExecutorSpec,
+    GraphSpec,
+    StepSpec,
+    topological_order,
+)
 from lily.kernel.paths import LOGS_DIR
 from lily.kernel.policy_models import (
     POLICY_VIOLATION_SCHEMA_ID,
@@ -31,6 +41,7 @@ from lily.kernel.routing_models import (
     RoutingContext,
     RoutingEngine,
 )
+from lily.kernel.run import KERNEL_VERSION
 from lily.kernel.schema_registry import SchemaRegistry
 from lily.kernel.write_path_enforcement import (
     check_write_paths,
@@ -41,6 +52,38 @@ from lily.kernel.write_path_enforcement import (
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _workspace_root_from_run_root(run_root: Path) -> Path:
+    """Derive workspace root from run_root (.iris/runs/<run_id> -> workspace)."""
+    return run_root.resolve().parent.parent.parent
+
+
+def _artifact_hashes_for_ids(
+    store: ArtifactStore, artifact_ids: list[str]
+) -> dict[str, str]:
+    """Build artifact_id -> sha256 map for IDs that exist in the store."""
+    out: dict[str, str] = {}
+    for aid in artifact_ids:
+        ref = store.get_ref(aid)
+        if ref is not None:
+            out[aid] = ref.sha256
+    return out
+
+
+def _duration_ms(started_at: str | None, finished_at: str | None) -> int | None:
+    """Compute duration in milliseconds from ISO timestamps. Returns None if either missing."""
+    if not started_at or not finished_at:
+        return None
+    from datetime import datetime
+
+    try:
+        start = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        end = datetime.fromisoformat(finished_at.replace("Z", "+00:00"))
+        delta = end - start
+        return int(delta.total_seconds() * 1000)
+    except (ValueError, TypeError):
+        return None
 
 
 def _apply_routing_action(
@@ -65,14 +108,20 @@ def _apply_routing_action(
         save_run_state_atomic(run_root, state)
         return True
     if action_type == RoutingActionType.GOTO_STEP and target_step_id:
-        rec.status = StepStatus.FAILED if rec.status != StepStatus.SUCCEEDED else StepStatus.SUCCEEDED
+        rec.status = (
+            StepStatus.FAILED
+            if rec.status != StepStatus.SUCCEEDED
+            else StepStatus.SUCCEEDED
+        )
         state.current_step_id = None
         state.forced_next_step_id = target_step_id
         state.updated_at = _now_iso()
         save_run_state_atomic(run_root, state)
         return True
     if action_type == RoutingActionType.ESCALATE:
-        rec.status = StepStatus.FAILED if rec.status != StepStatus.SUCCEEDED else rec.status
+        rec.status = (
+            StepStatus.FAILED if rec.status != StepStatus.SUCCEEDED else rec.status
+        )
         state.status = RunStatus.BLOCKED
         state.escalation_reason = reason or "escalated"
         state.escalation_step_id = step_id
@@ -98,14 +147,38 @@ def run_graph(
     graph: GraphSpec,
     *,
     safety_policy: SafetyPolicy | None = None,
+    dry_run_gates: bool = False,
 ) -> RunState:
     """
     Execute a validated DAG. Loads or creates RunState, runs steps in dependency order.
     Uses atomic writes for RunState. Supports bounded retries.
+    When dry_run_gates=True, only runs gates (no step execution); does not mutate step status.
     """
     state = load_run_state(run_root)
     if state is None:
         state = create_initial_run_state(str(run_root.name), graph)
+        # Layer 5: capture environment snapshot and store envelope before first persist
+        run_id = str(run_root.name)
+        workspace_root = _workspace_root_from_run_root(run_root)
+        store = ArtifactStore(run_root, run_id)
+        registry = SchemaRegistry()
+        register_gate_schemas(registry)
+        register_policy_schemas(registry)
+        register_observability_schemas(registry)
+        payload = capture_environment_snapshot(
+            workspace_root, kernel_version=KERNEL_VERSION
+        )
+        ref = store.put_envelope(
+            ENVIRONMENT_SNAPSHOT_SCHEMA_ID,
+            payload,
+            meta_fields={
+                "producer_id": "kernel",
+                "producer_kind": "system",
+                "inputs": [],
+            },
+            artifact_name="environment_snapshot",
+        )
+        state.environment_snapshot_ref = ref.artifact_id
         save_run_state_atomic(run_root, state)
 
     # Resume: any running step -> failed with reason interrupted
@@ -120,6 +193,29 @@ def run_graph(
 
     step_by_id = {s.step_id: s for s in graph.steps}
     topo = topological_order(graph)
+
+    if dry_run_gates:
+        # Layer 5: run gates only; do not execute steps or mutate step status.
+        run_id = str(run_root.name)
+        store = ArtifactStore(run_root, run_id)
+        registry = SchemaRegistry()
+        register_gate_schemas(registry)
+        for sid in topo:
+            step = step_by_id[sid]
+            if not step.gates:
+                continue
+            step_rec = state.step_records.get(sid)
+            for gate in step.gates:
+                execute_gate(
+                    gate,
+                    run_root,
+                    store,
+                    registry,
+                    attempt=step_rec.attempts if step_rec else 1,
+                )
+        state.updated_at = _now_iso()
+        save_run_state_atomic(run_root, state)
+        return state
 
     while True:
         eligible = []
@@ -177,7 +273,9 @@ def run_graph(
                         context = RoutingContext(
                             step_status="succeeded",
                             gate_status="failed",
-                            gate_id=failed_run_gate.gate_id if failed_run_gate else None,
+                            gate_id=failed_run_gate.gate_id
+                            if failed_run_gate
+                            else None,
                         )
                         action = RoutingEngine.evaluate(context, graph.routing_rules)
                         state.status = RunStatus.FAILED
@@ -203,6 +301,16 @@ def run_graph(
         step_id = eligible[0]
         step = step_by_id[step_id]
         rec = state.step_records[step_id]
+        run_id = str(run_root.name)
+        store = ArtifactStore(run_root, run_id)
+
+        # Layer 5: input artifact hashes from deps and step inputs
+        input_ids: list[str] = list(step.input_artifact_ids)
+        for dep in step.depends_on:
+            dep_rec = state.step_records.get(dep)
+            if dep_rec:
+                input_ids.extend(dep_rec.produced_artifact_ids)
+        rec.input_artifact_hashes = _artifact_hashes_for_ids(store, input_ids)
 
         # Mark running
         rec.status = StepStatus.RUNNING
@@ -214,28 +322,33 @@ def run_graph(
         # Tool allowlist check (Layer 4)
         policy = safety_policy or SafetyPolicy.default_policy()
         if step.executor.kind not in policy.allowed_tools:
-            run_id = str(run_root.name)
-            store = ArtifactStore(run_root, run_id)
             registry = SchemaRegistry()
             register_gate_schemas(registry)
             register_policy_schemas(registry)
-            payload = PolicyViolationPayload(
+            violation_payload = PolicyViolationPayload(
                 step_id=step_id,
                 violation_type="tool_not_allowed",
                 details=f"executor kind {step.executor.kind!r} not in allowed_tools",
                 timestamp=datetime.now(UTC),
             )
-            store.put_envelope(
+            ref = store.put_envelope(
                 POLICY_VIOLATION_SCHEMA_ID,
-                payload,
-                meta_fields={"producer_id": "kernel", "producer_kind": "system", "inputs": []},
+                violation_payload,
+                meta_fields={
+                    "producer_id": "kernel",
+                    "producer_kind": "system",
+                    "inputs": [],
+                },
                 artifact_name=f"policy_violation_{step_id}",
             )
+            rec.policy_violation_ids.append(ref.artifact_id)
             context = RoutingContext(policy_violation=True, step_id=step_id)
             action = RoutingEngine.evaluate(context, [])
             rec.status = StepStatus.FAILED
             rec.finished_at = _now_iso()
-            rec.last_error = f"Policy violation: tool {step.executor.kind!r} not in allowed_tools"
+            rec.last_error = (
+                f"Policy violation: tool {step.executor.kind!r} not in allowed_tools"
+            )
             state.current_step_id = None
             state.status = RunStatus.FAILED
             state.updated_at = _now_iso()
@@ -272,6 +385,15 @@ def run_graph(
 
         rec.finished_at = _now_iso()
         rec.log_paths = result.log_paths
+        rec.duration_ms = _duration_ms(rec.started_at, rec.finished_at)
+        rec.executor_summary = {
+            "argv": step.executor.argv,
+            "cwd": step.executor.cwd,
+            "env": step.executor.env,
+        }
+        rec.output_artifact_hashes = _artifact_hashes_for_ids(
+            store, rec.produced_artifact_ids
+        )
 
         if result.success:
             # Write path enforcement (after step)
@@ -291,18 +413,23 @@ def run_graph(
                     registry = SchemaRegistry()
                     register_gate_schemas(registry)
                     register_policy_schemas(registry)
-                    payload = PolicyViolationPayload(
+                    violation_payload = PolicyViolationPayload(
                         step_id=step_id,
                         violation_type="write_denied",
                         details=violation_details,
                         timestamp=datetime.now(UTC),
                     )
-                    store.put_envelope(
+                    ref = store.put_envelope(
                         POLICY_VIOLATION_SCHEMA_ID,
-                        payload,
-                        meta_fields={"producer_id": "kernel", "producer_kind": "system", "inputs": []},
+                        violation_payload,
+                        meta_fields={
+                            "producer_id": "kernel",
+                            "producer_kind": "system",
+                            "inputs": [],
+                        },
                         artifact_name=f"policy_violation_{step_id}",
                     )
+                    rec.policy_violation_ids.append(ref.artifact_id)
                     context = RoutingContext(policy_violation=True, step_id=step_id)
                     RoutingEngine.evaluate(context, [])
                     rec.status = StepStatus.FAILED
@@ -335,6 +462,7 @@ def run_graph(
                         attempt=rec.attempts,
                     )
                     rec.gate_results.append(artifact_id)
+                    rec.gate_result_ids.append(artifact_id)
                     if gate.required and not gate_ok:
                         required_failed = True
                         failed_gate_id = gate.gate_id

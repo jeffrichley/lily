@@ -31,8 +31,10 @@ def _downstream_step_ids(graph: GraphSpec, step_id: str) -> set[str]:
 
 def rerun_from(state: RunState, graph: GraphSpec, step_id: str) -> RunState:
     """
-    Mark target step and all downstream steps as pending; clear produced_artifact_ids.
-    Does not delete artifacts on disk. Returns a new RunState (caller should persist).
+    Mark target step and all downstream steps as pending; clear produced_artifact_ids
+    and provenance fields so they are repopulated on re-run. Preserves log_paths
+    (historical logs). Does not delete artifacts on disk. Returns a new RunState
+    (caller should persist).
     """
     to_reset = _downstream_step_ids(graph, step_id)
     for sid in to_reset:
@@ -44,7 +46,13 @@ def rerun_from(state: RunState, graph: GraphSpec, step_id: str) -> RunState:
             rec.finished_at = None
             rec.last_error = None
             rec.produced_artifact_ids = []
-            rec.log_paths = {}
+            # Preserve log_paths for audit (Layer 5)
+            rec.input_artifact_hashes = {}
+            rec.output_artifact_hashes = {}
+            rec.duration_ms = None
+            rec.executor_summary = {}
+            rec.gate_result_ids = []
+            rec.policy_violation_ids = []
     state.current_step_id = None
     state.status = RunStatus.RUNNING
     state.updated_at = datetime.now(UTC).isoformat()
