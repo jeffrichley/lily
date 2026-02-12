@@ -10,7 +10,6 @@ from lily.kernel.paths import (
 from lily.kernel.run_directory import create_run_directory
 from lily.kernel.manifest import (
     RunManifest,
-    RunStatus,
     read_manifest,
     write_manifest_atomic,
 )
@@ -32,12 +31,38 @@ from lily.kernel.graph_models import (
     ExecutorSpec,
     GraphSpec,
     RetryPolicy,
+    RoutingRule,
     StepSpec,
     TimeoutPolicy,
     validate_graph_spec,
 )
 from lily.kernel.executors.local_command import ExecResult, run_local_command
+from lily.kernel.gate_engine import execute_gate
+from lily.kernel.gate_runner import GateExecutionResult, run_local_gate
+from lily.kernel.gate_models import (
+    GATE_RESULT_SCHEMA_ID,
+    GateResultPayload,
+    GateSpec,
+    GateRunnerSpec,
+    GateStatus,
+    register_gate_schemas,
+    validate_gate_specs_unique,
+)
+from lily.kernel.policy_models import (
+    POLICY_VIOLATION_SCHEMA_ID,
+    PolicyViolationPayload,
+    SafetyPolicy,
+    register_policy_schemas,
+)
 from lily.kernel.rerun import rerun_from
+from lily.kernel.routing_models import (
+    RoutingAction,
+    RoutingActionType,
+    RoutingCondition,
+    RoutingContext,
+    RoutingEngine,
+    RoutingRule,
+)
 from lily.kernel.runner import run_graph
 from lily.kernel.run_state import (
     RunState,
@@ -82,11 +107,32 @@ __all__ = [
     "ExecutorSpec",
     "GraphSpec",
     "RetryPolicy",
+    "RoutingRule",
     "StepSpec",
     "TimeoutPolicy",
     "validate_graph_spec",
     "ExecResult",
     "run_local_command",
+    "GATE_RESULT_SCHEMA_ID",
+    "GateResultPayload",
+    "GateSpec",
+    "GateRunnerSpec",
+    "GateStatus",
+    "register_gate_schemas",
+    "validate_gate_specs_unique",
+    "POLICY_VIOLATION_SCHEMA_ID",
+    "PolicyViolationPayload",
+    "SafetyPolicy",
+    "register_policy_schemas",
+    "GateExecutionResult",
+    "run_local_gate",
+    "execute_gate",
+    "RoutingAction",
+    "RoutingActionType",
+    "RoutingCondition",
+    "RoutingContext",
+    "RoutingEngine",
+    "RoutingRule",
     "run_graph",
     "rerun_from",
     "RunState",

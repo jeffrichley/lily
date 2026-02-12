@@ -1,4 +1,4 @@
-"""Layer 2: Local command executor."""
+"""Layer 3: Local command gate runner. Executes gate commands and captures logs."""
 
 from __future__ import annotations
 
@@ -9,12 +9,12 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from lily.kernel.graph_models import ExecutorSpec
+from lily.kernel.gate_models import GateSpec
 from lily.kernel.paths import LOGS_DIR
 
 
-class ExecResult(BaseModel):
-    """Result of a single step execution."""
+class GateExecutionResult(BaseModel):
+    """Result of a single gate execution (no envelope yet)."""
 
     success: bool
     returncode: int
@@ -22,63 +22,61 @@ class ExecResult(BaseModel):
     log_paths: dict[str, str] = Field(default_factory=dict)
 
 
-def run_local_command(
-    executor_spec: ExecutorSpec,
-    *,
+def run_local_gate(
+    gate_spec: GateSpec,
     run_root: Path,
-    step_id: str,
-    attempt: int,
-    timeout_s: float | None = None,
-) -> ExecResult:
+    attempt: int = 1,
+) -> GateExecutionResult:
     """
-    Execute a local command, capturing stdout/stderr to run logs.
-    Logs at: .iris/runs/<run_id>/logs/steps/<step_id>/<attempt>/
+    Execute a gate as a local command; capture stdout/stderr to run logs.
+    Logs at: .iris/runs/<run_id>/logs/gates/<gate_id>/<attempt>/
     """
-    if executor_spec.kind != "local_command":
-        return ExecResult(
+    runner = gate_spec.runner
+    if runner.kind != "local_command":
+        return GateExecutionResult(
             success=False,
             returncode=-1,
-            error_message=f"Unsupported executor kind: {executor_spec.kind!r}",
+            error_message=f"Unsupported gate runner kind: {runner.kind!r}",
             log_paths={},
         )
 
-    log_dir = run_root / LOGS_DIR / "steps" / step_id / str(attempt)
+    log_dir = run_root / LOGS_DIR / "gates" / gate_spec.gate_id / str(attempt)
     log_dir.mkdir(parents=True, exist_ok=True)
     stdout_path = log_dir / "stdout.txt"
     stderr_path = log_dir / "stderr.txt"
-    executor_json_path = log_dir / "executor.json"
+    runner_json_path = log_dir / "runner.json"
 
-    # executor.json summary
     summary: dict[str, Any] = {
-        "argv": executor_spec.argv,
-        "cwd": executor_spec.cwd,
-        "timeout_s": timeout_s,
+        "gate_id": gate_spec.gate_id,
+        "argv": runner.argv,
+        "cwd": runner.cwd,
+        "timeout_s": runner.timeout_s,
     }
-    if executor_spec.env:
-        summary["env"] = executor_spec.env
-    executor_json_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    if runner.env:
+        summary["env"] = runner.env
+    runner_json_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     env = None
-    if executor_spec.env is not None:
+    if runner.env is not None:
         import os
 
         env = os.environ.copy()
-        env.update(executor_spec.env)
+        env.update(runner.env)
 
     cwd_path: Path | None = None
-    if executor_spec.cwd is not None:
-        cwd_path = Path(executor_spec.cwd)
+    if runner.cwd is not None:
+        cwd_path = Path(runner.cwd)
         if not cwd_path.is_absolute():
             cwd_path = run_root / cwd_path
 
     try:
         result = subprocess.run(
-            executor_spec.argv,
+            runner.argv,
             cwd=cwd_path,
             env=env,
             capture_output=True,
             text=True,
-            timeout=timeout_s,
+            timeout=runner.timeout_s,
         )
     except subprocess.TimeoutExpired as e:
         out = (
@@ -93,33 +91,33 @@ def run_local_command(
         )
         stdout_path.write_text(out, encoding="utf-8")
         stderr_path.write_text(err, encoding="utf-8")
-        return ExecResult(
+        return GateExecutionResult(
             success=False,
             returncode=-1,
             error_message="timeout",
             log_paths={
                 "stdout": str(stdout_path),
                 "stderr": str(stderr_path),
-                "executor.json": str(executor_json_path),
+                "runner.json": str(runner_json_path),
             },
         )
     except FileNotFoundError as e:
         stderr_path.write_text(str(e), encoding="utf-8")
-        return ExecResult(
+        return GateExecutionResult(
             success=False,
             returncode=-1,
             error_message=f"command not found: {e}",
             log_paths={
                 "stdout": str(stdout_path),
                 "stderr": str(stderr_path),
-                "executor.json": str(executor_json_path),
+                "runner.json": str(runner_json_path),
             },
         )
 
     stdout_path.write_text(result.stdout or "", encoding="utf-8")
     stderr_path.write_text(result.stderr or "", encoding="utf-8")
 
-    return ExecResult(
+    return GateExecutionResult(
         success=result.returncode == 0,
         returncode=result.returncode,
         error_message=None
@@ -128,6 +126,6 @@ def run_local_command(
         log_paths={
             "stdout": str(stdout_path),
             "stderr": str(stderr_path),
-            "executor.json": str(executor_json_path),
+            "runner.json": str(runner_json_path),
         },
     )

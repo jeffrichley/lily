@@ -46,6 +46,7 @@ class StepRunRecord(BaseModel):
     last_error: str | None = None
     produced_artifact_ids: list[str] = Field(default_factory=list)
     log_paths: dict[str, str] = Field(default_factory=dict)
+    gate_results: list[str] = Field(default_factory=list)
 
 
 class RunState(BaseModel):
@@ -57,6 +58,9 @@ class RunState(BaseModel):
     current_step_id: str | None = None
     step_records: dict[str, StepRunRecord] = Field(default_factory=dict)
     updated_at: str = ""
+    escalation_reason: str | None = None
+    escalation_step_id: str | None = None
+    forced_next_step_id: str | None = None  # for goto_step routing
 
     def to_file_dict(self) -> dict[str, Any]:
         """Serialize for JSON file."""

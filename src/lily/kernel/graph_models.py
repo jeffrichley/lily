@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-
 from pydantic import BaseModel, Field, model_validator
+
+from lily.kernel.gate_models import GateSpec
+from lily.kernel.routing_models import RoutingRule
 
 
 class RetryPolicy(BaseModel):
@@ -41,6 +43,7 @@ class StepSpec(BaseModel):
     executor: ExecutorSpec
     retry_policy: RetryPolicy = Field(default_factory=RetryPolicy)
     timeout_policy: TimeoutPolicy = Field(default_factory=TimeoutPolicy)
+    gates: list[GateSpec] = Field(default_factory=list)
 
 
 class GraphSpec(BaseModel):
@@ -48,6 +51,8 @@ class GraphSpec(BaseModel):
 
     graph_id: str
     steps: list[StepSpec] = Field(default_factory=list)
+    run_gates: list[GateSpec] | None = None
+    routing_rules: list[RoutingRule] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_graph(self) -> "GraphSpec":

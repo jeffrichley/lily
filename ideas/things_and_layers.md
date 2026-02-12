@@ -23,17 +23,17 @@
 
 ## Layer 3 — Gates
 
-- Gate model (inputs + runner + required/optional)
-- Gate runners (local command runner first)
-- Gate result model (pass/fail + reasons + logs)
-- Gate report persistence (logs capture + artifact refs)
+- [x] Gate model (inputs + runner + required/optional)
+- [x] Gate runners (local command runner first)
+- [x] Gate result model (pass/fail + reasons + logs)
+- [x] Gate report persistence (logs capture + artifact refs)
 
 ## Layer 4 — Routing and Policies
 
-- Routing rules model (if fail → route)
-- Retry policy enforcement (bounded)
-- Workspace policies (allowlist/denylist paths)
-- Tool allowlist policy (what executors may run)
+- [x] Routing rules model (if fail → route) — *Phase 4.6 done*
+- [x] Retry policy enforcement (bounded) — *Phase 4.6 done*
+- [x] Workspace policies (allowlist/denylist paths) — *Phase 4.5 done*
+- [x] Tool allowlist policy (what executors may run) — *Phase 4.4 done*
 
 ## Layer 5 — Observability and Reproducibility
 
@@ -101,20 +101,20 @@ end
 %% Layer 3
 %% =========================
 subgraph L3["Layer 3 - Gates"]
-L3A["Gate Model - inputs, runner, required optional"]:::red
-L3B["Gate Runners - local command runner first"]:::red
-L3C["GateResult Model - pass fail, reasons, refs"]:::red
-L3D["Gate Logs Capture - stdout stderr and files"]:::red
+L3A["Gate Model - inputs, runner, required optional"]:::green
+L3B["Gate Runners - local command runner first"]:::green
+L3C["GateResult Model - pass fail, reasons, refs"]:::green
+L3D["Gate Logs Capture - stdout stderr and files"]:::green
 end
 
 %% =========================
 %% Layer 4
 %% =========================
 subgraph L4["Layer 4 - Routing and Policies"]
-L4A["Routing Rules Model - outcome to next step"]:::red
-L4B["Retry Policy Enforcement - bounded retries"]:::red
-L4C["Workspace Policies - allow deny paths"]:::red
-L4D["Tool Allowlist Policy - executors tools permitted"]:::red
+L4A["Routing Rules Model - outcome to next step"]:::green
+L4B["Retry Policy Enforcement - bounded retries"]:::green
+L4C["Workspace Policies - allow deny paths"]:::green
+L4D["Tool Allowlist Policy - executors tools permitted"]:::green
 end
 
 %% =========================
