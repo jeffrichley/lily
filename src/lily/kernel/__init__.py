@@ -73,6 +73,20 @@ from lily.kernel.run_state import (
     load_run_state,
     save_run_state_atomic,
 )
+from lily.kernel.pack_models import (
+    GateTemplate,
+    PackDefinition,
+    SchemaRegistration,
+    StepTemplate,
+)
+from lily.kernel.pack_loader import load_pack, load_packs
+from lily.kernel.pack_registration import (
+    merge_pack_safety_policies,
+    merge_routing_rules,
+    register_pack_schemas,
+    register_pack_templates,
+)
+from lily.kernel.template_registry import TemplateRegistry
 
 __all__ = [
     "generate_run_id",
@@ -143,4 +157,15 @@ __all__ = [
     "create_initial_run_state",
     "load_run_state",
     "save_run_state_atomic",
+    "GateTemplate",
+    "PackDefinition",
+    "SchemaRegistration",
+    "StepTemplate",
+    "load_pack",
+    "load_packs",
+    "merge_pack_safety_policies",
+    "merge_routing_rules",
+    "register_pack_schemas",
+    "register_pack_templates",
+    "TemplateRegistry",
 ]

@@ -45,11 +45,12 @@
 
 ## Layer 6 — Extension Points
 
-- Plugin/Pack loader
-- Pack contribution: schemas (artifact types)
-- Pack contribution: step templates (optional)
-- Pack contribution: gate templates (optional)
-- Pack contribution: routing policies (optional)
+- [x] Plugin/Pack loader
+- [x] Pack contribution: schemas (artifact types)
+- [x] Pack contribution: step templates (optional)
+- [x] Pack contribution: gate templates (optional)
+- [x] Pack contribution: routing policies (optional)
+- [x] Pack contribution: default safety policy (optional)
 
 ```mermaid
 flowchart TD
@@ -66,7 +67,7 @@ end
 %% =========================
 %% Kernel root
 %% =========================
-KERNEL(["Kernel Runtime - Local-first"]):::red
+KERNEL(["Kernel Runtime - Local-first"]):::green
 
 %% =========================
 %% Layer 0
@@ -132,12 +133,12 @@ end
 %% Layer 6
 %% =========================
 subgraph L6["Layer 6 - Extension Points"]
-L6A["Pack Plugin Loader - discover and load"]:::red
+L6A["Pack Plugin Loader - discover and load"]:::green
 subgraph L6B["Pack Contributions"]
-L6B1["Schemas - artifact types"]:::red
-L6B2["Step Templates - optional"]:::red
-L6B3["Gate Templates - optional"]:::red
-L6B4["Routing Policies - optional"]:::red
+L6B1["Schemas - artifact types"]:::green
+L6B2["Step Templates - optional"]:::green
+L6B3["Gate Templates - optional"]:::green
+L6B4["Routing Policies - optional"]:::green
 end
 end
 
