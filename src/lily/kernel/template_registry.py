@@ -57,7 +57,9 @@ class TemplateRegistry:
             name=name,
             description=description or template.template_id,
             depends_on=depends_on if depends_on is not None else [],
-            input_artifact_ids=input_artifact_ids if input_artifact_ids is not None else [],
+            input_artifact_ids=input_artifact_ids
+            if input_artifact_ids is not None
+            else [],
             output_schema_ids=template.output_schema_ids,
             executor=template.default_executor,
             retry_policy=template.default_retry_policy,

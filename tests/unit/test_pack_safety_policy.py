@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from lily.kernel.pack_models import PackDefinition
 from lily.kernel.pack_registration import merge_pack_safety_policies
@@ -40,20 +39,38 @@ def test_policy_merge_deterministic() -> None:
     ]
     m1 = merge_pack_safety_policies(packs)
     m2 = merge_pack_safety_policies(packs)
-    assert m1 is not None and m2 is not None
-    assert m1.allowed_tools == m2.allowed_tools
-    assert set(m1.deny_write_paths) == set(m2.deny_write_paths)
+    assert m1 is not None and m2 is not None, (
+        "merge should return policy for packs with policies"
+    )
+    assert m1.allowed_tools == m2.allowed_tools, (
+        "deterministic merge: allowed_tools should match"
+    )
+    assert set(m1.deny_write_paths) == set(m2.deny_write_paths), (
+        "deterministic merge: deny_write_paths should match"
+    )
 
 
 def test_conservative_merge_enforced() -> None:
     """allowed_tools intersection, deny_write_paths union, network deny wins."""
     packs = [
-        _pack("a", allowed_tools=["local_command", "curl"], deny_write_paths=["/sys"], network_access="allow"),
-        _pack("b", allowed_tools=["local_command"], deny_write_paths=["/etc"], network_access="deny"),
+        _pack(
+            "a",
+            allowed_tools=["local_command", "curl"],
+            deny_write_paths=["/sys"],
+            network_access="allow",
+        ),
+        _pack(
+            "b",
+            allowed_tools=["local_command"],
+            deny_write_paths=["/etc"],
+            network_access="deny",
+        ),
     ]
     merged = merge_pack_safety_policies(packs)
-    assert merged is not None
-    assert set(merged.allowed_tools) == {"local_command"}
+    assert merged is not None, "packs with policies should yield merged policy"
+    assert set(merged.allowed_tools) == {"local_command"}, (
+        "allowed_tools should be intersection"
+    )
     assert set(merged.deny_write_paths) == {"/sys", "/etc"}
     assert merged.network_access == "deny"
 

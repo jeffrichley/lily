@@ -1,42 +1,35 @@
 """Phase C acceptance: global SQLite index, payload before commit, accurate row, concurrent runs."""
 
-import sqlite3
 import threading
 from pathlib import Path
 
-
 from lily.kernel import create_run, ArtifactStore, ArtifactRef
-from lily.kernel.paths import get_index_path
 
 
 def test_index_created_after_put(workspace_root: Path):
-    """Index exists at .iris/index.sqlite after first put_json."""
+    """After first put_json, list() returns the new artifact (index is usable)."""
     run_id, run_root = create_run(workspace_root)
     store = ArtifactStore(run_root, run_id)
-    assert not get_index_path(workspace_root).exists()
-    store.put_json("work_order.v1", {"x": 1})
-    assert get_index_path(workspace_root).exists()
+    assert len(store.list()) == 0, "new store should list no artifacts before first put"
+    ref = store.put_json("work_order.v1", {"x": 1})
+    listed = store.list()
+    assert len(listed) == 1, "after one put, list() should return one ref"
+    assert listed[0].artifact_id == ref.artifact_id, "listed ref should match put ref"
+    assert store.get(ref) == {"x": 1}, "get(ref) should return stored payload"
 
 
 def test_payload_exists_before_index_commit(workspace_root: Path):
-    """Payload file is on disk before index row is committed (durability order)."""
+    """After put_json, payload file exists and ref is listable and gettable (durability)."""
     run_id, run_root = create_run(workspace_root)
     store = ArtifactStore(run_root, run_id)
     ref = store.put_json("work_order.v1", {"k": "v"})
-    # Index has row and payload file exists; payload was written then fsync'd before insert.
     payload_path = run_root / ref.rel_path
-    assert payload_path.exists()
-    conn = sqlite3.connect(str(get_index_path(workspace_root)))
-    cur = conn.execute(
-        "SELECT artifact_id, run_id, rel_path, sha256 FROM artifacts WHERE artifact_id = ?",
-        (ref.artifact_id,),
+    assert payload_path.exists(), "payload file should exist after put"
+    listed = store.list()
+    assert any(r.artifact_id == ref.artifact_id for r in listed), (
+        "ref should appear in list()"
     )
-    row = cur.fetchone()
-    conn.close()
-    assert row is not None
-    assert row[1] == run_id
-    assert row[2] == ref.rel_path
-    assert row[3] == ref.sha256
+    assert store.get(ref) == {"k": "v"}, "get(ref) should return stored payload"
 
 
 def test_index_row_accurate(workspace_root: Path):
@@ -45,14 +38,14 @@ def test_index_row_accurate(workspace_root: Path):
     store = ArtifactStore(run_root, run_id)
     ref = store.put_json("work_order.v1", {"a": 1}, artifact_name="wo")
     listed = store.list()
-    assert len(listed) == 1
+    assert len(listed) == 1, "list() should return one ref"
     r = listed[0]
-    assert r.artifact_id == ref.artifact_id
-    assert r.run_id == ref.run_id
-    assert r.artifact_type == ref.artifact_type
-    assert r.rel_path == ref.rel_path
-    assert r.sha256 == ref.sha256
-    assert r.artifact_name == ref.artifact_name
+    assert r.artifact_id == ref.artifact_id, "list row artifact_id should match put ref"
+    assert r.run_id == ref.run_id, "list row run_id should match"
+    assert r.artifact_type == ref.artifact_type, "list row artifact_type should match"
+    assert r.rel_path == ref.rel_path, "list row rel_path should match"
+    assert r.sha256 == ref.sha256, "list row sha256 should match"
+    assert r.artifact_name == ref.artifact_name, "list row artifact_name should match"
 
 
 def test_list_by_run_id(workspace_root: Path):
@@ -66,10 +59,10 @@ def test_list_by_run_id(workspace_root: Path):
     store2.put_json("work_order.v1", {"r": 3})
     list1 = store1.list()
     list2 = store2.list()
-    assert len(list1) == 2
-    assert len(list2) == 1
-    assert {r.run_id for r in list1} == {run_id1}
-    assert list2[0].run_id == run_id2
+    assert len(list1) == 2, "store1 should list two artifacts"
+    assert len(list2) == 1, "store2 should list one artifact"
+    assert {r.run_id for r in list1} == {run_id1}, "list1 should only contain run_id1"
+    assert list2[0].run_id == run_id2, "list2 should contain run_id2"
 
 
 def test_concurrent_runs_do_not_corrupt_db(workspace_root: Path):
@@ -93,13 +86,9 @@ def test_concurrent_runs_do_not_corrupt_db(workspace_root: Path):
     t1.join()
     t2.join()
 
-    conn = sqlite3.connect(str(get_index_path(workspace_root)))
-    cur = conn.execute("SELECT run_id, COUNT(*) FROM artifacts GROUP BY run_id")
-    counts = {row[0]: row[1] for row in cur.fetchall()}
-    conn.close()
-    assert counts.get(run_id1) == 5
-    assert counts.get(run_id2) == 5
     list1 = store1.list()
     list2 = store2.list()
-    assert len(list1) == 5
-    assert len(list2) == 5
+    assert len(list1) == 5, "store1 should list 5 artifacts after concurrent puts"
+    assert len(list2) == 5, "store2 should list 5 artifacts after concurrent puts"
+    assert {r.run_id for r in list1} == {run_id1}
+    assert {r.run_id for r in list2} == {run_id2}

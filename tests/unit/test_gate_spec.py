@@ -42,42 +42,40 @@ def test_valid_gate_spec_constructs():
     assert minimal.required is True
 
 
-def test_missing_fields_fail():
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"gate_id": "g1"},  # missing name, runner
+        {"name": "n", "runner": _local_runner()},  # missing gate_id
+        {"gate_id": "g1", "name": "n"},  # missing runner
+    ],
+    ids=["missing_name_and_runner", "missing_gate_id", "missing_runner"],
+)
+def test_missing_fields_fail(kwargs):
     """Missing required fields raise ValidationError."""
     with pytest.raises(ValidationError):
-        GateSpec(
-            gate_id="g1",
-            # missing name, runner
-        )
-    with pytest.raises(ValidationError):
-        GateSpec(
-            name="n",
-            runner=_local_runner(),
-            # missing gate_id
-        )
-    with pytest.raises(ValidationError):
-        GateSpec(
-            gate_id="g1",
-            name="n",
-            # missing runner
-        )
+        GateSpec(**kwargs)
 
 
-def test_invalid_runner_kind_fails():
-    """Runner kind other than local_command raises ValueError (model validator)."""
+@pytest.mark.parametrize(
+    "case",
+    ["gate_spec_invalid_runner", "runner_spec_invalid_kind"],
+    ids=["gate_spec_invalid_runner", "runner_spec_invalid_kind"],
+)
+def test_invalid_runner_kind_fails(case):
+    """Runner kind other than local_command raises ValidationError."""
     with pytest.raises(ValidationError):
-        GateSpec(
-            gate_id="g1",
-            name="n",
-            runner=GateRunnerSpec(
-                kind="local_command",
-                argv=["true"],
-            ).model_copy(update={"kind": "llm_judge"}),
-        )
-    # GateRunnerSpec itself only allows Literal["local_command"], so constructing
-    # with kind="llm_judge" would fail at GateRunnerSpec level
-    with pytest.raises(ValidationError):
-        GateRunnerSpec(kind="llm_judge", argv=[])  # type: ignore[arg-type]
+        if case == "gate_spec_invalid_runner":
+            GateSpec(
+                gate_id="g1",
+                name="n",
+                runner=GateRunnerSpec(
+                    kind="local_command",
+                    argv=["true"],
+                ).model_copy(update={"kind": "llm_judge"}),
+            )
+        else:
+            GateRunnerSpec(kind="llm_judge", argv=[])  # type: ignore[arg-type]
 
 
 def test_validate_gate_specs_unique():

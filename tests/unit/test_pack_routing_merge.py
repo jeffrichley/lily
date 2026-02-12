@@ -46,7 +46,11 @@ def test_deterministic_order_preserved() -> None:
     b = [_rule("third")]
     m1 = merge_routing_rules([a, b])
     m2 = merge_routing_rules([a, b])
-    assert [r.rule_id for r in m1] == [r.rule_id for r in m2] == ["first", "second", "third"]
+    assert (
+        [r.rule_id for r in m1]
+        == [r.rule_id for r in m2]
+        == ["first", "second", "third"]
+    )
 
 
 def test_empty_list_returns_empty() -> None:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel
 
-from lily.kernel.gate_models import GateRunnerSpec, GateSpec
+from lily.kernel.gate_models import GateRunnerSpec
 from lily.kernel.graph_models import ExecutorSpec
 from lily.kernel.pack_models import (
     GateTemplate,
@@ -14,7 +14,12 @@ from lily.kernel.pack_models import (
     StepTemplate,
 )
 from lily.kernel.policy_models import SafetyPolicy
-from lily.kernel.routing_models import RoutingAction, RoutingActionType, RoutingCondition, RoutingRule
+from lily.kernel.routing_models import (
+    RoutingAction,
+    RoutingActionType,
+    RoutingCondition,
+    RoutingRule,
+)
 
 
 class _DummyPayload(BaseModel):
@@ -70,7 +75,9 @@ def test_valid_pack_definition_with_contributions_passes() -> None:
                 action=RoutingAction(type=RoutingActionType.RETRY_STEP),
             ),
         ],
-        default_safety_policy=SafetyPolicy(allowed_tools=["local_command"], network_access="deny"),
+        default_safety_policy=SafetyPolicy(
+            allowed_tools=["local_command"], network_access="deny"
+        ),
     )
     assert len(pack.schemas) == 1
     assert pack.schemas[0].schema_id == "coding.code_patch.v1"
@@ -84,32 +91,36 @@ def test_valid_pack_definition_with_contributions_passes() -> None:
     assert pack.default_safety_policy.network_access == "deny"
 
 
-def test_pack_definition_missing_name_fails() -> None:
+@pytest.mark.parametrize("invalid_name", ["", "   "], ids=["empty", "whitespace_only"])
+def test_pack_definition_missing_name_fails(invalid_name: str) -> None:
     """Empty or missing pack name fails validation."""
     with pytest.raises(ValueError, match="Pack name is required"):
         PackDefinition(
-            name="",
-            version="1.0.0",
-            minimum_kernel_version="0.1.0",
-        )
-    with pytest.raises(ValueError, match="Pack name is required"):
-        PackDefinition(
-            name="   ",
+            name=invalid_name,
             version="1.0.0",
             minimum_kernel_version="0.1.0",
         )
 
 
-def test_schema_registration_namespacing_enforced() -> None:
+@pytest.mark.parametrize("invalid_schema_id", ["no_dot", ""], ids=["no_dot", "empty"])
+def test_schema_registration_namespacing_enforced(invalid_schema_id: str) -> None:
     """Schema IDs must be namespaced (contain a dot)."""
     SchemaRegistration(schema_id="domain.artifact.v1", model=_DummyPayload)
     with pytest.raises(ValueError, match="namespaced"):
-        SchemaRegistration(schema_id="no_dot", model=_DummyPayload)
-    with pytest.raises(ValueError, match="namespaced"):
-        SchemaRegistration(schema_id="", model=_DummyPayload)
+        SchemaRegistration(schema_id=invalid_schema_id, model=_DummyPayload)
 
 
-def test_step_template_namespacing_enforced() -> None:
+@pytest.mark.parametrize(
+    "template_id,output_schema_ids",
+    [
+        ("no_dot", []),
+        ("domain.step.v1", ["bad"]),
+    ],
+    ids=["template_id_no_dot", "output_schema_id_not_namespaced"],
+)
+def test_step_template_namespacing_enforced(
+    template_id: str, output_schema_ids: list[str]
+) -> None:
     """Step template_id and schema IDs in lists must be namespaced."""
     StepTemplate(
         template_id="domain.step.v1",
@@ -117,12 +128,7 @@ def test_step_template_namespacing_enforced() -> None:
         output_schema_ids=["domain.out.v1"],
     )
     with pytest.raises(ValueError, match="namespaced"):
-        StepTemplate(template_id="no_dot", output_schema_ids=[])
-    with pytest.raises(ValueError, match="namespaced"):
-        StepTemplate(
-            template_id="domain.step.v1",
-            output_schema_ids=["bad"],
-        )
+        StepTemplate(template_id=template_id, output_schema_ids=output_schema_ids)
 
 
 def test_gate_template_namespacing_enforced() -> None:

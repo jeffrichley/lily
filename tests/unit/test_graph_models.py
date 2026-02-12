@@ -42,29 +42,25 @@ def test_missing_dependency_step_id_fails():
         )
 
 
-def test_cycle_detected():
-    """Simple 2-3 node cycle must be detected."""
+@pytest.mark.parametrize(
+    "steps",
+    [
+        [
+            _make_step("a", depends_on=["c"]),
+            _make_step("b", depends_on=["a"]),
+            _make_step("c", depends_on=["b"]),
+        ],
+        [
+            _make_step("a", depends_on=["b"]),
+            _make_step("b", depends_on=["a"]),
+        ],
+    ],
+    ids=["three_node_cycle", "two_node_cycle"],
+)
+def test_cycle_detected(steps):
+    """Cycles in step dependencies must be detected."""
     with pytest.raises(ValueError, match="Cycle detected"):
-        GraphSpec(
-            graph_id="g1",
-            steps=[
-                _make_step("a", depends_on=["c"]),
-                _make_step("b", depends_on=["a"]),
-                _make_step("c", depends_on=["b"]),
-            ],
-        )
-
-
-def test_cycle_detected_two_node():
-    """Two-node cycle a -> b -> a."""
-    with pytest.raises(ValueError, match="Cycle detected"):
-        GraphSpec(
-            graph_id="g1",
-            steps=[
-                _make_step("a", depends_on=["b"]),
-                _make_step("b", depends_on=["a"]),
-            ],
-        )
+        GraphSpec(graph_id="g1", steps=steps)
 
 
 def test_valid_dag_passes():

@@ -26,8 +26,12 @@ def test_allowed_tool_executes(workspace_root: Path):
         ],
     )
     state = run_graph(run_root, graph, safety_policy=policy)
-    assert state.status == RunStatus.SUCCEEDED
-    assert state.step_records["a"].status == StepStatus.SUCCEEDED
+    assert state.status == RunStatus.SUCCEEDED, (
+        "allowed tool should allow run to succeed"
+    )
+    assert state.step_records["a"].status == StepStatus.SUCCEEDED, (
+        "step with allowed executor should succeed"
+    )
 
 
 def test_disallowed_tool_triggers_policy_violation(workspace_root: Path):
@@ -48,10 +52,16 @@ def test_disallowed_tool_triggers_policy_violation(workspace_root: Path):
         ],
     )
     state = run_graph(run_root, graph, safety_policy=policy)
-    assert state.status == RunStatus.FAILED
-    assert state.step_records["a"].status == StepStatus.FAILED
-    assert "Policy violation" in (state.step_records["a"].last_error or "")
-    assert "not in allowed_tools" in (state.step_records["a"].last_error or "")
+    assert state.status == RunStatus.FAILED, "disallowed tool should fail run"
+    assert state.step_records["a"].status == StepStatus.FAILED, (
+        "step with disallowed executor should fail"
+    )
+    assert "Policy violation" in (state.step_records["a"].last_error or ""), (
+        "last_error should mention policy violation"
+    )
+    assert "not in allowed_tools" in (state.step_records["a"].last_error or ""), (
+        "last_error should mention allowed_tools"
+    )
 
 
 def test_policy_violation_envelope_stored(workspace_root: Path):
@@ -72,12 +82,12 @@ def test_policy_violation_envelope_stored(workspace_root: Path):
         ],
     )
     state = run_graph(run_root, graph, safety_policy=policy)
-    assert state.status == RunStatus.FAILED
+    assert state.status == RunStatus.FAILED, "disallowed tool should fail run"
 
     store = ArtifactStore(run_root, run_id)
     refs = store.list(run_id=run_id)
     policy_refs = [r for r in refs if r.artifact_type == POLICY_VIOLATION_SCHEMA_ID]
-    assert len(policy_refs) == 1
+    assert len(policy_refs) == 1, "one policy_violation.v1 envelope should be stored"
     envelope = store.get_envelope(policy_refs[0])
     assert envelope.meta.schema_id == POLICY_VIOLATION_SCHEMA_ID
     assert envelope.payload["step_id"] == "a"
@@ -102,5 +112,9 @@ def test_default_policy_allows_local_command(workspace_root: Path):
         ],
     )
     state = run_graph(run_root, graph)
-    assert state.status == RunStatus.SUCCEEDED
-    assert state.step_records["a"].status == StepStatus.SUCCEEDED
+    assert state.status == RunStatus.SUCCEEDED, (
+        "default policy should allow local_command"
+    )
+    assert state.step_records["a"].status == StepStatus.SUCCEEDED, (
+        "step should succeed with default policy"
+    )

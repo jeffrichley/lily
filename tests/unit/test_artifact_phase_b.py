@@ -21,14 +21,17 @@ def test_put_get_json_artifact(workspace_root: Path):
     assert loaded == payload
 
 
-def test_cannot_escape_run_root(workspace_root: Path):
+@pytest.mark.parametrize(
+    "rel_path",
+    ["../../../etc/passwd", ".."],
+    ids=["path_traversal", "parent_of_run_root"],
+)
+def test_cannot_escape_run_root(workspace_root: Path, rel_path: str):
     """Path confinement: resolving a path that escapes run root raises."""
     run_id, run_root = create_run(workspace_root)
     run_root = run_root.resolve()
     with pytest.raises(ValueError, match="escapes run root"):
-        resolve_artifact_path(run_root, "../../../etc/passwd")
-    with pytest.raises(ValueError, match="escapes run root"):
-        resolve_artifact_path(run_root, "..")  # parent of run root escapes
+        resolve_artifact_path(run_root, rel_path)
 
 
 def test_get_rejects_wrong_run_id(workspace_root: Path):

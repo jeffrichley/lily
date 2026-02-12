@@ -40,9 +40,13 @@ def test_step_succeeds_and_gates_pass_run_continues(tmp_path: Path):
     run_root = _run_root(tmp_path, "run-1")
     state = run_graph(run_root, graph)
 
-    assert state.status == RunStatus.SUCCEEDED
-    assert state.step_records["a"].status == StepStatus.SUCCEEDED
-    assert len(state.step_records["a"].gate_results) == 1
+    assert state.status == RunStatus.SUCCEEDED, "run with passing gate should succeed"
+    assert state.step_records["a"].status == StepStatus.SUCCEEDED, (
+        "step a should succeed"
+    )
+    assert len(state.step_records["a"].gate_results) == 1, (
+        "one gate should produce one gate_result"
+    )
 
 
 def test_required_gate_fails_run_fails(tmp_path: Path):
@@ -72,10 +76,16 @@ def test_required_gate_fails_run_fails(tmp_path: Path):
     run_root = _run_root(tmp_path, "run-2")
     state = run_graph(run_root, graph)
 
-    assert state.status == RunStatus.FAILED
-    assert state.step_records["a"].status == StepStatus.FAILED
-    assert "gate failed" in (state.step_records["a"].last_error or "")
-    assert len(state.step_records["a"].gate_results) == 1
+    assert state.status == RunStatus.FAILED, "required gate failure should fail run"
+    assert state.step_records["a"].status == StepStatus.FAILED, (
+        "step with failing required gate should be FAILED"
+    )
+    assert "gate failed" in (state.step_records["a"].last_error or ""), (
+        "last_error should mention gate failed"
+    )
+    assert len(state.step_records["a"].gate_results) == 1, (
+        "gate result should still be recorded"
+    )
 
 
 def test_non_required_gate_fails_run_continues(tmp_path: Path):
@@ -105,9 +115,15 @@ def test_non_required_gate_fails_run_continues(tmp_path: Path):
     run_root = _run_root(tmp_path, "run-3")
     state = run_graph(run_root, graph)
 
-    assert state.status == RunStatus.SUCCEEDED
-    assert state.step_records["a"].status == StepStatus.SUCCEEDED
-    assert len(state.step_records["a"].gate_results) == 1
+    assert state.status == RunStatus.SUCCEEDED, (
+        "non-required gate failure should not fail run"
+    )
+    assert state.step_records["a"].status == StepStatus.SUCCEEDED, (
+        "step should succeed despite optional gate failure"
+    )
+    assert len(state.step_records["a"].gate_results) == 1, (
+        "optional gate result should be recorded"
+    )
 
 
 def test_gate_results_recorded_in_run_state(tmp_path: Path):
@@ -138,7 +154,9 @@ def test_gate_results_recorded_in_run_state(tmp_path: Path):
     run_root = _run_root(tmp_path, "run-4")
     state = run_graph(run_root, graph)
 
-    assert state.status == RunStatus.SUCCEEDED
+    assert state.status == RunStatus.SUCCEEDED, "run with two gates should succeed"
     rec = state.step_records["a"]
-    assert len(rec.gate_results) == 2
-    assert all(len(aid) > 0 for aid in rec.gate_results)
+    assert len(rec.gate_results) == 2, "two gates should produce two gate_result ids"
+    assert all(len(aid) > 0 for aid in rec.gate_results), (
+        "gate_result ids should be non-empty"
+    )

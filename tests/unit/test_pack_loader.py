@@ -6,10 +6,10 @@ import pytest
 
 from lily.kernel.pack_loader import load_pack, load_packs
 
-_FIXTURE_MODULE = "unit.pack_fixtures.sample_pack_for_loader"
-_OLD_KERNEL_MODULE = "unit.pack_fixtures.sample_pack_old_kernel"
-_NO_EXPORT_MODULE = "unit.pack_fixtures.sample_pack_no_export"
-_WRONG_TYPE_MODULE = "unit.pack_fixtures.sample_pack_wrong_type"
+_FIXTURE_MODULE = "tests.unit.pack_fixtures.sample_pack_for_loader"
+_OLD_KERNEL_MODULE = "tests.unit.pack_fixtures.sample_pack_old_kernel"
+_NO_EXPORT_MODULE = "tests.unit.pack_fixtures.sample_pack_no_export"
+_WRONG_TYPE_MODULE = "tests.unit.pack_fixtures.sample_pack_wrong_type"
 
 
 def test_valid_pack_loads() -> None:
@@ -27,25 +27,22 @@ def test_load_packs_multiple() -> None:
     assert packs[0].name == packs[1].name == "sample_pack"
 
 
-def test_missing_pack_definition_fails() -> None:
-    """Module without PACK_DEFINITION raises ValueError."""
-    with pytest.raises(ValueError, match="no PACK_DEFINITION export"):
-        load_pack(_NO_EXPORT_MODULE)
-
-
-def test_version_mismatch_fails() -> None:
-    """Pack requiring newer kernel than current raises ValueError."""
-    with pytest.raises(ValueError, match="requires minimum_kernel_version.*99\\.0\\.0"):
-        load_pack(_OLD_KERNEL_MODULE)
-
-
-def test_invalid_structure_fails() -> None:
-    """PACK_DEFINITION that is not a PackDefinition instance raises ValueError."""
-    with pytest.raises(ValueError, match="must be a PackDefinition instance"):
-        load_pack(_WRONG_TYPE_MODULE)
-
-
-def test_nonexistent_module_fails() -> None:
-    """Import of non-existent module raises ValueError (wrapping ImportError)."""
-    with pytest.raises(ValueError, match="Failed to import pack module"):
-        load_pack("nonexistent.module.path.that.does.not.exist")
+@pytest.mark.parametrize(
+    "module_path,match",
+    [
+        (_NO_EXPORT_MODULE, "no PACK_DEFINITION export"),
+        (_OLD_KERNEL_MODULE, r"requires minimum_kernel_version.*99\.0\.0"),
+        (_WRONG_TYPE_MODULE, "must be a PackDefinition instance"),
+        ("nonexistent.module.path.that.does.not.exist", "Failed to import pack module"),
+    ],
+    ids=[
+        "missing_pack_definition",
+        "version_mismatch",
+        "invalid_structure",
+        "nonexistent_module",
+    ],
+)
+def test_load_pack_fails(module_path: str, match: str) -> None:
+    """load_pack raises ValueError with expected message for invalid or missing modules."""
+    with pytest.raises(ValueError, match=match):
+        load_pack(module_path)

@@ -101,7 +101,11 @@ def test_run_state_references_snapshot(tmp_path: Path):
         ],
     )
     state = run_graph(run_root, graph)
-    assert state.environment_snapshot_ref is not None
+    assert state.environment_snapshot_ref is not None, (
+        "run_graph should set environment_snapshot_ref"
+    )
     loaded = load_run_state(run_root)
-    assert loaded is not None
-    assert loaded.environment_snapshot_ref == state.environment_snapshot_ref
+    assert loaded is not None, "run state should persist"
+    assert loaded.environment_snapshot_ref == state.environment_snapshot_ref, (
+        "persisted ref should match"
+    )

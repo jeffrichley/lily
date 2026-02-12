@@ -34,14 +34,17 @@ def test_validate_returns_typed_instance():
     assert instance.echo == "hi"
 
 
-def test_duplicate_registration_raises():
+@pytest.mark.parametrize(
+    "model_to_register",
+    [EchoPayload, EchoPayloadV2],
+    ids=["same_class", "different_class"],
+)
+def test_duplicate_registration_raises(model_to_register):
     """Duplicate registration raises unless override=True."""
     reg = SchemaRegistry()
     reg.register("echo_payload.v1", EchoPayload)
     with pytest.raises(ValueError, match="already registered"):
-        reg.register("echo_payload.v1", EchoPayload)
-    with pytest.raises(ValueError, match="already registered"):
-        reg.register("echo_payload.v1", EchoPayloadV2)
+        reg.register("echo_payload.v1", model_to_register)
 
 
 def test_override_replaces_registration():
@@ -68,16 +71,21 @@ def test_validate_unknown_schema_raises():
         reg.validate("unknown.v1", {})
 
 
-def test_validate_invalid_payload_raises():
+@pytest.mark.parametrize(
+    "invalid_payload,description",
+    [
+        ({"wrong": "shape"}, "wrong keys"),
+        ("not a dict", "not a dict"),
+        ({"echo": 123}, "wrong type for echo"),
+    ],
+    ids=["wrong_keys", "not_a_dict", "wrong_type_for_echo"],
+)
+def test_validate_invalid_payload_raises(invalid_payload, description):
     """validate() with wrong shape raises Pydantic ValidationError (clear validation errors)."""
     reg = SchemaRegistry()
     reg.register("echo_payload.v1", EchoPayload)
     with pytest.raises(ValidationError):
-        reg.validate("echo_payload.v1", {"wrong": "shape"})
-    with pytest.raises(ValidationError):
-        reg.validate("echo_payload.v1", "not a dict")
-    with pytest.raises(ValidationError):
-        reg.validate("echo_payload.v1", {"echo": 123})  # wrong type for echo
+        reg.validate("echo_payload.v1", invalid_payload)
 
 
 def test_registry_stores_model_class_only_no_per_validation_state():

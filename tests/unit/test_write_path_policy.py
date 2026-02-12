@@ -36,8 +36,10 @@ def test_writing_to_allowed_path_passes(workspace_root: Path):
         ],
     )
     state = run_graph(run_root, graph, safety_policy=policy)
-    assert state.status == RunStatus.SUCCEEDED
-    assert state.step_records["a"].status == StepStatus.SUCCEEDED
+    assert state.status == RunStatus.SUCCEEDED, "writing to allowed path should succeed"
+    assert state.step_records["a"].status == StepStatus.SUCCEEDED, (
+        "step writing to allowed path should succeed"
+    )
 
 
 def test_writing_to_denied_path_triggers_violation(workspace_root: Path):
@@ -68,10 +70,16 @@ def test_writing_to_denied_path_triggers_violation(workspace_root: Path):
         ],
     )
     state = run_graph(run_root, graph, safety_policy=policy)
-    assert state.status == RunStatus.FAILED
-    assert state.step_records["a"].status == StepStatus.FAILED
-    assert "Policy violation" in (state.step_records["a"].last_error or "")
-    assert "denied" in (state.step_records["a"].last_error or "")
+    assert state.status == RunStatus.FAILED, "writing to denied path should fail run"
+    assert state.step_records["a"].status == StepStatus.FAILED, (
+        "step writing to denied path should fail"
+    )
+    assert "Policy violation" in (state.step_records["a"].last_error or ""), (
+        "last_error should mention policy violation"
+    )
+    assert "denied" in (state.step_records["a"].last_error or ""), (
+        "last_error should mention denied"
+    )
 
 
 def test_policy_violation_envelope_stored_on_write_denied(workspace_root: Path):
@@ -102,12 +110,14 @@ def test_policy_violation_envelope_stored_on_write_denied(workspace_root: Path):
         ],
     )
     state = run_graph(run_root, graph, safety_policy=policy)
-    assert state.status == RunStatus.FAILED
+    assert state.status == RunStatus.FAILED, "write to denied path should fail run"
 
     store = ArtifactStore(run_root, run_id)
     refs = store.list(run_id=run_id)
     policy_refs = [r for r in refs if r.artifact_type == POLICY_VIOLATION_SCHEMA_ID]
-    assert len(policy_refs) == 1
+    assert len(policy_refs) == 1, (
+        "one policy_violation.v1 envelope should be stored on write_denied"
+    )
     envelope = store.get_envelope(policy_refs[0])
     assert envelope.payload["violation_type"] == "write_denied"
     assert "denied" in envelope.payload["details"]

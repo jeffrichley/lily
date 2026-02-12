@@ -6,7 +6,7 @@ from lily.kernel import create_run, run_graph
 from lily.kernel.artifact_store import ArtifactStore
 from lily.kernel.graph_models import ExecutorSpec, GraphSpec, StepSpec
 from lily.kernel.gate_models import GateRunnerSpec, GateSpec
-from lily.kernel.run_state import load_run_state
+from lily.kernel.run_state import load_run_state, StepStatus
 
 
 def test_gates_execute(tmp_path: Path):
@@ -37,7 +37,9 @@ def test_gates_execute(tmp_path: Path):
     run_graph(run_root, graph, dry_run_gates=True)
     store = ArtifactStore(run_root, run_id)
     listed = store.list(artifact_type="gate_result.v1")
-    assert len(listed) >= 1
+    assert len(listed) >= 1, (
+        "dry_run_gates=True should produce at least one gate_result.v1 artifact"
+    )
 
 
 def test_step_status_unchanged(tmp_path: Path):
@@ -66,7 +68,9 @@ def test_step_status_unchanged(tmp_path: Path):
         ],
     )
     state = run_graph(run_root, graph, dry_run_gates=True)
-    assert state.step_records["a"].status == "pending"
+    assert state.step_records["a"].status == StepStatus.PENDING, (
+        "dry_run_gates must not change step status"
+    )
 
 
 def test_gate_results_stored(tmp_path: Path):
@@ -97,7 +101,9 @@ def test_gate_results_stored(tmp_path: Path):
     run_graph(run_root, graph, dry_run_gates=True)
     store = ArtifactStore(run_root, run_id)
     refs = [r for r in store.list() if r.artifact_type == "gate_result.v1"]
-    assert any(r.artifact_name and "g_dry" in r.artifact_name for r in refs)
+    assert any(r.artifact_name and "g_dry" in r.artifact_name for r in refs), (
+        "gate_result.v1 ref for gate g_dry should be stored"
+    )
 
 
 def test_no_step_execution_logs_created(tmp_path: Path):
@@ -129,5 +135,5 @@ def test_no_step_execution_logs_created(tmp_path: Path):
     state = load_run_state(run_root)
     rec = state.step_records["a"]
     # Step was never run, so no step execution log_paths
-    assert rec.log_paths == {}
-    assert rec.produced_artifact_ids == []
+    assert rec.log_paths == {}, "dry_run should not create step execution logs"
+    assert rec.produced_artifact_ids == [], "dry_run should not produce step artifacts"

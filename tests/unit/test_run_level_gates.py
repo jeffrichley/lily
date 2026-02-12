@@ -43,8 +43,12 @@ def test_run_level_gate_passes_run_succeeded(tmp_path: Path):
     run_root = _run_root(tmp_path, "run-1")
     state = run_graph(run_root, graph)
 
-    assert state.status == RunStatus.SUCCEEDED
-    assert state.step_records["a"].status == StepStatus.SUCCEEDED
+    assert state.status == RunStatus.SUCCEEDED, (
+        "run-level gate pass should yield run succeeded"
+    )
+    assert state.step_records["a"].status == StepStatus.SUCCEEDED, (
+        "step a should succeed"
+    )
 
 
 def test_required_run_level_gate_fails_run_failed(tmp_path: Path):
@@ -75,5 +79,9 @@ def test_required_run_level_gate_fails_run_failed(tmp_path: Path):
     run_root = _run_root(tmp_path, "run-2")
     state = run_graph(run_root, graph)
 
-    assert state.status == RunStatus.FAILED
-    assert state.step_records["a"].status == StepStatus.SUCCEEDED
+    assert state.status == RunStatus.FAILED, (
+        "required run-level gate failure should fail run"
+    )
+    assert state.step_records["a"].status == StepStatus.SUCCEEDED, (
+        "steps should still succeed before run gate"
+    )

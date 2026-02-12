@@ -46,26 +46,26 @@ def test_payload_validates_correctly():
     assert payload2.metrics == {"duration_s": 0.5}
 
 
-def test_missing_required_fields_fail():
+@pytest.mark.parametrize(
+    "keys_to_include",
+    [
+        ("gate_id", "status"),  # missing timestamp
+        ("gate_id", "timestamp"),  # missing status
+        ("status", "timestamp"),  # missing gate_id
+    ],
+    ids=["missing_timestamp", "missing_status", "missing_gate_id"],
+)
+def test_missing_required_fields_fail(keys_to_include):
     """Missing required fields raise ValidationError."""
+    ts = datetime.now(UTC)
+    base = {
+        "gate_id": "g1",
+        "status": GateStatus.PASSED,
+        "timestamp": ts,
+    }
+    kwargs = {k: base[k] for k in keys_to_include}
     with pytest.raises(ValidationError):
-        GateResultPayload(
-            gate_id="g1",
-            status=GateStatus.PASSED,
-            # missing timestamp
-        )
-    with pytest.raises(ValidationError):
-        GateResultPayload(
-            gate_id="g1",
-            timestamp=datetime.now(UTC),
-            # missing status
-        )
-    with pytest.raises(ValidationError):
-        GateResultPayload(
-            status=GateStatus.PASSED,
-            timestamp=datetime.now(UTC),
-            # missing gate_id
-        )
+        GateResultPayload(**kwargs)
 
 
 def test_invalid_status_fails():
@@ -98,11 +98,17 @@ def test_schema_registry_can_validate_gate_result_v1():
     assert instance.status == GateStatus.PASSED
 
 
-def test_schema_registry_unknown_schema_raises():
+@pytest.mark.parametrize(
+    "method_name,method_args",
+    [
+        ("get", ("other.v1",)),
+        ("validate", ("other.v1", {})),
+    ],
+    ids=["get_unknown_schema", "validate_unknown_schema"],
+)
+def test_schema_registry_unknown_schema_raises(method_name, method_args):
     """get/validate with unknown schema_id raises SchemaRegistryError."""
     reg = SchemaRegistry()
     register_gate_schemas(reg)
     with pytest.raises(SchemaRegistryError, match="Unknown schema_id"):
-        reg.get("other.v1")
-    with pytest.raises(SchemaRegistryError, match="Unknown schema_id"):
-        reg.validate("other.v1", {})
+        getattr(reg, method_name)(*method_args)

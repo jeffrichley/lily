@@ -24,7 +24,7 @@ def test_envelope_meta_fields():
 
 def test_envelope_meta_rejects_invalid_producer_kind():
     """producer_kind must be one of tool, llm, human, system."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="producer_kind|Literal"):
         EnvelopeMeta(
             schema_id="x.v1",
             producer_id="",
@@ -85,7 +85,7 @@ def test_envelope_roundtrip_json_bytes():
 
 def test_envelope_meta_forbids_extra_fields():
     """EnvelopeMeta rejects extra fields (extra=forbid)."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="extra|forbid|not permitted"):
         EnvelopeMeta(
             schema_id="x.v1",
             producer_id="",
@@ -107,5 +107,5 @@ def test_envelope_pure_data_no_extra_fields():
         inputs=[],
         payload_sha256="",
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="extra|forbid|not permitted"):
         Envelope(meta=meta, payload={}, unexpected="field")  # type: ignore[call-arg]

@@ -59,9 +59,15 @@ def test_resume_marks_running_step_interrupted_and_proceeds(tmp_path: Path):
     # Run - should mark "a" interrupted (failed), no eligible steps, run completes with FAILED
     result = run_graph(run_root, graph)
 
-    assert result.step_records["a"].status == StepStatus.FAILED
-    assert result.step_records["a"].last_error == "interrupted"
-    assert result.status == RunStatus.FAILED  # a failed, b can't run, run completes
+    assert result.step_records["a"].status == StepStatus.FAILED, (
+        "interrupted running step should be marked failed"
+    )
+    assert result.step_records["a"].last_error == "interrupted", (
+        "last_error should be 'interrupted'"
+    )
+    assert result.status == RunStatus.FAILED, (
+        "a failed and b cannot run so run should be FAILED"
+    )
 
 
 def test_resume_with_succeeded_deps_then_running_proceeds(tmp_path: Path):
@@ -107,7 +113,15 @@ def test_resume_with_succeeded_deps_then_running_proceeds(tmp_path: Path):
 
     result = run_graph(run_root, graph)
 
-    assert result.step_records["a"].status == StepStatus.SUCCEEDED
-    assert result.step_records["b"].status == StepStatus.FAILED
-    assert result.step_records["b"].last_error == "interrupted"
-    assert result.status == RunStatus.FAILED
+    assert result.step_records["a"].status == StepStatus.SUCCEEDED, (
+        "upstream a should remain succeeded"
+    )
+    assert result.step_records["b"].status == StepStatus.FAILED, (
+        "interrupted running step b should be failed"
+    )
+    assert result.step_records["b"].last_error == "interrupted", (
+        "last_error should be 'interrupted'"
+    )
+    assert result.status == RunStatus.FAILED, (
+        "run should be FAILED when current step was interrupted"
+    )

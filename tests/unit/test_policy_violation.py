@@ -32,37 +32,33 @@ def test_valid_payload_passes():
     assert payload.timestamp == ts
 
 
-def test_missing_required_fields_fail():
+@pytest.mark.parametrize(
+    "keys_to_include",
+    [
+        ("step_id", "violation_type", "details"),  # missing timestamp
+        ("step_id", "violation_type", "timestamp"),  # missing details
+        ("step_id", "details", "timestamp"),  # missing violation_type
+        ("violation_type", "details", "timestamp"),  # missing step_id
+    ],
+    ids=[
+        "missing_timestamp",
+        "missing_details",
+        "missing_violation_type",
+        "missing_step_id",
+    ],
+)
+def test_missing_required_fields_fail(keys_to_include):
     """Missing required fields raise ValidationError."""
     ts = datetime.now(UTC)
+    base = {
+        "step_id": "s1",
+        "violation_type": "x",
+        "details": "x",
+        "timestamp": ts,
+    }
+    kwargs = {k: base[k] for k in keys_to_include}
     with pytest.raises(ValidationError):
-        PolicyViolationPayload(
-            step_id="s1",
-            violation_type="x",
-            details="x",
-            # missing timestamp
-        )
-    with pytest.raises(ValidationError):
-        PolicyViolationPayload(
-            step_id="s1",
-            violation_type="x",
-            timestamp=ts,
-            # missing details
-        )
-    with pytest.raises(ValidationError):
-        PolicyViolationPayload(
-            step_id="s1",
-            details="x",
-            timestamp=ts,
-            # missing violation_type
-        )
-    with pytest.raises(ValidationError):
-        PolicyViolationPayload(
-            violation_type="x",
-            details="x",
-            timestamp=ts,
-            # missing step_id
-        )
+        PolicyViolationPayload(**kwargs)
 
 
 def test_schema_registry_can_validate_policy_violation_v1():

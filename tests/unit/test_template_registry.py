@@ -78,7 +78,9 @@ def test_expansion_produces_valid_gate_spec() -> None:
     reg = TemplateRegistry()
     gate_t = GateTemplate(
         template_id="coding.lint.v1",
-        runner_spec=GateRunnerSpec(kind="local_command", argv=["ruff", "check"], timeout_s=30.0),
+        runner_spec=GateRunnerSpec(
+            kind="local_command", argv=["ruff", "check"], timeout_s=30.0
+        ),
         required=True,
     )
     reg.register_gate_template(gate_t)
@@ -112,7 +114,9 @@ def test_register_pack_templates_collision_across_packs() -> None:
         name="b",
         version="1.0.0",
         minimum_kernel_version="0.1.0",
-        step_templates=[StepTemplate(template_id="shared.step.v1", output_schema_ids=[])],
+        step_templates=[
+            StepTemplate(template_id="shared.step.v1", output_schema_ids=[])
+        ],
     )
     register_pack_templates(reg, [pack_a])
     with pytest.raises(ValueError, match="already registered"):

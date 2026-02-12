@@ -32,12 +32,12 @@ def test_successful_command_passes(tmp_path: Path):
         _gate_spec(argv=["python", "-c", "print(1)"]), run_root, attempt=1
     )
 
-    assert result.success is True
-    assert result.returncode == 0
-    assert result.error_message is None
-    assert "stdout" in result.log_paths
-    assert "stderr" in result.log_paths
-    assert "runner.json" in result.log_paths
+    assert result.success is True, "successful command should report success"
+    assert result.returncode == 0, "successful command should have returncode 0"
+    assert result.error_message is None, "success should have no error message"
+    assert "stdout" in result.log_paths, "stdout log path should be present"
+    assert "stderr" in result.log_paths, "stderr log path should be present"
+    assert "runner.json" in result.log_paths, "runner.json log path should be present"
 
 
 def test_failing_command_fails(tmp_path: Path):
@@ -52,9 +52,9 @@ def test_failing_command_fails(tmp_path: Path):
         attempt=1,
     )
 
-    assert result.success is False
-    assert result.returncode == 3
-    assert result.error_message is not None
+    assert result.success is False, "failing command should report failure"
+    assert result.returncode == 3, "exit(3) should yield returncode 3"
+    assert result.error_message is not None, "failure should have error message"
 
 
 def test_timeout_fails(tmp_path: Path):
@@ -72,9 +72,12 @@ def test_timeout_fails(tmp_path: Path):
         attempt=1,
     )
 
-    assert result.success is False
-    assert result.returncode == -1
-    assert result.error_message == "timeout"
+    assert result.success is False, "timeout should report failure"
+    assert result.returncode == -1, "timeout should use returncode -1"
+    assert result.error_message is not None, "timeout should set error message"
+    assert "timeout" in result.error_message.lower(), (
+        "error message should indicate timeout"
+    )
 
 
 def test_logs_created(tmp_path: Path):
@@ -89,10 +92,16 @@ def test_logs_created(tmp_path: Path):
         attempt=2,
     )
 
-    assert result.success is True
+    assert result.success is True, "command should succeed for log path test"
     log_dir = run_root / "logs" / "gates" / "my-gate" / "2"
-    assert log_dir.is_dir()
-    assert (log_dir / "stdout.txt").read_text().strip() == "hi"
-    assert (log_dir / "stderr.txt").exists()
-    assert (log_dir / "runner.json").exists()
-    assert "gate_id" in (log_dir / "runner.json").read_text()
+    assert log_dir.is_dir(), (
+        "log dir should exist under run_root/logs/gates/<gate_id>/<attempt>"
+    )
+    assert (log_dir / "stdout.txt").read_text().strip() == "hi", (
+        "stdout should contain command output"
+    )
+    assert (log_dir / "stderr.txt").exists(), "stderr file should exist"
+    assert (log_dir / "runner.json").exists(), "runner.json should exist"
+    assert "gate_id" in (log_dir / "runner.json").read_text(), (
+        "runner.json should include gate_id"
+    )

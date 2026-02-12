@@ -37,24 +37,29 @@ def test_canonical_json_bytes_dict_with_datetime_fails_hard():
         hash_payload({"ts": datetime.now(UTC)})
 
 
-def test_canonical_json_bytes_fails_on_unsupported_types():
+@pytest.mark.parametrize(
+    "unsupported_value",
+    [object(), {1, 2, 3}, (1, 2)],
+    ids=["object", "set", "tuple"],
+)
+def test_canonical_json_bytes_fails_on_unsupported_types(unsupported_value):
     """Raises TypeError on unsupported types."""
     with pytest.raises(TypeError, match="Unsupported type"):
-        canonical_json_bytes(object())
-    with pytest.raises(TypeError, match="Unsupported type"):
-        canonical_json_bytes({1, 2, 3})  # set
-    with pytest.raises(TypeError, match="Unsupported type"):
-        canonical_json_bytes(
-            (1, 2)
-        )  # tuple - plan says list/dict/str/int/float/bool/None + BaseModel
+        canonical_json_bytes(unsupported_value)
 
 
-def test_canonical_json_bytes_fails_on_nan():
-    """Raises on NaN (allow_nan=False)."""
-    with pytest.raises(ValueError, match="Out of range|NaN|allow_nan"):
-        canonical_json_bytes(float("nan"))
-    with pytest.raises(ValueError, match="Out of range|Infinity|allow_nan"):
-        canonical_json_bytes(float("inf"))
+@pytest.mark.parametrize(
+    "value,match",
+    [
+        (float("nan"), "Out of range|NaN|allow_nan"),
+        (float("inf"), "Out of range|Infinity|allow_nan"),
+    ],
+    ids=["nan", "inf"],
+)
+def test_canonical_json_bytes_fails_on_nan(value, match):
+    """Raises on NaN/Infinity (allow_nan=False)."""
+    with pytest.raises(ValueError, match=match):
+        canonical_json_bytes(value)
 
 
 def test_canonical_json_bytes_base_model():

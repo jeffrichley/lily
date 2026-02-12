@@ -58,9 +58,13 @@ def test_escalate_sets_run_blocked(tmp_path: Path):
         routing_rules=rules,
     )
     state = run_graph(run_root, graph)
-    assert state.status == RunStatus.BLOCKED
-    assert "gate failed" in (state.escalation_reason or "")
-    assert state.escalation_step_id == "a"
+    assert state.status == RunStatus.BLOCKED, "escalate rule should set run to BLOCKED"
+    assert "gate failed" in (state.escalation_reason or ""), (
+        "escalation_reason should mention gate failed"
+    )
+    assert state.escalation_step_id == "a", (
+        "escalation_step_id should be the step with failing gate"
+    )
 
 
 def test_abort_run_sets_run_failed(tmp_path: Path):
@@ -91,8 +95,10 @@ def test_abort_run_sets_run_failed(tmp_path: Path):
         routing_rules=rules,
     )
     state = run_graph(run_root, graph)
-    assert state.status == RunStatus.FAILED
-    assert state.step_records["bad"].status == StepStatus.FAILED
+    assert state.status == RunStatus.FAILED, "abort_run rule should set run to FAILED"
+    assert state.step_records["bad"].status == StepStatus.FAILED, (
+        "failing step should be FAILED"
+    )
 
 
 def test_retry_rule_overrides_default(tmp_path: Path):
@@ -131,8 +137,12 @@ sys.exit(1 if n < 2 else 0)
         routing_rules=rules,
     )
     state = run_graph(run_root, graph)
-    assert state.status == RunStatus.SUCCEEDED
-    assert state.step_records["flaky"].status == StepStatus.SUCCEEDED
+    assert state.status == RunStatus.SUCCEEDED, (
+        "retry rule should allow run to succeed after retries"
+    )
+    assert state.step_records["flaky"].status == StepStatus.SUCCEEDED, (
+        "flaky step should succeed after retry"
+    )
 
 
 def test_goto_step_changes_execution_order(tmp_path: Path):
@@ -184,6 +194,12 @@ def test_goto_step_changes_execution_order(tmp_path: Path):
     )
     state = run_graph(run_root, graph)
     # goto_step from a (failed) to c: c runs and succeeds
-    assert state.step_records["a"].status == StepStatus.FAILED
-    assert state.step_records["b"].status == StepStatus.PENDING
-    assert state.step_records["c"].status == StepStatus.SUCCEEDED
+    assert state.step_records["a"].status == StepStatus.FAILED, (
+        "step a should remain failed"
+    )
+    assert state.step_records["b"].status == StepStatus.PENDING, (
+        "step b should be skipped (PENDING)"
+    )
+    assert state.step_records["c"].status == StepStatus.SUCCEEDED, (
+        "goto_step target c should run and succeed"
+    )

@@ -18,3 +18,7 @@ quality:
     uv run ruff check --fix .
     uv run mypy src/lily
 
+# Generate Test Quality Audit skeleton (Step 0 of /test-quality): inventory + per-file method tables + placeholders
+test-quality-audit-init output="test_quality_audit.md":
+    uv run python scripts/generate_test_quality_audit.py -o {{output}}
+

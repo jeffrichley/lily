@@ -9,7 +9,9 @@ from lily.kernel.schema_registry import SchemaRegistry
 from lily.kernel.template_registry import TemplateRegistry
 
 
-def register_pack_schemas(registry: SchemaRegistry, packs: list[PackDefinition]) -> None:
+def register_pack_schemas(
+    registry: SchemaRegistry, packs: list[PackDefinition]
+) -> None:
     """
     Register all pack schemas into the registry.
     Never uses override; kernel schemas cannot be overridden by packs.
@@ -27,13 +29,15 @@ def register_pack_schemas(registry: SchemaRegistry, packs: list[PackDefinition])
             seen_from_packs[reg.schema_id] = pack.name
 
 
-def register_pack_templates(registry: TemplateRegistry, packs: list[PackDefinition]) -> None:
+def register_pack_templates(
+    registry: TemplateRegistry, packs: list[PackDefinition]
+) -> None:
     """Register all pack step and gate templates. Fails on template_id collision."""
     for pack in packs:
-        for t in pack.step_templates:
-            registry.register_step_template(t)
-        for t in pack.gate_templates:
-            registry.register_gate_template(t)
+        for st in pack.step_templates:
+            registry.register_step_template(st)
+        for gt in pack.gate_templates:
+            registry.register_gate_template(gt)
 
 
 def merge_routing_rules(pack_rules_list: list[list[RoutingRule]]) -> list[RoutingRule]:
@@ -63,7 +67,9 @@ def merge_pack_safety_policies(packs: list[PackDefinition]) -> SafetyPolicy | No
     - max_diff_size_bytes: minimum of set values, or None if any is None
     Returns None if no pack has a default_safety_policy.
     """
-    policies = [p.default_safety_policy for p in packs if p.default_safety_policy is not None]
+    policies = [
+        p.default_safety_policy for p in packs if p.default_safety_policy is not None
+    ]
     if not policies:
         return None
     if len(policies) == 1:
@@ -79,7 +85,9 @@ def merge_pack_safety_policies(packs: list[PackDefinition]) -> SafetyPolicy | No
     for p in policies[1:]:
         deny_write_set |= set(p.deny_write_paths)
 
-    max_diff_values = [p.max_diff_size_bytes for p in policies if p.max_diff_size_bytes is not None]
+    max_diff_values = [
+        p.max_diff_size_bytes for p in policies if p.max_diff_size_bytes is not None
+    ]
     max_diff = min(max_diff_values) if max_diff_values else None
 
     network_deny = any(p.network_access == "deny" for p in policies)
