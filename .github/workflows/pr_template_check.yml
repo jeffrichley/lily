@@ -12,13 +12,18 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      issues: write
     steps:
       - name: Validate PR body
         uses: actions/github-script@v7
         with:
           script: |
             const pr = context.payload.pull_request;
-            const body = (pr.body || '').replace(/\r\n/g, '\n');
+            // Normalize: strip BOM, collapse line endings to \n
+            let body = (pr.body || '')
+              .replace(/^\uFEFF/, '')
+              .replace(/\r\n/g, '\n')
+              .replace(/\r/g, '\n');
             const isDraft = !!pr.draft;
 
             const COMMENT_MARKER = '<!-- pr-body-template-check -->';
@@ -27,8 +32,8 @@ jobs:
               core.setFailed(msg);
             }
 
-            async function postOrUpdateComment(body) {
-              const fullBody = body + '\n\n' + COMMENT_MARKER;
+            async function postOrUpdateComment(commentBody) {
+              const fullBody = commentBody + '\n\n' + COMMENT_MARKER;
               const { data: comments } = await github.rest.issues.listComments({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -52,8 +57,14 @@ jobs:
               }
             }
 
+            // Escape regex specials in heading text so we match literally (e.g. "Breaking Change?")
+            function escapeHeading(h) {
+              return h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }
+
             function hasHeading(h) {
-              const re = new RegExp(`^#{1,6}\\s+${h}\\s*$`, 'im');
+              const escaped = escapeHeading(h.replace(/\\(.)/g, '$1'));
+              const re = new RegExp(`^#{1,6}\\s+${escaped}\\s*$`, 'im');
               return re.test(body);
             }
 
@@ -61,37 +72,41 @@ jobs:
               'Summary',
               'Verification',
               'Risk Assessment',
-              'Checklist \\(Ruthless\\)',
+              'Checklist (Ruthless)',
             ];
             const missingHeadings = requiredHeadings.filter(h => !hasHeading(h));
             if (missingHeadings.length) {
-              const display = missingHeadings.map(h => h.replace(/\\/g, ''));
-              const checklist = display.map(h => `- [ ] Add section: **${h}**`).join('\n');
+              const checklist = missingHeadings.map(h => `- [ ] Add section: **${h}**`).join('\n');
               await postOrUpdateComment(
                 '## PR body template check — missing sections\n\n' +
                 'Add these required sections to the PR description (see `.github/pull_request_template.md`):\n\n' +
                 checklist
               );
               fail(
-                'PR body is missing required sections: ' + display.join(', ') +
+                'PR body is missing required sections: ' + missingHeadings.join(', ') +
                 '\n\nFix: edit the PR description and add the missing headings from .github/pull_request_template.md'
               );
               return;
             }
 
             function sectionText(heading) {
+              const escaped = escapeHeading(heading);
+              // Lookahead: next heading (^#{1,6}) OR end of string (?![\s\S]) — not $ which matches every EOL in multiline
               const re = new RegExp(
-                `(^#{1,6}\\s+${heading}\\s*$)([\\s\\S]*?)(?=^#{1,6}\\s+|$)`,
+                `(^#{1,6}\\s+${escaped}\\s*$)([\\s\\S]*?)(?=^#{1,6}\\s+|(?![\\s\\S]))`,
                 'im'
               );
               const m = body.match(re);
               return m ? m[2].trim() : '';
             }
 
+            // Match [x] or Unicode ballot box with check (GitHub may normalize)
+            const CHECKED_BOX = /\\[x\\]|\u2611|&#x2611;/i;
             function countCheckedInSection(heading) {
               const t = sectionText(heading);
-              const matches = t.match(/^\s*-\s*\[x\]\s+/gim);
-              return matches ? matches.length : 0;
+              if (!t) return 0;
+              const lines = t.split('\n');
+              return lines.filter(line => /^\s*-\s*/.test(line) && CHECKED_BOX.test(line)).length;
             }
 
             const problems = [];
@@ -99,7 +114,7 @@ jobs:
             // Require at least one checkbox checked in each "answered" section
             const riskChecked = countCheckedInSection('Risk Level');
             const perfChecked = countCheckedInSection('Perf Impact');
-            const breakingChecked = countCheckedInSection('Breaking Change\\?');
+            const breakingChecked = countCheckedInSection('Breaking Change?');
             const schemaChecked = countCheckedInSection('Config / Schema Changes');
 
             if (riskChecked < 1) problems.push('Risk Level: check one of Low / Medium / High.');
@@ -107,17 +122,19 @@ jobs:
             if (breakingChecked < 1) problems.push('Breaking Change?: check Yes or No.');
             if (schemaChecked < 1) problems.push('Config / Schema Changes: check None or Yes.');
 
-            // Verification: must mention gates; non-draft must have them checked
+            // Verification: must mention gates; non-draft must have them checked (under ## Required Gates)
             const verification = sectionText('Verification');
-            const hasCleanup = /\/cleanup/.test(verification);
-            const hasCoverage = /\/coverage/.test(verification);
+            const requiredGates = sectionText('Required Gates');
+            const hasCleanup = /\/cleanup/.test(verification) || /\/cleanup/.test(requiredGates);
+            const hasCoverage = /\/coverage/.test(verification) || /\/coverage/.test(requiredGates);
             if (!hasCleanup) problems.push('Verification must mention /cleanup (quality + tests).');
             if (!hasCoverage) problems.push('Verification must mention /coverage (coverage threshold).');
             if (!isDraft) {
-              const cleanupChecked = /-\s*\[x\][^\n]*\/cleanup/i.test(verification);
-              const coverageChecked = /-\s*\[x\][^\n]*\/coverage/i.test(verification);
-              if (!cleanupChecked) problems.push('Non-draft PRs: check the /cleanup gate in Required Gates.');
-              if (!coverageChecked) problems.push('Non-draft PRs: check the /coverage gate in Required Gates.');
+              const gatesText = requiredGates || verification;
+              const hasCheckedLineWith = (text) => gatesText.split('\n').some(line =>
+                /^\s*-\s*/.test(line) && CHECKED_BOX.test(line) && line.includes(text));
+              if (!hasCheckedLineWith('/cleanup')) problems.push('Non-draft PRs: check the /cleanup gate in Required Gates.');
+              if (!hasCheckedLineWith('/coverage')) problems.push('Non-draft PRs: check the /coverage gate in Required Gates.');
             }
 
             // Minimal content: Summary not empty, Tests and Failure Modes answered
