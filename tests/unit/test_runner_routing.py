@@ -23,9 +23,9 @@ def _run_root(tmp_path: Path, name: str) -> Path:
     return r
 
 
-def test_escalate_sets_run_blocked(tmp_path: Path):
+def test_escalate_sets_run_blocked(tmp_path: Path) -> None:
     """Routing rule with escalate sets run status to blocked."""
-    run_id, run_root = create_run(tmp_path)
+    _run_id, run_root = create_run(tmp_path)
     rules = [
         RoutingRule(
             rule_id="escalate_on_gate_fail",
@@ -67,9 +67,9 @@ def test_escalate_sets_run_blocked(tmp_path: Path):
     )
 
 
-def test_abort_run_sets_run_failed(tmp_path: Path):
+def test_abort_run_sets_run_failed(tmp_path: Path) -> None:
     """Routing rule with abort_run sets run status to failed."""
-    run_id, run_root = create_run(tmp_path)
+    _run_id, run_root = create_run(tmp_path)
     rules = [
         RoutingRule(
             rule_id="abort_on_fail",
@@ -101,8 +101,8 @@ def test_abort_run_sets_run_failed(tmp_path: Path):
     )
 
 
-def test_retry_rule_overrides_default(tmp_path: Path):
-    """Routing rule with retry_step can override default abort when retries exhausted."""
+def test_retry_rule_overrides_default(tmp_path: Path) -> None:
+    """retry_step rule can override default abort when retries exhausted."""
     counter_file = tmp_path / "counter"
     counter_file.write_text("0")
     script_file = tmp_path / "retry_script.py"
@@ -113,7 +113,7 @@ n = int(open(p).read())
 open(p, "w").write(str(n + 1))
 sys.exit(1 if n < 2 else 0)
 """)
-    run_id, run_root = create_run(tmp_path)
+    _run_id, run_root = create_run(tmp_path)
     rules = [
         RoutingRule(
             rule_id="retry_more",
@@ -145,9 +145,9 @@ sys.exit(1 if n < 2 else 0)
     )
 
 
-def test_goto_step_changes_execution_order(tmp_path: Path):
+def test_goto_step_changes_execution_order(tmp_path: Path) -> None:
     """Routing rule with goto_step redirects to target step."""
-    run_id, run_root = create_run(tmp_path)
+    _run_id, run_root = create_run(tmp_path)
     rules = [
         RoutingRule(
             rule_id="goto_c_on_a_fail",

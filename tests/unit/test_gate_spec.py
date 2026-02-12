@@ -14,7 +14,7 @@ def _local_runner(argv: list[str] | None = None) -> GateRunnerSpec:
     return GateRunnerSpec(kind="local_command", argv=argv or ["true"])
 
 
-def test_valid_gate_spec_constructs():
+def test_valid_gate_spec_constructs() -> None:
     """Valid GateSpec with all fields constructs."""
     spec = GateSpec(
         gate_id="g1",
@@ -51,7 +51,7 @@ def test_valid_gate_spec_constructs():
     ],
     ids=["missing_name_and_runner", "missing_gate_id", "missing_runner"],
 )
-def test_missing_fields_fail(kwargs):
+def test_missing_fields_fail(kwargs: dict[str, object]) -> None:
     """Missing required fields raise ValidationError."""
     with pytest.raises(ValidationError):
         GateSpec(**kwargs)
@@ -62,7 +62,7 @@ def test_missing_fields_fail(kwargs):
     ["gate_spec_invalid_runner", "runner_spec_invalid_kind"],
     ids=["gate_spec_invalid_runner", "runner_spec_invalid_kind"],
 )
-def test_invalid_runner_kind_fails(case):
+def test_invalid_runner_kind_fails(case: str) -> None:
     """Runner kind other than local_command raises ValidationError."""
     with pytest.raises(ValidationError):
         if case == "gate_spec_invalid_runner":
@@ -78,7 +78,7 @@ def test_invalid_runner_kind_fails(case):
             GateRunnerSpec(kind="llm_judge", argv=[])  # type: ignore[arg-type]
 
 
-def test_validate_gate_specs_unique():
+def test_validate_gate_specs_unique() -> None:
     """validate_gate_specs_unique raises on duplicate gate_id."""
     gates = [
         GateSpec(gate_id="a", name="A", runner=_local_runner()),

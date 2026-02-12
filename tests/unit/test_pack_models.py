@@ -145,7 +145,7 @@ def test_gate_template_namespacing_enforced() -> None:
 
 
 def test_pack_definition_with_non_namespaced_schema_fails() -> None:
-    """PackDefinition with a schema that has non-namespaced ID fails (validator runs on schemas)."""
+    """PackDefinition with non-namespaced schema ID fails (validator on schemas)."""
     with pytest.raises(ValueError, match="namespaced"):
         PackDefinition(
             name="p",

@@ -36,7 +36,7 @@ def test_duplicate_rule_id_fails() -> None:
     """Duplicate rule_id across packs raises ValueError."""
     pack_a = [_rule("shared.rule")]
     pack_b = [_rule("shared.rule")]
-    with pytest.raises(ValueError, match="Duplicate routing rule_id.*shared\\.rule"):
+    with pytest.raises(ValueError, match=r"Duplicate routing rule_id.*shared\.rule"):
         merge_routing_rules([pack_a, pack_b])
 
 

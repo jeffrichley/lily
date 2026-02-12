@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -13,7 +13,7 @@ from lily.kernel.schema_registry import SchemaRegistry
 GATE_RESULT_SCHEMA_ID = "gate_result.v1"
 
 
-class GateStatus(str, Enum):
+class GateStatus(StrEnum):
     """Gate execution outcome."""
 
     PASSED = "passed"
@@ -34,7 +34,11 @@ class GateResultPayload(BaseModel):
 
 
 def register_gate_schemas(registry: SchemaRegistry) -> None:
-    """Register Layer 3 schema(s) on the given registry."""
+    """Register Layer 3 schema(s) on the given registry.
+
+    Args:
+        registry: Schema registry to register gate schemas on.
+    """
     registry.register(GATE_RESULT_SCHEMA_ID, GateResultPayload)
 
 
@@ -67,14 +71,21 @@ class GateSpec(BaseModel):
     required: bool = True
 
     @model_validator(mode="after")
-    def _runner_must_be_local_command(self) -> "GateSpec":
+    def _runner_must_be_local_command(self) -> GateSpec:
         if self.runner.kind != "local_command":
             raise ValueError(f"Unsupported gate runner kind: {self.runner.kind!r}")
         return self
 
 
 def validate_gate_specs_unique(gates: list[GateSpec]) -> None:
-    """Raise ValueError if gate_id is duplicated in the list."""
+    """Raise ValueError if gate_id is duplicated in the list.
+
+    Args:
+        gates: List of gate specs to check.
+
+    Raises:
+        ValueError: If any gate_id appears more than once.
+    """
     seen: set[str] = set()
     for g in gates:
         if g.gate_id in seen:

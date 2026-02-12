@@ -1,4 +1,4 @@
-"""Fixture pack that requires a newer kernel than current. For version mismatch tests."""
+"""Fixture pack requiring newer kernel than current (version mismatch tests)."""
 
 from lily.kernel.pack_models import PackDefinition
 

@@ -2,6 +2,8 @@
 
 import json
 from pathlib import Path
+from types import EllipsisType
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -21,17 +23,23 @@ console = Console()
 
 @run_app.command("new")
 def run_new(
-    work_order: Path | None = typer.Option(
-        None,
-        "--work-order",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        resolve_path=True,
-        help="Attach a work order file as a file artifact.",
-    ),
+    work_order: Annotated[
+        Path | None,
+        typer.Option(
+            "--work-order",
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            resolve_path=True,
+            help="Attach a work order file as a file artifact.",
+        ),
+    ] = None,
 ) -> None:
-    """Create a new run. Optionally attach a work order file."""
+    """Create a new run. Optionally attach a work order file.
+
+    Args:
+        work_order: Optional path to a work order file to attach as artifact.
+    """
     workspace_root = Path.cwd()
     info = create_run_with_optional_work_order(
         workspace_root, work_order_path=work_order
@@ -45,17 +53,25 @@ def run_new(
 @run_app.command("graph")
 def run_graph_cmd(
     run_id: str = typer.Option(..., "--run-id", help="Run ID (from lily run new)."),
-    graph_path: Path = typer.Option(
-        ...,
-        "--graph",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        resolve_path=True,
-        help="Path to GraphSpec JSON file.",
-    ),
+    graph_path: Annotated[
+        Path | EllipsisType,
+        typer.Option(
+            "--graph",
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            resolve_path=True,
+            help="Path to GraphSpec JSON file.",
+        ),
+    ] = ...,
 ) -> None:
-    """Run a graph spec for a run."""
+    """Run a graph spec for a run.
+
+    Args:
+        run_id: Run ID (from lily run new).
+        graph_path: Path to GraphSpec JSON file.
+    """
+    assert isinstance(graph_path, Path), "--graph is required"
     workspace_root = Path.cwd()
     run_root = get_run_root(workspace_root, run_id)
     if not run_root.exists():

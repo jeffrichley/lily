@@ -49,7 +49,7 @@ def test_collision_between_packs_fails() -> None:
         minimum_kernel_version="0.1.0",
         schemas=[SchemaRegistration(schema_id="shared.id.v1", model=_PayloadB)],
     )
-    with pytest.raises(ValueError, match="Duplicate schema_id.*shared\\.id\\.v1"):
+    with pytest.raises(ValueError, match=r"Duplicate schema_id.*shared\.id\.v1"):
         register_pack_schemas(registry, [pack_a, pack_b])
 
 

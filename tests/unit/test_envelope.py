@@ -7,7 +7,7 @@ import pytest
 from lily.kernel.envelope import Envelope, EnvelopeMeta
 
 
-def test_envelope_meta_fields():
+def test_envelope_meta_fields() -> None:
     """EnvelopeMeta has required fields and producer_kind is Literal."""
     meta = EnvelopeMeta(
         schema_id="echo_payload.v1",
@@ -22,9 +22,9 @@ def test_envelope_meta_fields():
     assert meta.inputs == []
 
 
-def test_envelope_meta_rejects_invalid_producer_kind():
+def test_envelope_meta_rejects_invalid_producer_kind() -> None:
     """producer_kind must be one of tool, llm, human, system."""
-    with pytest.raises(ValueError, match="producer_kind|Literal"):
+    with pytest.raises(ValueError, match=r"producer_kind|Literal"):
         EnvelopeMeta(
             schema_id="x.v1",
             producer_id="",
@@ -35,8 +35,8 @@ def test_envelope_meta_rejects_invalid_producer_kind():
         )
 
 
-def test_envelope_meta_inputs_artifact_ids_only():
-    """inputs is list[str] (artifact IDs), not ArtifactRef."""
+def test_envelope_meta_inputs_artifact_ids_only() -> None:
+    """Inputs is list[str] (artifact IDs), not ArtifactRef."""
     meta = EnvelopeMeta(
         schema_id="x.v1",
         producer_id="",
@@ -48,7 +48,7 @@ def test_envelope_meta_inputs_artifact_ids_only():
     assert meta.inputs == ["id1", "id2"]
 
 
-def test_envelope_roundtrip_serialize_deserialize_dict():
+def test_envelope_roundtrip_serialize_deserialize_dict() -> None:
     """Round-trip serialize/deserialize Envelope[dict]."""
     meta = EnvelopeMeta(
         schema_id="work_order.v1",
@@ -66,7 +66,7 @@ def test_envelope_roundtrip_serialize_deserialize_dict():
     assert restored.payload == payload
 
 
-def test_envelope_roundtrip_json_bytes():
+def test_envelope_roundtrip_json_bytes() -> None:
     """Envelope[dict] round-trips via model_dump_json / model_validate_json."""
     meta = EnvelopeMeta(
         schema_id="echo_payload.v1",
@@ -83,9 +83,9 @@ def test_envelope_roundtrip_json_bytes():
     assert restored.payload == {"echo": "hi"}
 
 
-def test_envelope_meta_forbids_extra_fields():
+def test_envelope_meta_forbids_extra_fields() -> None:
     """EnvelopeMeta rejects extra fields (extra=forbid)."""
-    with pytest.raises(ValueError, match="extra|forbid|not permitted"):
+    with pytest.raises(ValueError, match=r"extra|forbid|not permitted"):
         EnvelopeMeta(
             schema_id="x.v1",
             producer_id="",
@@ -97,7 +97,7 @@ def test_envelope_meta_forbids_extra_fields():
         )
 
 
-def test_envelope_pure_data_no_extra_fields():
+def test_envelope_pure_data_no_extra_fields() -> None:
     """Envelope rejects extra fields (extra=forbid)."""
     meta = EnvelopeMeta(
         schema_id="x.v1",
@@ -107,5 +107,5 @@ def test_envelope_pure_data_no_extra_fields():
         inputs=[],
         payload_sha256="",
     )
-    with pytest.raises(ValueError, match="extra|forbid|not permitted"):
+    with pytest.raises(ValueError, match=r"extra|forbid|not permitted"):
         Envelope(meta=meta, payload={}, unexpected="field")  # type: ignore[call-arg]

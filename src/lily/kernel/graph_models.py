@@ -47,7 +47,7 @@ class StepSpec(BaseModel):
 
 
 class GraphSpec(BaseModel):
-    """DAG of steps. Validation: unique ids, deps exist, no cycles, at least one step."""
+    """DAG of steps. Validation: unique ids, deps exist, no cycles, ≥1 step."""
 
     graph_id: str
     steps: list[StepSpec] = Field(default_factory=list)
@@ -55,18 +55,30 @@ class GraphSpec(BaseModel):
     routing_rules: list[RoutingRule] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def _validate_graph(self) -> "GraphSpec":
+    def _validate_graph(self) -> GraphSpec:
         validate_graph_spec(self)
         return self
 
 
 def topological_order(graph: GraphSpec) -> list[str]:
-    """Return step_ids in topological order (deps first). Ties broken by step_id sort."""
+    """Return step_ids in topological order (deps first). Ties by step_id sort.
+
+    Args:
+        graph: Graph spec with steps and depends_on.
+
+    Returns:
+        List of step_ids in dependency order.
+    """
     step_by_id = {s.step_id: s for s in graph.steps}
     result: list[str] = []
     visited: set[str] = set()
 
     def visit(sid: str) -> None:
+        """Visit step and its dependencies in DFS order; append to result after deps.
+
+        Args:
+            sid: Step id to visit.
+        """
         if sid in visited:
             return
         visited.add(sid)
@@ -80,12 +92,15 @@ def topological_order(graph: GraphSpec) -> list[str]:
 
 
 def validate_graph_spec(graph: GraphSpec) -> None:
-    """
-    Validate GraphSpec. Raises ValueError on failure.
-    - step_ids unique
-    - all depends_on references exist
-    - at least one step
-    - no cycles
+    """Validate GraphSpec. Raises ValueError on failure.
+
+    - step_ids unique; all depends_on exist; at least one step; no cycles.
+
+    Args:
+        graph: Graph spec to validate.
+
+    Raises:
+        ValueError: If step_ids not unique, deps missing, empty graph, or cycle.
     """
     if not graph.steps:
         raise ValueError("Graph must have at least one step")
@@ -103,25 +118,38 @@ def validate_graph_spec(graph: GraphSpec) -> None:
 
 
 def _detect_cycle(graph: GraphSpec) -> None:
-    """Raise ValueError if graph contains a cycle."""
+    """Raise ValueError if graph contains a cycle.
+
+    Args:
+        graph: Graph spec to check for cycles.
+    """
     step_ids = {s.step_id for s in graph.steps}
     step_by_id = {s.step_id: s for s in graph.steps}
-    WHITE, GRAY, BLACK = 0, 1, 2
-    color: dict[str, int] = {sid: WHITE for sid in step_ids}
+    white, gray, black = 0, 1, 2
+    color: dict[str, int] = {sid: white for sid in step_ids}
 
     def visit(sid: str, path: list[str]) -> None:
-        if color[sid] == GRAY:
+        """DFS visit for cycle detection; raises ValueError on back-edge to gray.
+
+        Args:
+            sid: Step id being visited.
+            path: Current path from root for cycle reporting.
+
+        Raises:
+            ValueError: If a back-edge to a gray node (cycle) is found.
+        """
+        if color[sid] == gray:
             idx = path.index(sid)
-            cycle = path[idx:] + [sid]
+            cycle = [*path[idx:], sid]
             raise ValueError(f"Cycle detected: {' -> '.join(cycle)}")
-        if color[sid] == BLACK:
+        if color[sid] == black:
             return
-        color[sid] = GRAY
+        color[sid] = gray
         step = step_by_id[sid]
         for dep in step.depends_on:
-            visit(dep, path + [sid])
-        color[sid] = BLACK
+            visit(dep, [*path, sid])
+        color[sid] = black
 
     for sid in step_ids:
-        if color[sid] == WHITE:
+        if color[sid] == white:
             visit(sid, [])

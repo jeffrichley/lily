@@ -17,7 +17,7 @@ def _run_root(tmp_path: Path, name: str) -> Path:
     return r
 
 
-def test_step_succeeds_and_gates_pass_run_continues(tmp_path: Path):
+def test_step_succeeds_and_gates_pass_run_continues(tmp_path: Path) -> None:
     """Step succeeds and gates pass -> run continues."""
     gate = GateSpec(
         gate_id="g1",
@@ -49,7 +49,7 @@ def test_step_succeeds_and_gates_pass_run_continues(tmp_path: Path):
     )
 
 
-def test_required_gate_fails_run_fails(tmp_path: Path):
+def test_required_gate_fails_run_fails(tmp_path: Path) -> None:
     """Required gate fails -> run fails."""
     gate = GateSpec(
         gate_id="fail-gate",
@@ -88,7 +88,7 @@ def test_required_gate_fails_run_fails(tmp_path: Path):
     )
 
 
-def test_non_required_gate_fails_run_continues(tmp_path: Path):
+def test_non_required_gate_fails_run_continues(tmp_path: Path) -> None:
     """Non-required gate fails -> run continues."""
     gate = GateSpec(
         gate_id="opt-fail",
@@ -126,7 +126,7 @@ def test_non_required_gate_fails_run_continues(tmp_path: Path):
     )
 
 
-def test_gate_results_recorded_in_run_state(tmp_path: Path):
+def test_gate_results_recorded_in_run_state(tmp_path: Path) -> None:
     """Gate result artifact IDs are recorded in StepRunRecord."""
     g1 = GateSpec(
         gate_id="g1",

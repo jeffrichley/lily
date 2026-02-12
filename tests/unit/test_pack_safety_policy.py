@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from lily.kernel.pack_models import PackDefinition
 from lily.kernel.pack_registration import merge_pack_safety_policies
 from lily.kernel.policy_models import SafetyPolicy
@@ -11,19 +10,26 @@ from lily.kernel.policy_models import SafetyPolicy
 def _pack(
     name: str,
     *,
-    allow_write_paths: list[str] | None = None,
-    deny_write_paths: list[str] | None = None,
+    write_paths: tuple[list[str] | None, list[str] | None] | None = None,
     allowed_tools: list[str] | None = None,
     network_access: str = "deny",
     max_diff_size_bytes: int | None = None,
 ) -> PackDefinition:
+    allow_write_paths, deny_write_paths = (
+        ([], [])
+        if write_paths is None
+        else (
+            write_paths[0] or [],
+            write_paths[1] or [],
+        )
+    )
     return PackDefinition(
         name=name,
         version="1.0.0",
         minimum_kernel_version="0.1.0",
         default_safety_policy=SafetyPolicy(
-            allow_write_paths=allow_write_paths or [],
-            deny_write_paths=deny_write_paths or [],
+            allow_write_paths=allow_write_paths,
+            deny_write_paths=deny_write_paths,
             allowed_tools=allowed_tools or ["local_command"],
             network_access=network_access,
             max_diff_size_bytes=max_diff_size_bytes,
@@ -34,8 +40,8 @@ def _pack(
 def test_policy_merge_deterministic() -> None:
     """Merging same packs in same order yields same result."""
     packs = [
-        _pack("a", allowed_tools=["local_command"], deny_write_paths=["/sys"]),
-        _pack("b", allowed_tools=["local_command"], deny_write_paths=["/etc"]),
+        _pack("a", write_paths=(None, ["/sys"]), allowed_tools=["local_command"]),
+        _pack("b", write_paths=(None, ["/etc"]), allowed_tools=["local_command"]),
     ]
     m1 = merge_pack_safety_policies(packs)
     m2 = merge_pack_safety_policies(packs)
@@ -55,14 +61,14 @@ def test_conservative_merge_enforced() -> None:
     packs = [
         _pack(
             "a",
+            write_paths=(None, ["/sys"]),
             allowed_tools=["local_command", "curl"],
-            deny_write_paths=["/sys"],
             network_access="allow",
         ),
         _pack(
             "b",
+            write_paths=(None, ["/etc"]),
             allowed_tools=["local_command"],
-            deny_write_paths=["/etc"],
             network_access="deny",
         ),
     ]
@@ -78,12 +84,12 @@ def test_conservative_merge_enforced() -> None:
 def test_allow_write_paths_intersection() -> None:
     """allow_write_paths is intersection (only paths all allow)."""
     packs = [
-        _pack("a", allow_write_paths=["/tmp", "/out"]),
-        _pack("b", allow_write_paths=["/tmp"]),
+        _pack("a", write_paths=(["/allowed/a", "/out"], None)),
+        _pack("b", write_paths=(["/allowed/a"], None)),
     ]
     merged = merge_pack_safety_policies(packs)
     assert merged is not None
-    assert set(merged.allow_write_paths) == {"/tmp"}
+    assert set(merged.allow_write_paths) == {"/allowed/a"}
 
 
 def test_conflicts_resolved_safely() -> None:

@@ -1,5 +1,6 @@
-"""Run-scoped file lock. Held only during manifest write. Never hold another lock while holding this."""
+"""Run-scoped file lock. Held only during manifest write. No nested locks."""
 
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -9,10 +10,16 @@ from lily.kernel.paths import get_lock_path
 
 
 @contextmanager
-def run_lock(run_root: Path):
-    """
-    Acquire run-scoped file lock (.lock). Use only for manifest writes.
-    Lock ordering: never acquire any other lock while holding the run lock.
+def run_lock(run_root: Path) -> Generator:
+    """Acquire run-scoped file lock (.lock). Use only for manifest writes.
+
+    Never acquire any other lock while holding the run lock.
+
+    Args:
+        run_root: Run directory root (lock file is .lock under it).
+
+    Yields:
+        None; lock is held for the context body.
     """
     lock_path = get_lock_path(run_root)
     # Ensure parent exists (run directory)

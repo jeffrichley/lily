@@ -1,8 +1,8 @@
 """Layer 2: rerun_from utility."""
 
 from lily.kernel.graph_models import ExecutorSpec, GraphSpec, StepSpec
-from lily.kernel.run_state import RunState, RunStatus, StepRunRecord, StepStatus
 from lily.kernel.rerun import rerun_from
+from lily.kernel.run_state import RunState, RunStatus, StepRunRecord, StepStatus
 
 
 def _make_step(step_id: str, depends_on: list[str] | None = None) -> StepSpec:
@@ -14,7 +14,7 @@ def _make_step(step_id: str, depends_on: list[str] | None = None) -> StepSpec:
     )
 
 
-def test_downstream_detection_correct():
+def test_downstream_detection_correct() -> None:
     """Downstream of a step includes itself and all steps that depend on it."""
     graph = GraphSpec(
         graph_id="g1",
@@ -69,7 +69,7 @@ def test_downstream_detection_correct():
     )
 
 
-def test_statuses_reset_as_expected():
+def test_statuses_reset_as_expected() -> None:
     """Reset steps have status pending, attempts 0, cleared timestamps and errors."""
     graph = GraphSpec(
         graph_id="g1",

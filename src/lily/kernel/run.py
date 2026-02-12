@@ -1,11 +1,9 @@
-"""Create run and resume. Phase A: run identity + directory + manifest + lock. No SQLite, no artifact store."""
+"""Create run and resume. Phase A: identity + directory + manifest + lock. No SQLite."""
 
 from pathlib import Path
 from typing import NamedTuple
 
-from lily.kernel.run_id import generate_run_id
-from lily.kernel.paths import get_run_root
-from lily.kernel.run_directory import create_run_directory
+from lily.kernel.artifact_store import ArtifactStore, PutArtifactOptions
 from lily.kernel.manifest import (
     RunManifest,
     WorkOrderRef,
@@ -13,8 +11,10 @@ from lily.kernel.manifest import (
     read_manifest,
     write_manifest_atomic,
 )
+from lily.kernel.paths import get_run_root
+from lily.kernel.run_directory import create_run_directory
+from lily.kernel.run_id import generate_run_id
 from lily.kernel.run_lock import run_lock
-from lily.kernel.artifact_store import ArtifactStore
 
 # Kernel version for manifest (single source)
 KERNEL_VERSION = "0.1.0"
@@ -33,9 +33,17 @@ def create_run(
     work_order_ref: WorkOrderRef | None = None,
     workspace_snapshot: dict | None = None,
 ) -> tuple[str, Path]:
-    """
-    Create a new run: generate run_id, create directory, write initial manifest atomically under run lock.
+    """Create a new run: run_id, directory, initial manifest under run lock.
+
     Returns (run_id, run_root). No artifact store, no SQLite.
+
+    Args:
+        workspace_root: Workspace root path.
+        work_order_ref: Optional work order ref for manifest.
+        workspace_snapshot: Optional workspace snapshot for manifest.
+
+    Returns:
+        (run_id, run_root).
     """
     run_id = generate_run_id()
     run_root = create_run_directory(workspace_root, run_id)
@@ -51,9 +59,19 @@ def create_run(
 
 
 def resume_run(workspace_root: Path, run_id: str) -> tuple[Path, RunManifest]:
-    """
-    Open existing run for resume: resolve run root, read manifest. No artifact store.
-    Returns (run_root, manifest). Raises if run directory or manifest missing.
+    """Open existing run for resume: resolve run root, read manifest.
+
+    Returns (run_root, manifest). Raises if run dir or manifest missing.
+
+    Args:
+        workspace_root: Workspace root path.
+        run_id: Run identifier.
+
+    Returns:
+        (run_root, manifest).
+
+    Raises:
+        FileNotFoundError: If run directory or manifest missing.
     """
     run_root = get_run_root(workspace_root, run_id)
     if not run_root.is_dir():
@@ -66,9 +84,16 @@ def create_run_with_optional_work_order(
     workspace_root: Path,
     work_order_path: Path | None = None,
 ) -> RunInfo:
-    """
-    Create a new run; optionally attach a work order file as a file artifact.
+    """Create a new run; optionally attach work order file as file artifact.
+
     Returns RunInfo (run_id, run_root, work_order_ref). Used by CLI.
+
+    Args:
+        workspace_root: Workspace root path.
+        work_order_path: Optional path to work order file to attach.
+
+    Returns:
+        RunInfo with run_id, run_root, and optional work_order_ref.
     """
     if work_order_path is None:
         run_id, run_root = create_run(workspace_root)
@@ -76,7 +101,11 @@ def create_run_with_optional_work_order(
     run_id = generate_run_id()
     run_root = create_run_directory(workspace_root, run_id)
     store = ArtifactStore(run_root, run_id)
-    ref = store.put_file("work_order", work_order_path, artifact_name="work_order")
+    ref = store.put_file(
+        "work_order",
+        work_order_path,
+        options=PutArtifactOptions(artifact_name="work_order"),
+    )
     work_order_ref = WorkOrderRef(run_id=ref.run_id, artifact_id=ref.artifact_id)
     manifest = create_initial_manifest(
         run_id=run_id,

@@ -17,7 +17,7 @@ from lily.kernel.policy_models import POLICY_VIOLATION_SCHEMA_ID
 from lily.kernel.schema_registry import SchemaRegistry
 
 
-def test_valid_payload_passes():
+def test_valid_payload_passes() -> None:
     """PolicyViolationPayload accepts valid fields."""
     ts = datetime.now(UTC)
     payload = PolicyViolationPayload(
@@ -47,7 +47,9 @@ def test_valid_payload_passes():
         "missing_step_id",
     ],
 )
-def test_missing_required_fields_fail(keys_to_include):
+def test_missing_required_fields_fail(
+    keys_to_include: tuple[str, ...],
+) -> None:
     """Missing required fields raise ValidationError."""
     ts = datetime.now(UTC)
     base = {
@@ -61,7 +63,7 @@ def test_missing_required_fields_fail(keys_to_include):
         PolicyViolationPayload(**kwargs)
 
 
-def test_schema_registry_can_validate_policy_violation_v1():
+def test_schema_registry_can_validate_policy_violation_v1() -> None:
     """SchemaRegistry can validate policy_violation.v1 after register_policy_schemas."""
     reg = SchemaRegistry()
     register_policy_schemas(reg)
@@ -79,7 +81,7 @@ def test_schema_registry_can_validate_policy_violation_v1():
     assert instance.violation_type == "write_denied"
 
 
-def test_envelope_validation_works():
+def test_envelope_validation_works() -> None:
     """Envelope with policy_violation.v1 payload validates via EnvelopeValidator."""
     reg = SchemaRegistry()
     register_policy_schemas(reg)

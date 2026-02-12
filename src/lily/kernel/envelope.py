@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Generic, Literal, TypeVar
+from typing import Literal, TypeVar
 
 from pydantic import BaseModel
 
@@ -29,7 +29,7 @@ class EnvelopeMeta(BaseModel):
 T = TypeVar("T")
 
 
-class Envelope(BaseModel, Generic[T]):
+class Envelope[T](BaseModel):
     """Generic envelope: meta + payload. Pure data; no registry, hashing, or IO."""
 
     meta: EnvelopeMeta

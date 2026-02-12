@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""
-Generate the initial Test Quality Audit markdown file.
+"""Generate the initial Test Quality Audit markdown file.
 
 Discovers all test files (test_*.py, *_test.py) under the tests directory,
 and for each file extracts test methods (top-level test_* functions and
 test_* methods on classes). Writes a skeleton markdown file with:
-- Inventory of test file paths
-- Per-file sections with a table of test methods (Method | Score | Notes) for ranking
-- Placeholder sections for file-level scores, prioritized list, Phase B progress, and final summary.
 
-Excludes: __init__.py, conftest.py, and directories like pack_fixtures (support modules, not test modules).
+- Inventory of test file paths
+- Per-file sections with a table of test methods (Method | Score | Notes)
+- Placeholder sections for file-level scores, prioritized list, Phase B, summary.
+
+Excludes: __init__.py, conftest.py, and directories like pack_fixtures
+(support modules, not test modules).
 """
 
 from __future__ import annotations
@@ -39,16 +40,14 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-def is_test_file(path: Path, tests_root: Path) -> bool:
+def is_test_file(path: Path, _tests_root: Path) -> bool:
     """True if path is a test module we want to audit (not fixture/conftest/init)."""
     name = path.name
     if name.startswith("_") or name == "conftest.py":
         return False
     if "pack_fixtures" in path.parts or "fixtures" in path.parts:
         return False
-    if name.startswith("test_") or name.endswith("_test.py"):
-        return True
-    return False
+    return bool(name.startswith("test_") or name.endswith("_test.py"))
 
 
 def collect_test_files(tests_root: Path) -> list[Path]:
@@ -63,7 +62,10 @@ def collect_test_files(tests_root: Path) -> list[Path]:
 
 
 def _collect_from_class(class_node: ast.ClassDef, prefix: str = "") -> list[str]:
-    """Collect test_* methods from a class body (and nested classes). Returns names like 'test_foo' or 'ClassName::test_foo'."""
+    """Collect test_* methods from a class (and nested classes).
+
+    Returns names like 'test_foo' or 'ClassName::test_foo'.
+    """
     names: list[str] = []
     class_prefix = (
         f"{class_node.name}::" if prefix == "" else f"{prefix}{class_node.name}::"
@@ -78,15 +80,15 @@ def _collect_from_class(class_node: ast.ClassDef, prefix: str = "") -> list[str]
 
 
 def get_test_methods_from_file(file_path: Path) -> list[str]:
-    """
-    Parse Python file with ast and return names of test functions/methods.
+    """Parse Python file with ast and return names of test functions/methods.
 
     Matches pytest discovery:
     - Top-level functions named test_*
     - Methods named test_* in any class (including nested classes)
-    - Excludes nested functions (e.g. def test_inner inside def test_outer) since pytest does not collect those.
+    - Excludes nested functions (e.g. def test_inner inside def test_outer)
+      since pytest does not collect those.
 
-    Class methods are returned as "ClassName::test_method" so the audit can show which class they belong to.
+    Class methods are returned as "ClassName::test_method" for the audit.
     """
     names: list[str] = []
     try:
@@ -125,7 +127,7 @@ def generate_audit_md(
     lines: list[str] = [
         "# Test Quality Audit",
         "",
-        "Generated skeleton for the `/test-quality` workflow. Fill in the empty sections as you run the audit.",
+        "Generated skeleton for `/test-quality`. Fill in sections as you audit.",
         "",
         "---",
         "",
@@ -144,7 +146,7 @@ def generate_audit_md(
             "",
             "## 2. Per-file method tables (rank methods here)",
             "",
-            "For each test file, rank or score the test methods. Fill in **Score** and **Notes** as you audit.",
+            "Rank or score test methods per file. Fill in **Score** and **Notes**.",
             "",
         ]
     )
@@ -154,10 +156,9 @@ def generate_audit_md(
         log.debug("Parsed %s: %d test methods", rel, len(methods))
         lines.append(f"### `{rel}`")
         lines.append("")
-        lines.append("| Method | Score (0–3) | Notes |")
+        lines.append("| Method | Score (0-3) | Notes |")
         lines.append("|--------|-------------|-------|")
-        for m in methods:
-            lines.append(f"| `{m}` | | |")
+        lines.extend([f"| `{m}` | | |" for m in methods])
         lines.append("")
     lines.extend(
         [
@@ -165,7 +166,7 @@ def generate_audit_md(
             "",
             "## 3. File-level scores (rubric)",
             "",
-            "After scoring every file, add the table here (path + seven dimensions + average).",
+            "After scoring each file, add the table (path + dimensions + average).",
             "",
             "*Placeholder: fill in after Step 2.*",
             "",
@@ -219,7 +220,7 @@ def main(
         typer.Option("--verbose", "-v", help="Enable debug logging."),
     ] = False,
 ) -> None:
-    """Generate the Test Quality Audit skeleton (inventory + per-file method tables + placeholders)."""
+    """Generate Test Quality Audit (inventory + method tables + placeholders)."""
     if verbose:
         log.setLevel(logging.DEBUG)
     resolved_output = output.resolve()
@@ -232,9 +233,9 @@ def main(
     test_files = collect_test_files(tests_root)
     log.info("Found %d test files", len(test_files))
     generate_audit_md(tests_root, resolved_output, repo)
-    console.print(
-        f"[green]Wrote[/green] [bold]{resolved_output}[/bold] [dim]({len(test_files)} test files)[/dim]"
-    )
+    n = len(test_files)
+    out = f"[green]Wrote[/green] [bold]{resolved_output}[/bold]"
+    console.print(f"{out} [dim]({n} files)[/dim]")
 
 
 if __name__ == "__main__":

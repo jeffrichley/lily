@@ -31,8 +31,8 @@ def test_load_packs_multiple() -> None:
     "module_path,match",
     [
         (_NO_EXPORT_MODULE, "no PACK_DEFINITION export"),
-        (_OLD_KERNEL_MODULE, r"requires minimum_kernel_version.*99\.0\.0"),
-        (_WRONG_TYPE_MODULE, "must be a PackDefinition instance"),
+        (_OLD_KERNEL_MODULE, r"requires kernel.*99\.0\.0"),
+        (_WRONG_TYPE_MODULE, "must be PackDefinition"),
         ("nonexistent.module.path.that.does.not.exist", "Failed to import pack module"),
     ],
     ids=[
@@ -43,6 +43,6 @@ def test_load_packs_multiple() -> None:
     ],
 )
 def test_load_pack_fails(module_path: str, match: str) -> None:
-    """load_pack raises ValueError with expected message for invalid or missing modules."""
+    """load_pack raises ValueError with expected message for invalid/missing modules."""
     with pytest.raises(ValueError, match=match):
         load_pack(module_path)

@@ -20,12 +20,12 @@ def build_run_state_with_step_overrides(
     *,
     save: bool = True,
 ) -> RunState:
-    """
-    Build a RunState with given step status/artifact overrides (test-only seam).
+    """Build RunState with step status/artifact overrides (test-only seam).
 
     step_overrides maps step_id -> dict of StepRunRecord fields to set, e.g.:
         {"a": {"status": StepStatus.SUCCEEDED, "produced_artifact_ids": ["old_1"]}}
-    Steps not in step_overrides stay at create_initial_run_state defaults (PENDING, empty lists).
+    Steps not in step_overrides stay at create_initial_run_state defaults
+    (PENDING, empty lists).
     """
     state = create_initial_run_state(run_id, graph)
     new_records = dict(state.step_records)

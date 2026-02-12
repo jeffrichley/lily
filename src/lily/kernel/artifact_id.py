@@ -4,5 +4,9 @@ import uuid
 
 
 def generate_artifact_id() -> str:
-    """Generate a new artifact ID. UUID string, unique per artifact; used as directory name under artifacts/."""
+    """Generate a new artifact ID (UUID); used as directory name under artifacts/.
+
+    Returns:
+        A new UUID string.
+    """
     return str(uuid.uuid4())

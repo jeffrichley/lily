@@ -40,7 +40,11 @@ class ArtifactReplacementPayload(BaseModel):
 
 
 def register_observability_schemas(registry: SchemaRegistry) -> None:
-    """Register Layer 5 observability schema(s) on the given registry."""
+    """Register Layer 5 observability schema(s) on the given registry.
+
+    Args:
+        registry: Schema registry to register observability schemas on.
+    """
     registry.register(ENVIRONMENT_SNAPSHOT_SCHEMA_ID, EnvironmentSnapshotPayload)
     registry.register(ARTIFACT_REPLACEMENT_SCHEMA_ID, ArtifactReplacementPayload)
 
@@ -50,9 +54,16 @@ def capture_environment_snapshot(
     *,
     kernel_version: str,
 ) -> EnvironmentSnapshotPayload:
-    """
-    Collect reproducibility metadata: Python version, platform, kernel version,
-    optional uv.lock hash. Does not perform I/O beyond reading uv.lock if present.
+    """Collect reproducibility metadata: Python version, platform, kernel version.
+
+    Optional uv.lock hash. Does not perform I/O beyond reading uv.lock if present.
+
+    Args:
+        workspace_root: Workspace root (for uv.lock path).
+        kernel_version: Kernel version string to record.
+
+    Returns:
+        EnvironmentSnapshotPayload with captured metadata.
     """
     uv_lock_hash: str | None = None
     uv_lock_path = workspace_root / "uv.lock"

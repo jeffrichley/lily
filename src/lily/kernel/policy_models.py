@@ -24,8 +24,12 @@ class SafetyPolicy(BaseModel):
     network_access: Literal["allow", "deny"] = "deny"
 
     @classmethod
-    def default_policy(cls) -> "SafetyPolicy":
-        """Return a permissive default policy (local_command allowed, deny network)."""
+    def default_policy(cls) -> SafetyPolicy:
+        """Return a permissive default policy (local_command allowed, deny network).
+
+        Returns:
+            SafetyPolicy with local_command allowed, network denied.
+        """
         return cls(
             allow_write_paths=[],
             deny_write_paths=[],
@@ -36,7 +40,7 @@ class SafetyPolicy(BaseModel):
 
 
 class PolicyViolationPayload(BaseModel):
-    """Payload for policy_violation.v1 envelope. Produced on policy enforcement failure."""
+    """Payload for policy_violation.v1; produced on policy enforcement failure."""
 
     model_config = {"extra": "forbid"}
 
@@ -47,5 +51,9 @@ class PolicyViolationPayload(BaseModel):
 
 
 def register_policy_schemas(registry: SchemaRegistry) -> None:
-    """Register Layer 4 policy schema(s) on the given registry."""
+    """Register Layer 4 policy schema(s) on the given registry.
+
+    Args:
+        registry: Schema registry to register on.
+    """
     registry.register(POLICY_VIOLATION_SCHEMA_ID, PolicyViolationPayload)

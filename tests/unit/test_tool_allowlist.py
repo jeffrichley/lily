@@ -8,9 +8,9 @@ from lily.kernel.policy_models import POLICY_VIOLATION_SCHEMA_ID, SafetyPolicy
 from lily.kernel.run_state import RunStatus, StepStatus
 
 
-def test_allowed_tool_executes(workspace_root: Path):
+def test_allowed_tool_executes(workspace_root: Path) -> None:
     """Executor kind in allowed_tools executes successfully."""
-    run_id, run_root = create_run(workspace_root)
+    _run_id, run_root = create_run(workspace_root)
     policy = SafetyPolicy(allowed_tools=["local_command"])
     graph = GraphSpec(
         graph_id="g1",
@@ -34,9 +34,9 @@ def test_allowed_tool_executes(workspace_root: Path):
     )
 
 
-def test_disallowed_tool_triggers_policy_violation(workspace_root: Path):
+def test_disallowed_tool_triggers_policy_violation(workspace_root: Path) -> None:
     """Executor kind not in allowed_tools triggers policy_violation and run fails."""
-    run_id, run_root = create_run(workspace_root)
+    _run_id, run_root = create_run(workspace_root)
     policy = SafetyPolicy(allowed_tools=["custom_only"])
     graph = GraphSpec(
         graph_id="g1",
@@ -64,7 +64,7 @@ def test_disallowed_tool_triggers_policy_violation(workspace_root: Path):
     )
 
 
-def test_policy_violation_envelope_stored(workspace_root: Path):
+def test_policy_violation_envelope_stored(workspace_root: Path) -> None:
     """Disallowed tool produces policy_violation.v1 envelope in artifact store."""
     run_id, run_root = create_run(workspace_root)
     policy = SafetyPolicy(allowed_tools=[])
@@ -95,9 +95,9 @@ def test_policy_violation_envelope_stored(workspace_root: Path):
     assert "local_command" in envelope.payload["details"]
 
 
-def test_default_policy_allows_local_command(workspace_root: Path):
+def test_default_policy_allows_local_command(workspace_root: Path) -> None:
     """When safety_policy is None, default allows local_command."""
-    run_id, run_root = create_run(workspace_root)
+    _run_id, run_root = create_run(workspace_root)
     graph = GraphSpec(
         graph_id="g1",
         steps=[

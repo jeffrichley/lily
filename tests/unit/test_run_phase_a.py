@@ -1,4 +1,4 @@
-"""Phase A acceptance: create run, atomic manifest, run lock, resume. No SQLite, no artifact store."""
+"""Phase A: create run, atomic manifest, run lock, resume."""
 
 import json
 import threading
@@ -7,27 +7,27 @@ from pathlib import Path
 import pytest
 
 from lily.kernel import (
-    create_run,
-    resume_run,
-    read_manifest,
-    get_run_root,
-    get_manifest_path,
     RunStatus,
+    create_run,
+    get_manifest_path,
+    get_run_root,
+    read_manifest,
+    resume_run,
 )
+from lily.kernel.manifest import create_initial_manifest, write_manifest_atomic
 from lily.kernel.paths import (
-    IRIS_DIR,
-    RUNS_DIR,
     ARTIFACTS_DIR,
+    IRIS_DIR,
     LOGS_DIR,
+    RUNS_DIR,
     TMP_DIR,
 )
-from lily.kernel.run_id import generate_run_id
 from lily.kernel.run_directory import create_run_directory
+from lily.kernel.run_id import generate_run_id
 from lily.kernel.run_lock import run_lock
-from lily.kernel.manifest import write_manifest_atomic, create_initial_manifest
 
 
-def test_generate_run_id():
+def test_generate_run_id() -> None:
     """RunId is uuid4 string."""
     r1 = generate_run_id()
     r2 = generate_run_id()
@@ -36,7 +36,7 @@ def test_generate_run_id():
     assert r1 != r2
 
 
-def test_create_run(workspace_root: Path):
+def test_create_run(workspace_root: Path) -> None:
     """Can create run: directory and manifest exist."""
     run_id, run_root = create_run(workspace_root)
     assert run_id
@@ -48,8 +48,8 @@ def test_create_run(workspace_root: Path):
     assert (run_root / TMP_DIR).is_dir()
 
 
-def test_manifest_is_atomic(workspace_root: Path):
-    """Manifest is valid JSON and has required fields; written atomically (no partial file)."""
+def test_manifest_is_atomic(workspace_root: Path) -> None:
+    """Manifest is valid JSON with required fields; written atomically."""
     run_id, run_root = create_run(workspace_root)
     path = get_manifest_path(run_root)
     content = path.read_text(encoding="utf-8")
@@ -61,7 +61,7 @@ def test_manifest_is_atomic(workspace_root: Path):
     assert data["kernel_version"]
 
 
-def test_resume_works(workspace_root: Path):
+def test_resume_works(workspace_root: Path) -> None:
     """Resume loads run root and manifest."""
     run_id, run_root = create_run(workspace_root)
     loaded_root, manifest = resume_run(workspace_root, run_id)
@@ -70,20 +70,20 @@ def test_resume_works(workspace_root: Path):
     assert manifest.status == RunStatus.CREATED
 
 
-def test_resume_missing_run_raises(workspace_root: Path):
+def test_resume_missing_run_raises(workspace_root: Path) -> None:
     """Resume with missing run_id raises FileNotFoundError."""
     with pytest.raises(FileNotFoundError):
         resume_run(workspace_root, "00000000-0000-0000-0000-000000000000")
 
 
-def test_run_lock_serializes_manifest_writes(workspace_root: Path):
+def test_run_lock_serializes_manifest_writes(workspace_root: Path) -> None:
     """Run lock: two threads writing manifest do not corrupt; lock serializes writes."""
     run_id = generate_run_id()
     create_run_directory(workspace_root, run_id)
     run_root = get_run_root(workspace_root, run_id)
     results: list[Exception | None] = []
 
-    def write_manifest(step: int):
+    def write_manifest(step: int) -> None:
         try:
             manifest = create_initial_manifest(
                 run_id=run_id,
@@ -109,7 +109,7 @@ def test_run_lock_serializes_manifest_writes(workspace_root: Path):
     assert manifest.status == RunStatus.CREATED
 
 
-def test_no_sqlite_no_artifact_store(workspace_root: Path):
+def test_no_sqlite_no_artifact_store(workspace_root: Path) -> None:
     """Phase A: no .iris/index.sqlite; no artifact store usage."""
     create_run(workspace_root)
     iris = workspace_root / IRIS_DIR

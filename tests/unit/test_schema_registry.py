@@ -13,11 +13,13 @@ class EchoPayload(BaseModel):
 
 
 class EchoPayloadV2(BaseModel):
+    """Echo payload with version field for override tests."""
+
     echo: str
     version: int = 2
 
 
-def test_register_get():
+def test_register_get() -> None:
     """Register and get returns the model class."""
     reg = SchemaRegistry()
     reg.register("echo_payload.v1", EchoPayload)
@@ -25,8 +27,8 @@ def test_register_get():
     assert model is EchoPayload
 
 
-def test_validate_returns_typed_instance():
-    """validate returns an instance of the registered model."""
+def test_validate_returns_typed_instance() -> None:
+    """Validate returns an instance of the registered model."""
     reg = SchemaRegistry()
     reg.register("echo_payload.v1", EchoPayload)
     instance = reg.validate("echo_payload.v1", {"echo": "hi"})
@@ -39,7 +41,9 @@ def test_validate_returns_typed_instance():
     [EchoPayload, EchoPayloadV2],
     ids=["same_class", "different_class"],
 )
-def test_duplicate_registration_raises(model_to_register):
+def test_duplicate_registration_raises(
+    model_to_register: type[BaseModel],
+) -> None:
     """Duplicate registration raises unless override=True."""
     reg = SchemaRegistry()
     reg.register("echo_payload.v1", EchoPayload)
@@ -47,7 +51,7 @@ def test_duplicate_registration_raises(model_to_register):
         reg.register("echo_payload.v1", model_to_register)
 
 
-def test_override_replaces_registration():
+def test_override_replaces_registration() -> None:
     """override=True allows replacing a registration."""
     reg = SchemaRegistry()
     reg.register("echo_payload.v1", EchoPayload)
@@ -57,14 +61,14 @@ def test_override_replaces_registration():
     assert instance.version == 2
 
 
-def test_get_unknown_schema_raises():
+def test_get_unknown_schema_raises() -> None:
     """get() with unknown schema_id raises SchemaRegistryError."""
     reg = SchemaRegistry()
     with pytest.raises(SchemaRegistryError, match="Unknown schema_id"):
         reg.get("unknown.v1")
 
 
-def test_validate_unknown_schema_raises():
+def test_validate_unknown_schema_raises() -> None:
     """validate() with unknown schema_id raises SchemaRegistryError."""
     reg = SchemaRegistry()
     with pytest.raises(SchemaRegistryError, match="Unknown schema_id"):
@@ -72,7 +76,7 @@ def test_validate_unknown_schema_raises():
 
 
 @pytest.mark.parametrize(
-    "invalid_payload,description",
+    "invalid_payload,_description",
     [
         ({"wrong": "shape"}, "wrong keys"),
         ("not a dict", "not a dict"),
@@ -80,16 +84,18 @@ def test_validate_unknown_schema_raises():
     ],
     ids=["wrong_keys", "not_a_dict", "wrong_type_for_echo"],
 )
-def test_validate_invalid_payload_raises(invalid_payload, description):
-    """validate() with wrong shape raises Pydantic ValidationError (clear validation errors)."""
+def test_validate_invalid_payload_raises(
+    invalid_payload: object, _description: str
+) -> None:
+    """validate() with wrong shape raises Pydantic ValidationError."""
     reg = SchemaRegistry()
     reg.register("echo_payload.v1", EchoPayload)
     with pytest.raises(ValidationError):
         reg.validate("echo_payload.v1", invalid_payload)
 
 
-def test_registry_stores_model_class_only_no_per_validation_state():
-    """SchemaRegistry stores the model class only; no state per validation. Safe to reuse across runs."""
+def test_registry_stores_model_class_only_no_per_validation_state() -> None:
+    """SchemaRegistry stores model class only; no per-validation state."""
     reg = SchemaRegistry()
     reg.register("echo_payload.v1", EchoPayload)
     a = reg.validate("echo_payload.v1", {"echo": "first"})

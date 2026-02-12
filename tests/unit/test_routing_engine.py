@@ -12,7 +12,7 @@ from lily.kernel.routing_models import (
 )
 
 
-def test_matching_rule_triggers_correct_action():
+def test_matching_rule_triggers_correct_action() -> None:
     """First matching rule triggers its action."""
     context = RoutingContext(
         step_status="failed",
@@ -33,7 +33,7 @@ def test_matching_rule_triggers_correct_action():
     assert result.reason == "retry once"
 
 
-def test_rule_order_respected():
+def test_rule_order_respected() -> None:
     """First matching rule wins; later rules ignored."""
     context = RoutingContext(step_status="failed", step_id="s1")
     rules = [
@@ -52,8 +52,8 @@ def test_rule_order_respected():
     assert result.type == RoutingActionType.ABORT_RUN
 
 
-def test_default_behavior_when_no_rules_match():
-    """Default: step failed + retry_exhausted -> abort; else retry; step succeeded -> continue."""
+def test_default_behavior_when_no_rules_match() -> None:
+    """Default: failed+retry_exhausted -> abort; else retry; succeeded -> continue."""
     ctx_failed_retries_left = RoutingContext(
         step_status="failed", retry_exhausted=False
     )
@@ -70,7 +70,7 @@ def test_default_behavior_when_no_rules_match():
     assert result_succeeded.type == RoutingActionType.CONTINUE
 
 
-def test_default_abort_on_policy_violation():
+def test_default_abort_on_policy_violation() -> None:
     """Policy violation defaults to abort_run when no rule matches."""
     context = RoutingContext(
         step_status="succeeded",
@@ -80,7 +80,7 @@ def test_default_abort_on_policy_violation():
     assert result.type == RoutingActionType.ABORT_RUN
 
 
-def test_goto_step_requires_target_step_id():
+def test_goto_step_requires_target_step_id() -> None:
     """RoutingAction validates target_step_id when type is goto_step."""
     with pytest.raises(ValueError, match="target_step_id is required"):
         RoutingAction(type=RoutingActionType.GOTO_STEP, target_step_id=None)
@@ -94,7 +94,7 @@ def test_goto_step_requires_target_step_id():
     assert action.target_step_id == "s2"
 
 
-def test_condition_conjunctive():
+def test_condition_conjunctive() -> None:
     """All specified condition fields must match."""
     context = RoutingContext(
         step_status="failed",
@@ -115,7 +115,7 @@ def test_condition_conjunctive():
     assert result.type == RoutingActionType.ABORT_RUN
 
 
-def test_condition_ignores_none_fields():
+def test_condition_ignores_none_fields() -> None:
     """None fields in condition are ignored (match any)."""
     context = RoutingContext(step_status="succeeded", step_id="s1")
     rules = [

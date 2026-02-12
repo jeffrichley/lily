@@ -14,7 +14,7 @@ from lily.kernel.gate_models import (
 from lily.kernel.schema_registry import SchemaRegistry, SchemaRegistryError
 
 
-def test_payload_validates_correctly():
+def test_payload_validates_correctly() -> None:
     """GateResultPayload accepts valid fields."""
     ts = datetime.now(UTC)
     payload = GateResultPayload(
@@ -55,7 +55,7 @@ def test_payload_validates_correctly():
     ],
     ids=["missing_timestamp", "missing_status", "missing_gate_id"],
 )
-def test_missing_required_fields_fail(keys_to_include):
+def test_missing_required_fields_fail(keys_to_include: tuple[str, ...]) -> None:
     """Missing required fields raise ValidationError."""
     ts = datetime.now(UTC)
     base = {
@@ -68,7 +68,7 @@ def test_missing_required_fields_fail(keys_to_include):
         GateResultPayload(**kwargs)
 
 
-def test_invalid_status_fails():
+def test_invalid_status_fails() -> None:
     """Invalid status value raises ValidationError."""
     with pytest.raises(ValidationError):
         GateResultPayload(
@@ -78,7 +78,7 @@ def test_invalid_status_fails():
         )
 
 
-def test_schema_registry_can_validate_gate_result_v1():
+def test_schema_registry_can_validate_gate_result_v1() -> None:
     """SchemaRegistry can validate gate_result.v1 after register_gate_schemas."""
     reg = SchemaRegistry()
     register_gate_schemas(reg)
@@ -106,7 +106,9 @@ def test_schema_registry_can_validate_gate_result_v1():
     ],
     ids=["get_unknown_schema", "validate_unknown_schema"],
 )
-def test_schema_registry_unknown_schema_raises(method_name, method_args):
+def test_schema_registry_unknown_schema_raises(
+    method_name: str, method_args: tuple[object, ...]
+) -> None:
     """get/validate with unknown schema_id raises SchemaRegistryError."""
     reg = SchemaRegistry()
     register_gate_schemas(reg)

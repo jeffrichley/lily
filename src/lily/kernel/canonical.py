@@ -4,19 +4,45 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any
+from collections.abc import Mapping, Sequence
 
 from pydantic import BaseModel
+from pydantic.types import JsonValue
+
+# Read-only JSON type: covariant Mapping/Sequence so list[str], dict[str,str]
+# etc. work without cast. Use for params and returns when data is only read.
+type JSONReadOnly = (
+    Mapping[str, JSONReadOnly]
+    | Sequence[JSONReadOnly]
+    | str
+    | int
+    | float
+    | bool
+    | None
+)
+
+# For building/mutating JSON, use pydantic.types.JsonValue.
+# Canonical serialization accepts either (we only read/serialize).
+CanonicalJSONInput = BaseModel | JSONReadOnly
 
 
-def canonical_json_bytes(obj: Any) -> bytes:
+def canonical_json_bytes(obj: CanonicalJSONInput) -> bytes:
     """Serialize to canonical JSON bytes. Deterministic; stable across key order.
 
     Supported types: BaseModel (via model_dump(mode='json')), dict, list, str,
     int, float, bool, None. Raises on unsupported types or NaN/Infinity.
+
+    Args:
+        obj: Model or JSON-like structure to serialize.
+
+    Returns:
+        UTF-8 encoded canonical JSON bytes.
+
+    Raises:
+        TypeError: On unsupported type.
     """
     if obj is None:
-        data: Any = None
+        data: JsonValue = None
     elif isinstance(obj, BaseModel):
         data = obj.model_dump(mode="json")
     elif isinstance(obj, (dict, list, str, int, float, bool)):
@@ -35,16 +61,29 @@ def canonical_json_bytes(obj: Any) -> bytes:
 
 
 def sha256_bytes(data: bytes) -> str:
-    """Return hex-encoded SHA-256 hash of data."""
+    """Return hex-encoded SHA-256 hash of data.
+
+    Args:
+        data: Raw bytes to hash.
+
+    Returns:
+        Hex-encoded digest string.
+    """
     return hashlib.sha256(data).hexdigest()
 
 
-def hash_payload(payload: Any) -> str:
+def hash_payload(payload: bytes | CanonicalJSONInput) -> str:
     """Hash payload deterministically.
 
     JSON-like payload -> canonical JSON bytes -> sha256.
     bytes -> sha256 directly.
     File hashing is Layer 0.
+
+    Args:
+        payload: Bytes or JSON-like payload to hash.
+
+    Returns:
+        Hex-encoded SHA-256 digest.
     """
     if isinstance(payload, bytes):
         return sha256_bytes(payload)

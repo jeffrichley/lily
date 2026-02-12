@@ -1,22 +1,26 @@
 """Layer 1: ArtifactStore envelope helpers (Phase 5)."""
 
+from pathlib import Path
+
 import pytest
 from pydantic import BaseModel
 
 from lily.kernel import (
     ArtifactStore,
-    create_run,
-    EnvelopeValidator,
     EnvelopeValidationError,
+    EnvelopeValidator,
     SchemaRegistry,
+    create_run,
 )
 
 
 class EchoPayload(BaseModel):
+    """Minimal payload for envelope round-trip tests."""
+
     echo: str
 
 
-def test_put_envelope_get_envelope_roundtrip(workspace_root):
+def test_put_envelope_get_envelope_roundtrip(workspace_root: Path) -> None:
     """put_envelope then get_envelope returns equivalent envelope (round-trip)."""
     run_id, run_root = create_run(workspace_root)
     store = ArtifactStore(run_root, run_id)
@@ -36,7 +40,7 @@ def test_put_envelope_get_envelope_roundtrip(workspace_root):
     assert envelope.payload == {"echo": "hello"}
 
 
-def test_get_validated_returns_meta_and_model(workspace_root):
+def test_get_validated_returns_meta_and_model(workspace_root: Path) -> None:
     """get_validated enforces schema and hash; returns (meta, payload_model)."""
     run_id, run_root = create_run(workspace_root)
     store = ArtifactStore(run_root, run_id)
@@ -55,7 +59,7 @@ def test_get_validated_returns_meta_and_model(workspace_root):
     assert model.echo == "validated"
 
 
-def test_get_validated_fails_when_schema_not_registered(workspace_root):
+def test_get_validated_fails_when_schema_not_registered(workspace_root: Path) -> None:
     """get_validated raises when schema_id is not in registry."""
     run_id, run_root = create_run(workspace_root)
     store = ArtifactStore(run_root, run_id)
@@ -73,11 +77,11 @@ def test_get_validated_fails_when_schema_not_registered(workspace_root):
         store.get_validated(ref, validator2)
 
 
-def test_get_validated_fails_on_schema_drift(workspace_root):
-    """If the registered model is changed later (stricter schema), get_validated fails appropriately.
+def test_get_validated_fails_on_schema_drift(workspace_root: Path) -> None:
+    """If the registered model is changed later (stricter schema), get_validated fails.
 
-    Store envelope with EchoPayload (echo only). Then register a stricter model with an extra
-    required field. get_validated must fail — desired behavior, not a bug.
+    Store envelope with EchoPayload (echo only). Then register a stricter model with
+    an extra required field. get_validated must fail — desired behavior, not a bug.
     """
     run_id, run_root = create_run(workspace_root)
     store = ArtifactStore(run_root, run_id)
@@ -100,10 +104,13 @@ def test_get_validated_fails_on_schema_drift(workspace_root):
         store.get_validated(ref, validator)
 
 
-def test_integration_create_run_put_envelope_get_validated_typed(workspace_root):
-    """Integration: create run, put_envelope, get_validated, assert payload is typed correctly.
+def test_integration_create_run_put_envelope_get_validated_typed(
+    workspace_root: Path,
+) -> None:
+    """Integration: create run, put_envelope, get_validated, assert payload typed.
 
-    Layer 0 + Layer 1 boundary: one toy schema (echo.v1), full round-trip, typed payload.
+    Layer 0 + Layer 1 boundary: one toy schema (echo.v1), full round-trip,
+    typed payload.
     """
     run_id, run_root = create_run(workspace_root)
     store = ArtifactStore(run_root, run_id)

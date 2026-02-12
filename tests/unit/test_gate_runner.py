@@ -22,7 +22,7 @@ def _gate_spec(
     )
 
 
-def test_successful_command_passes(tmp_path: Path):
+def test_successful_command_passes(tmp_path: Path) -> None:
     """Successful command returns success=True and returncode=0."""
     run_root = tmp_path / "run"
     run_root.mkdir()
@@ -40,7 +40,7 @@ def test_successful_command_passes(tmp_path: Path):
     assert "runner.json" in result.log_paths, "runner.json log path should be present"
 
 
-def test_failing_command_fails(tmp_path: Path):
+def test_failing_command_fails(tmp_path: Path) -> None:
     """Failing command returns success=False and non-zero returncode."""
     run_root = tmp_path / "run"
     run_root.mkdir()
@@ -57,7 +57,7 @@ def test_failing_command_fails(tmp_path: Path):
     assert result.error_message is not None, "failure should have error message"
 
 
-def test_timeout_fails(tmp_path: Path):
+def test_timeout_fails(tmp_path: Path) -> None:
     """Timeout returns success=False and error_message='timeout'."""
     run_root = tmp_path / "run"
     run_root.mkdir()
@@ -80,7 +80,7 @@ def test_timeout_fails(tmp_path: Path):
     )
 
 
-def test_logs_created(tmp_path: Path):
+def test_logs_created(tmp_path: Path) -> None:
     """Logs are written under .iris/runs/<run_id>/logs/gates/<gate_id>/<attempt>/."""
     run_root = tmp_path / "run"
     run_root.mkdir()

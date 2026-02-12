@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 from lily.kernel.graph_models import ExecutorSpec, GraphSpec, StepSpec
 from lily.kernel.run_state import (
     RunState,
@@ -14,7 +13,7 @@ from lily.kernel.run_state import (
 from lily.kernel.runner import run_graph
 
 
-def test_resume_marks_running_step_interrupted_and_proceeds(tmp_path: Path):
+def test_resume_marks_running_step_interrupted_and_proceeds(tmp_path: Path) -> None:
     """Create state with a running step; runner marks it interrupted and proceeds."""
     graph = GraphSpec(
         graph_id="g1",
@@ -56,7 +55,7 @@ def test_resume_marks_running_step_interrupted_and_proceeds(tmp_path: Path):
     )
     save_run_state_atomic(run_root, state)
 
-    # Run - should mark "a" interrupted (failed), no eligible steps, run completes with FAILED
+    # Run: mark "a" failed (interrupted), no eligible steps, run FAILED
     result = run_graph(run_root, graph)
 
     assert result.step_records["a"].status == StepStatus.FAILED, (
@@ -70,8 +69,8 @@ def test_resume_marks_running_step_interrupted_and_proceeds(tmp_path: Path):
     )
 
 
-def test_resume_with_succeeded_deps_then_running_proceeds(tmp_path: Path):
-    """a succeeded, b was running; resume marks b interrupted, run completes failed."""
+def test_resume_with_succeeded_deps_then_running_proceeds(tmp_path: Path) -> None:
+    """A succeeded, b was running; resume marks b interrupted, run completes failed."""
     graph = GraphSpec(
         graph_id="g1",
         steps=[

@@ -1,7 +1,9 @@
 """Layer 5: Environment snapshot envelope and capture."""
 
+from datetime import UTC, datetime
 from pathlib import Path
 
+from lily.kernel import create_run, run_graph
 from lily.kernel.artifact_store import ArtifactStore
 from lily.kernel.env_snapshot import (
     ENVIRONMENT_SNAPSHOT_SCHEMA_ID,
@@ -9,14 +11,14 @@ from lily.kernel.env_snapshot import (
     capture_environment_snapshot,
     register_observability_schemas,
 )
+from lily.kernel.graph_models import ExecutorSpec, GraphSpec, StepSpec
 from lily.kernel.run import KERNEL_VERSION
+from lily.kernel.run_state import load_run_state
 from lily.kernel.schema_registry import SchemaRegistry
 
 
-def test_envelope_validates():
+def test_envelope_validates() -> None:
     """EnvironmentSnapshotPayload validates with required fields."""
-    from datetime import UTC, datetime
-
     payload = EnvironmentSnapshotPayload(
         python_version="3.12.0",
         platform="Linux-1.2.3-x86_64",
@@ -34,8 +36,8 @@ def test_envelope_validates():
     assert validated.python_version == payload.python_version
 
 
-def test_snapshot_fields_populated(tmp_path: Path):
-    """capture_environment_snapshot populates python_version, platform, kernel_version, timestamp."""
+def test_snapshot_fields_populated(tmp_path: Path) -> None:
+    """Snapshot populates python_version, platform, kernel_version."""
     payload = capture_environment_snapshot(tmp_path, kernel_version=KERNEL_VERSION)
     assert payload.python_version
     assert payload.platform
@@ -44,13 +46,13 @@ def test_snapshot_fields_populated(tmp_path: Path):
     assert payload.uv_lock_hash is None  # no uv.lock in tmp_path
 
 
-def test_uv_lock_hash_optional(tmp_path: Path):
+def test_uv_lock_hash_optional(tmp_path: Path) -> None:
     """When uv.lock is absent, uv_lock_hash is None."""
     payload = capture_environment_snapshot(tmp_path, kernel_version="0.1.0")
     assert payload.uv_lock_hash is None
 
 
-def test_uv_lock_hash_when_present(tmp_path: Path):
+def test_uv_lock_hash_when_present(tmp_path: Path) -> None:
     """When uv.lock exists, uv_lock_hash is its sha256 hex."""
     (tmp_path / "uv.lock").write_text("content")
     payload = capture_environment_snapshot(tmp_path, kernel_version="0.1.0")
@@ -59,7 +61,7 @@ def test_uv_lock_hash_when_present(tmp_path: Path):
     assert all(c in "0123456789abcdef" for c in payload.uv_lock_hash)
 
 
-def test_stored_artifact_retrievable(tmp_path: Path):
+def test_stored_artifact_retrievable(tmp_path: Path) -> None:
     """Snapshot envelope can be stored via ArtifactStore and retrieved."""
     run_id = "run-snap"
     run_root = tmp_path / ".iris" / "runs" / run_id
@@ -81,14 +83,10 @@ def test_stored_artifact_retrievable(tmp_path: Path):
     assert envelope.payload["kernel_version"] == payload.kernel_version
 
 
-def test_run_state_references_snapshot(tmp_path: Path):
+def test_run_state_references_snapshot(tmp_path: Path) -> None:
     """run_graph creates RunState with environment_snapshot_ref set."""
-    from lily.kernel import create_run, run_graph
-    from lily.kernel.graph_models import ExecutorSpec, GraphSpec, StepSpec
-    from lily.kernel.run_state import load_run_state
-
     workspace_root = tmp_path
-    run_id, run_root = create_run(workspace_root)
+    _run_id, run_root = create_run(workspace_root)
     graph = GraphSpec(
         graph_id="g1",
         steps=[

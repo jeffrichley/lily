@@ -6,9 +6,13 @@ import pytest
 
 from lily.kernel.gate_models import GateRunnerSpec, GateSpec
 from lily.kernel.graph_models import ExecutorSpec, StepSpec
-from lily.kernel.pack_models import GateTemplate, StepTemplate
+from lily.kernel.pack_models import GateTemplate, PackDefinition, StepTemplate
 from lily.kernel.pack_registration import register_pack_templates
-from lily.kernel.template_registry import TemplateRegistry
+from lily.kernel.template_registry import (
+    ExpandGateOptions,
+    ExpandStepOptions,
+    TemplateRegistry,
+)
 
 
 def test_template_registration_works() -> None:
@@ -61,8 +65,10 @@ def test_expansion_produces_valid_step_spec() -> None:
         "coding.apply.v1",
         step_id="step_1",
         name="Apply patch",
-        description="Apply the patch",
-        depends_on=["step_0"],
+        options=ExpandStepOptions(
+            description="Apply the patch",
+            depends_on=["step_0"],
+        ),
     )
     assert isinstance(spec, StepSpec)
     assert spec.step_id == "step_1"
@@ -88,7 +94,7 @@ def test_expansion_produces_valid_gate_spec() -> None:
         "coding.lint.v1",
         gate_id="gate_lint",
         name="Lint",
-        description="Run linter",
+        options=ExpandGateOptions(description="Run linter"),
     )
     assert isinstance(spec, GateSpec)
     assert spec.gate_id == "gate_lint"
@@ -100,8 +106,6 @@ def test_expansion_produces_valid_gate_spec() -> None:
 
 def test_register_pack_templates_collision_across_packs() -> None:
     """Two packs with same step template_id raise when registering."""
-    from lily.kernel.pack_models import PackDefinition
-
     reg = TemplateRegistry()
     t = StepTemplate(template_id="shared.step.v1", output_schema_ids=[])
     pack_a = PackDefinition(

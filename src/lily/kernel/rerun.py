@@ -5,11 +5,19 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from lily.kernel.graph_models import GraphSpec
-from lily.kernel.run_state import RunState, RunStatus, StepStatus
+from lily.kernel.run_state import RunState, RunStatus, StepRunRecord, StepStatus
 
 
 def _downstream_step_ids(graph: GraphSpec, step_id: str) -> set[str]:
-    """Return step_id and all steps that depend on it (directly or indirectly)."""
+    """Return step_id and all steps that depend on it (directly or indirectly).
+
+    Args:
+        graph: Graph spec.
+        step_id: Starting step id.
+
+    Returns:
+        Set of step_id and all downstream step ids.
+    """
     step_by_id = {s.step_id: s for s in graph.steps}
     if step_id not in step_by_id:
         return set()
@@ -29,30 +37,44 @@ def _downstream_step_ids(graph: GraphSpec, step_id: str) -> set[str]:
     return result
 
 
-def rerun_from(state: RunState, graph: GraphSpec, step_id: str) -> RunState:
+def _reset_step_record(rec: StepRunRecord) -> None:
+    """Mark step pending and clear provenance; preserve log_paths.
+
+    Args:
+        rec: Step run record to reset (mutated in place).
     """
-    Mark target step and all downstream steps as pending; clear produced_artifact_ids
-    and provenance fields so they are repopulated on re-run. Preserves log_paths
-    (historical logs). Does not delete artifacts on disk. Returns a new RunState
-    (caller should persist).
+    rec.status = StepStatus.PENDING
+    rec.attempts = 0
+    rec.started_at = None
+    rec.finished_at = None
+    rec.last_error = None
+    rec.produced_artifact_ids = []
+    rec.input_artifact_hashes = {}
+    rec.output_artifact_hashes = {}
+    rec.duration_ms = None
+    rec.executor_summary = {}
+    rec.gate_result_ids = []
+    rec.policy_violation_ids = []
+
+
+def rerun_from(state: RunState, graph: GraphSpec, step_id: str) -> RunState:
+    """Mark target and downstream steps pending; clear produced_artifact_ids/provenance.
+
+    Preserves log_paths. Does not delete artifacts. New RunState (caller persists).
+
+    Args:
+        state: Current run state (mutated).
+        graph: Graph spec for downstream resolution.
+        step_id: Step from which to rerun (and all downstream).
+
+    Returns:
+        Updated RunState (caller should persist).
     """
     to_reset = _downstream_step_ids(graph, step_id)
     for sid in to_reset:
         rec = state.step_records.get(sid)
         if rec:
-            rec.status = StepStatus.PENDING
-            rec.attempts = 0
-            rec.started_at = None
-            rec.finished_at = None
-            rec.last_error = None
-            rec.produced_artifact_ids = []
-            # Preserve log_paths for audit (Layer 5)
-            rec.input_artifact_hashes = {}
-            rec.output_artifact_hashes = {}
-            rec.duration_ms = None
-            rec.executor_summary = {}
-            rec.gate_result_ids = []
-            rec.policy_violation_ids = []
+            _reset_step_record(rec)
     state.current_step_id = None
     state.status = RunStatus.RUNNING
     state.updated_at = datetime.now(UTC).isoformat()

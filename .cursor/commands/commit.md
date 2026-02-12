@@ -147,11 +147,13 @@ feat(engine): add persistent model cache mounting
 Mount ~/.chrona/models into containers to avoid repeated downloads.
 ```
 
-### 6. Create Commit
+### 6. Validate and Create Commit
 
-```bash
-git commit -m "<message>"
-```
+- **Validate:** Before committing, ensure the message passes Commitizen:
+  `just commit-check` with the message, or `uv run cz check -m "<message>"`.
+  If validation fails, fix the message (type, scope, format) and re-check.
+- **Create:** Either run `just commit` (interactive Commitizen flow) or, when the message is already decided and validated:
+  `git commit -m "<message>"`
 
 ### 7. Verify Result
 

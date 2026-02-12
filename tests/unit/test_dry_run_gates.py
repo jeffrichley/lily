@@ -4,12 +4,12 @@ from pathlib import Path
 
 from lily.kernel import create_run, run_graph
 from lily.kernel.artifact_store import ArtifactStore
-from lily.kernel.graph_models import ExecutorSpec, GraphSpec, StepSpec
 from lily.kernel.gate_models import GateRunnerSpec, GateSpec
-from lily.kernel.run_state import load_run_state, StepStatus
+from lily.kernel.graph_models import ExecutorSpec, GraphSpec, StepSpec
+from lily.kernel.run_state import StepStatus, load_run_state
 
 
-def test_gates_execute(tmp_path: Path):
+def test_gates_execute(tmp_path: Path) -> None:
     """With dry_run_gates=True, gates run and produce GateResult artifacts."""
     run_id, run_root = create_run(tmp_path)
     graph = GraphSpec(
@@ -42,9 +42,9 @@ def test_gates_execute(tmp_path: Path):
     )
 
 
-def test_step_status_unchanged(tmp_path: Path):
+def test_step_status_unchanged(tmp_path: Path) -> None:
     """Dry-run does not change step status (all remain pending for new run)."""
-    run_id, run_root = create_run(tmp_path)
+    _run_id, run_root = create_run(tmp_path)
     graph = GraphSpec(
         graph_id="g1",
         steps=[
@@ -73,7 +73,7 @@ def test_step_status_unchanged(tmp_path: Path):
     )
 
 
-def test_gate_results_stored(tmp_path: Path):
+def test_gate_results_stored(tmp_path: Path) -> None:
     """GateResult envelopes are stored in the artifact store."""
     run_id, run_root = create_run(tmp_path)
     graph = GraphSpec(
@@ -106,9 +106,9 @@ def test_gate_results_stored(tmp_path: Path):
     )
 
 
-def test_no_step_execution_logs_created(tmp_path: Path):
+def test_no_step_execution_logs_created(tmp_path: Path) -> None:
     """Dry-run does not create step execution logs (logs/steps/...)."""
-    run_id, run_root = create_run(tmp_path)
+    _run_id, run_root = create_run(tmp_path)
     graph = GraphSpec(
         graph_id="g1",
         steps=[

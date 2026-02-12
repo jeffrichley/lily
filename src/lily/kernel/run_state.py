@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import json
-import os
-import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
+from pydantic.types import JsonValue
 
+from lily.kernel.atomic_write import atomic_write_json_at
 from lily.kernel.graph_models import GraphSpec
 from lily.kernel.paths import get_run_state_path
 
@@ -74,13 +74,24 @@ class RunState(BaseModel):
         None  # Layer 5: artifact_id of environment_snapshot.v1
     )
 
-    def to_file_dict(self) -> dict[str, Any]:
-        """Serialize for JSON file."""
+    def to_file_dict(self) -> dict[str, JsonValue]:
+        """Serialize for JSON file.
+
+        Returns:
+            JSON-serializable dict.
+        """
         return self.model_dump(mode="json")
 
     @classmethod
-    def from_file_dict(cls, d: dict[str, Any]) -> RunState:
-        """Deserialize from JSON file."""
+    def from_file_dict(cls, d: dict[str, JsonValue]) -> RunState:
+        """Deserialize from JSON file.
+
+        Args:
+            d: JSON-compatible dict (e.g. from file).
+
+        Returns:
+            RunState instance.
+        """
         return cls.model_validate(d)
 
 
@@ -89,7 +100,15 @@ def _now_iso() -> str:
 
 
 def create_initial_run_state(run_id: str, graph: GraphSpec) -> RunState:
-    """Create empty RunState for a graph. All steps start as pending."""
+    """Create empty RunState for a graph. All steps start as pending.
+
+    Args:
+        run_id: Run identifier.
+        graph: Graph spec; one step record per step.
+
+    Returns:
+        RunState with all steps pending.
+    """
     step_records = {s.step_id: StepRunRecord(step_id=s.step_id) for s in graph.steps}
     now = _now_iso()
     return RunState(
@@ -103,7 +122,14 @@ def create_initial_run_state(run_id: str, graph: GraphSpec) -> RunState:
 
 
 def load_run_state(run_root: Path) -> RunState | None:
-    """Load RunState from run_root. Returns None if file does not exist."""
+    """Load RunState from run_root. Returns None if file does not exist.
+
+    Args:
+        run_root: Run directory root.
+
+    Returns:
+        RunState or None if run_state.json does not exist.
+    """
     path = get_run_state_path(run_root)
     if not path.exists():
         return None
@@ -113,34 +139,15 @@ def load_run_state(run_root: Path) -> RunState | None:
 
 
 def save_run_state_atomic(run_root: Path, state: RunState) -> None:
+    """Write RunState atomically: temp -> fsync -> rename -> fsync dir.
+
+    Args:
+        run_root: Run directory root.
+        state: RunState to persist.
     """
-    Write RunState atomically: write temp -> fsync temp -> rename.
-    Same pattern as write_manifest_atomic.
-    """
-    run_state_path = get_run_state_path(run_root)
-    temp_path = run_root / f".run_state.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
-    content = json.dumps(state.to_file_dict(), indent=2)
-    content_bytes = content.encode("utf-8")
-    try:
-        fd = os.open(
-            str(temp_path),
-            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
-            0o644,
-        )
-        try:
-            os.write(fd, content_bytes)
-            os.fsync(fd)
-        finally:
-            os.close(fd)
-        os.replace(temp_path, run_state_path)
-        try:
-            dir_fd = os.open(str(run_root), os.O_RDONLY)
-            try:
-                os.fsync(dir_fd)
-            finally:
-                os.close(dir_fd)
-        except OSError:
-            pass
-    finally:
-        if temp_path.exists():
-            temp_path.unlink(missing_ok=True)
+    atomic_write_json_at(
+        run_root,
+        get_run_state_path(run_root),
+        state.to_file_dict(),
+        "run_state",
+    )

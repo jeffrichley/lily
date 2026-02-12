@@ -3,9 +3,10 @@
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any
 
-from lily.kernel.artifact_ref import ArtifactRef, StorageKind, ProducerKind
+from pydantic.types import JsonValue
+
+from lily.kernel.artifact_ref import ArtifactRef, ProducerKind, StorageKind
 from lily.kernel.paths import get_index_path
 
 TABLE_NAME = "artifacts"
@@ -31,8 +32,15 @@ def _ensure_table(conn: sqlite3.Connection) -> None:
     conn.execute(CREATE_SQL)
 
 
-def _ref_to_row(ref: ArtifactRef) -> dict[str, Any]:
-    """Convert ArtifactRef to index row (storage_kind/producer_kind as strings)."""
+def _ref_to_row(ref: ArtifactRef) -> dict[str, JsonValue]:
+    """Convert ArtifactRef to index row (storage_kind/producer_kind as strings).
+
+    Args:
+        ref: The artifact reference to convert.
+
+    Returns:
+        A dict suitable for SQLite row insertion.
+    """
     return {
         "artifact_id": ref.artifact_id,
         "run_id": ref.run_id,
@@ -49,7 +57,14 @@ def _ref_to_row(ref: ArtifactRef) -> dict[str, Any]:
 
 
 def _row_to_ref(row: sqlite3.Row | tuple) -> ArtifactRef:
-    """Build ArtifactRef from index row."""
+    """Build ArtifactRef from index row.
+
+    Args:
+        row: A SQLite row or tuple from the artifacts table.
+
+    Returns:
+        The reconstructed ArtifactRef.
+    """
     if isinstance(row, tuple):
         # columns in CREATE order
         (
@@ -93,7 +108,14 @@ def _row_to_ref(row: sqlite3.Row | tuple) -> ArtifactRef:
 
 
 def open_index(workspace_root: Path) -> sqlite3.Connection:
-    """Open connection to global index; create file and table if needed."""
+    """Open connection to global index; create file and table if needed.
+
+    Args:
+        workspace_root: Root of the workspace containing .iris/index.
+
+    Returns:
+        An open SQLite connection with row_factory set.
+    """
     index_path = get_index_path(workspace_root)
     index_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(index_path))
@@ -103,7 +125,12 @@ def open_index(workspace_root: Path) -> sqlite3.Connection:
 
 
 def insert_artifact(conn: sqlite3.Connection, ref: ArtifactRef) -> None:
-    """Insert one artifact row in a transaction. Caller commits."""
+    """Insert one artifact row in a transaction. Caller commits.
+
+    Args:
+        conn: Open index connection.
+        ref: Artifact reference to insert.
+    """
     row = _ref_to_row(ref)
     conn.execute(
         """
@@ -131,7 +158,15 @@ def insert_artifact(conn: sqlite3.Connection, ref: ArtifactRef) -> None:
 def get_artifact_by_id(
     conn: sqlite3.Connection, artifact_id: str
 ) -> ArtifactRef | None:
-    """Look up a single artifact by artifact_id. Returns None if not found."""
+    """Look up a single artifact by artifact_id. Returns None if not found.
+
+    Args:
+        conn: Open index connection.
+        artifact_id: The artifact ID to look up.
+
+    Returns:
+        The ArtifactRef if found, else None.
+    """
     cur = conn.execute("SELECT * FROM artifacts WHERE artifact_id = ?", (artifact_id,))
     row = cur.fetchone()
     if row is None:
@@ -146,9 +181,19 @@ def list_artifacts(
     artifact_type: str | None = None,
     producer_id: str | None = None,
 ) -> list[ArtifactRef]:
-    """Query artifacts by run_id with optional filters. Returns list of ArtifactRef."""
+    """Query artifacts by run_id with optional filters. Returns list of ArtifactRef.
+
+    Args:
+        conn: Open index connection.
+        run_id: Run ID to filter by.
+        artifact_type: Optional artifact type filter.
+        producer_id: Optional producer ID filter.
+
+    Returns:
+        List of matching ArtifactRefs, ordered by created_at.
+    """
     sql = "SELECT * FROM artifacts WHERE run_id = ?"
-    params: list[Any] = [run_id]
+    params: list[str] = [run_id]
     if artifact_type is not None:
         sql += " AND artifact_type = ?"
         params.append(artifact_type)

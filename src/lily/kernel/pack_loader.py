@@ -11,7 +11,14 @@ from lily.kernel.run import KERNEL_VERSION
 
 
 def _parse_version(version: str) -> tuple[int, ...]:
-    """Parse a version string into a tuple of integers for comparison. Handles 0.1.0, 0.1.0-dev, etc."""
+    """Parse version string into tuple of ints (e.g. 0.1.0, 0.1.0-dev).
+
+    Args:
+        version: Version string (e.g. 0.1.0 or 0.1.0-dev).
+
+    Returns:
+        Tuple of integers (e.g. (0, 1, 0)).
+    """
     # Take the first part that looks like semver (digits and dots)
     match = re.match(r"^(\d+(?:\.\d+)*)", version.strip())
     if not match:
@@ -21,7 +28,14 @@ def _parse_version(version: str) -> tuple[int, ...]:
 
 
 def _kernel_satisfies(minimum_kernel_version: str) -> bool:
-    """Return True if current kernel version >= pack's minimum_kernel_version."""
+    """Return True if current kernel version >= pack's minimum_kernel_version.
+
+    Args:
+        minimum_kernel_version: Minimum required kernel version string.
+
+    Returns:
+        True if current kernel satisfies the minimum.
+    """
     current = _parse_version(KERNEL_VERSION)
     required = _parse_version(minimum_kernel_version)
     # Pad with zeros so (0, 1) vs (0, 1, 0) compares correctly
@@ -36,10 +50,15 @@ def _fail(message: str) -> NoReturn:
 
 
 def load_pack(module_path: str) -> PackDefinition:
-    """
-    Load a pack definition from a Python module.
-    The module must export PACK_DEFINITION (a PackDefinition instance).
-    Validates minimum_kernel_version and structure; fails fast on error.
+    """Load a pack definition from a Python module.
+
+    Module must export PACK_DEFINITION (PackDefinition). Validates version/structure.
+
+    Args:
+        module_path: Dotted module path (e.g. my_pack.pack).
+
+    Returns:
+        Validated PackDefinition.
     """
     try:
         mod = importlib.import_module(module_path)
@@ -49,21 +68,29 @@ def load_pack(module_path: str) -> PackDefinition:
     if not hasattr(mod, "PACK_DEFINITION"):
         _fail(f"Pack module {module_path!r} has no PACK_DEFINITION export")
 
-    raw = getattr(mod, "PACK_DEFINITION")
+    raw = mod.PACK_DEFINITION
     if not isinstance(raw, PackDefinition):
         _fail(
-            f"PACK_DEFINITION in {module_path!r} must be a PackDefinition instance, got {type(raw).__name__}"
+            f"PACK_DEFINITION in {module_path!r} must be PackDefinition, "
+            f"got {type(raw).__name__}"
         )
 
     if not _kernel_satisfies(raw.minimum_kernel_version):
         _fail(
-            f"Pack {raw.name!r} requires minimum_kernel_version {raw.minimum_kernel_version!r}; "
-            f"current kernel is {KERNEL_VERSION!r}"
+            f"Pack {raw.name!r} requires kernel {raw.minimum_kernel_version!r}, "
+            f"current is {KERNEL_VERSION!r}"
         )
 
     return raw
 
 
 def load_packs(module_paths: list[str]) -> list[PackDefinition]:
-    """Load multiple pack definitions from Python modules. Order preserved; fails fast on first error."""
+    """Load multiple packs from modules. Order preserved; fails fast on first error.
+
+    Args:
+        module_paths: List of dotted module paths.
+
+    Returns:
+        List of PackDefinitions in order.
+    """
     return [load_pack(path) for path in module_paths]

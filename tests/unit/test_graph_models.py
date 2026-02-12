@@ -19,7 +19,7 @@ def _make_step(step_id: str, depends_on: list[str] | None = None) -> StepSpec:
     )
 
 
-def test_unique_step_ids_enforced():
+def test_unique_step_ids_enforced() -> None:
     """Duplicate step_ids must fail validation."""
     with pytest.raises(ValueError, match="unique"):
         GraphSpec(
@@ -31,9 +31,9 @@ def test_unique_step_ids_enforced():
         )
 
 
-def test_missing_dependency_step_id_fails():
+def test_missing_dependency_step_id_fails() -> None:
     """depends_on must reference existing step_ids."""
-    with pytest.raises(ValueError, match="missing step_id|depends_on"):
+    with pytest.raises(ValueError, match=r"missing step_id|depends_on"):
         GraphSpec(
             graph_id="g1",
             steps=[
@@ -57,13 +57,13 @@ def test_missing_dependency_step_id_fails():
     ],
     ids=["three_node_cycle", "two_node_cycle"],
 )
-def test_cycle_detected(steps):
+def test_cycle_detected(steps: list[StepSpec]) -> None:
     """Cycles in step dependencies must be detected."""
     with pytest.raises(ValueError, match="Cycle detected"):
         GraphSpec(graph_id="g1", steps=steps)
 
 
-def test_valid_dag_passes():
+def test_valid_dag_passes() -> None:
     """Valid DAG with no cycles passes validation."""
     g = GraphSpec(
         graph_id="g1",
@@ -78,13 +78,13 @@ def test_valid_dag_passes():
     assert len(g.steps) == 4
 
 
-def test_empty_steps_fails():
+def test_empty_steps_fails() -> None:
     """Graph must have at least one step."""
     with pytest.raises(ValueError, match="at least one step"):
         GraphSpec(graph_id="g1", steps=[])
 
 
-def test_graph_spec_from_dict():
+def test_graph_spec_from_dict() -> None:
     """GraphSpec can be constructed from dict and validated."""
     d = {
         "graph_id": "g1",
@@ -103,7 +103,7 @@ def test_graph_spec_from_dict():
     assert g.steps[0].executor.argv == ["echo", "x"]
 
 
-def test_validate_graph_spec_standalone():
+def test_validate_graph_spec_standalone() -> None:
     """validate_graph_spec can be called standalone on already-built spec."""
     g = GraphSpec.model_construct(
         graph_id="g1",

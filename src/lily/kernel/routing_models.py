@@ -1,14 +1,14 @@
-"""Layer 4: Routing models and engine. Deterministic control flow from runtime outcomes."""
+"""Layer 4: Routing models and engine. Deterministic control flow from outcomes."""
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, model_validator
 
 
-class RoutingActionType(str, Enum):
+class RoutingActionType(StrEnum):
     """Routing action types."""
 
     RETRY_STEP = "retry_step"
@@ -30,26 +30,26 @@ class RoutingCondition(BaseModel):
     step_id: str | None = None
     gate_id: str | None = None
 
-    def matches(self, context: "RoutingContext") -> bool:
-        """Return True if all specified fields match the context."""
-        if self.step_status is not None and context.step_status != self.step_status:
-            return False
-        if self.gate_status is not None and context.gate_status != self.gate_status:
-            return False
-        if (
-            self.retry_exhausted is not None
-            and context.retry_exhausted != self.retry_exhausted
-        ):
-            return False
-        if (
-            self.policy_violation is not None
-            and context.policy_violation != self.policy_violation
-        ):
-            return False
-        if self.step_id is not None and context.step_id != self.step_id:
-            return False
-        if self.gate_id is not None and context.gate_id != self.gate_id:
-            return False
+    def matches(self, context: RoutingContext) -> bool:
+        """Return True if all specified fields match the context.
+
+        Args:
+            context: Current routing context.
+
+        Returns:
+            True if all non-None condition fields match context.
+        """
+        checks = [
+            (self.step_status, context.step_status),
+            (self.gate_status, context.gate_status),
+            (self.retry_exhausted, context.retry_exhausted),
+            (self.policy_violation, context.policy_violation),
+            (self.step_id, context.step_id),
+            (self.gate_id, context.gate_id),
+        ]
+        for expected, actual in checks:
+            if expected is not None and actual != expected:
+                return False
         return True
 
 
@@ -63,7 +63,7 @@ class RoutingAction(BaseModel):
     reason: str | None = None
 
     @model_validator(mode="after")
-    def _goto_step_requires_target(self) -> "RoutingAction":
+    def _goto_step_requires_target(self) -> RoutingAction:
         if self.type == RoutingActionType.GOTO_STEP and not self.target_step_id:
             raise ValueError("target_step_id is required when type is goto_step")
         return self
@@ -93,21 +93,23 @@ class RoutingContext(BaseModel):
 
 
 class RoutingEngine:
-    """
-    Pure routing evaluator. No side effects. Deterministic.
-    Does not mutate RunState; returns RoutingAction for Runner to apply.
-    """
+    """Pure routing evaluator. No side effects. Returns RoutingAction for Runner."""
 
     @staticmethod
     def evaluate(
         context: RoutingContext,
         rules: list[RoutingRule],
     ) -> RoutingAction:
-        """
-        Evaluate routing rules deterministically. First matching rule wins.
-        Default behavior if no rule matches:
-        - step failed (or policy_violation) -> abort_run
-        - step succeeded -> continue
+        """Evaluate routing rules; first match wins.
+
+        No match: failed/policy_violation -> abort_run; succeeded -> continue.
+
+        Args:
+            context: Current routing context.
+            rules: List of routing rules (first match wins).
+
+        Returns:
+            The action from the first matching rule or default action.
         """
         for rule in rules:
             if rule.when.matches(context):

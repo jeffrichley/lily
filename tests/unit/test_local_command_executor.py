@@ -2,12 +2,11 @@
 
 from pathlib import Path
 
-
-from lily.kernel.graph_models import ExecutorSpec
 from lily.kernel.executors.local_command import run_local_command
+from lily.kernel.graph_models import ExecutorSpec
 
 
-def test_successful_command_produces_stdout_log(tmp_path: Path):
+def test_successful_command_produces_stdout_log(tmp_path: Path) -> None:
     """Successful command produces stdout log in correct path."""
     spec = ExecutorSpec(
         kind="local_command", argv=["python", "-c", "print('hello world')"]
@@ -21,7 +20,7 @@ def test_successful_command_produces_stdout_log(tmp_path: Path):
     assert "hello world" in stdout_path.read_text()
 
 
-def test_failing_command_produces_stderr_returncode(tmp_path: Path):
+def test_failing_command_produces_stderr_returncode(tmp_path: Path) -> None:
     """Failing command produces stderr and returncode."""
     spec = ExecutorSpec(
         kind="local_command",
@@ -37,7 +36,7 @@ def test_failing_command_produces_stderr_returncode(tmp_path: Path):
     assert "oops" in stderr_path.read_text()
 
 
-def test_timeout_produces_failure(tmp_path: Path):
+def test_timeout_produces_failure(tmp_path: Path) -> None:
     """Timeout produces failure with timeout reason."""
     spec = ExecutorSpec(
         kind="local_command", argv=["python", "-c", "import time; time.sleep(10)"]
@@ -53,7 +52,7 @@ def test_timeout_produces_failure(tmp_path: Path):
     assert "stdout" in result.log_paths, "stdout log path present even on timeout"
 
 
-def test_logs_in_correct_paths(tmp_path: Path):
+def test_logs_in_correct_paths(tmp_path: Path) -> None:
     """Logs are created at run_root/logs/steps/<step_id>/<attempt>/."""
     spec = ExecutorSpec(kind="local_command", argv=["python", "-c", "print('x')"])
     result = run_local_command(spec, run_root=tmp_path, step_id="my_step", attempt=2)
@@ -67,7 +66,7 @@ def test_logs_in_correct_paths(tmp_path: Path):
     assert (expected_log_dir / "executor.json").exists(), "executor.json should exist"
 
 
-def test_unsupported_executor_kind(tmp_path: Path):
+def test_unsupported_executor_kind(tmp_path: Path) -> None:
     """Unsupported executor kind returns error without running."""
     spec = ExecutorSpec(kind="python_callable")
     result = run_local_command(spec, run_root=tmp_path, step_id="s1", attempt=0)

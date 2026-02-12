@@ -1,12 +1,12 @@
-"""Phase C acceptance: global SQLite index, payload before commit, accurate row, concurrent runs."""
+"""Phase C: global SQLite index, payload before commit, concurrent runs."""
 
 import threading
 from pathlib import Path
 
-from lily.kernel import create_run, ArtifactStore, ArtifactRef
+from lily.kernel import ArtifactRef, ArtifactStore, PutArtifactOptions, create_run
 
 
-def test_index_created_after_put(workspace_root: Path):
+def test_index_created_after_put(workspace_root: Path) -> None:
     """After first put_json, list() returns the new artifact (index is usable)."""
     run_id, run_root = create_run(workspace_root)
     store = ArtifactStore(run_root, run_id)
@@ -18,8 +18,8 @@ def test_index_created_after_put(workspace_root: Path):
     assert store.get(ref) == {"x": 1}, "get(ref) should return stored payload"
 
 
-def test_payload_exists_before_index_commit(workspace_root: Path):
-    """After put_json, payload file exists and ref is listable and gettable (durability)."""
+def test_payload_exists_before_index_commit(workspace_root: Path) -> None:
+    """After put_json, payload exists and ref is listable/gettable (durability)."""
     run_id, run_root = create_run(workspace_root)
     store = ArtifactStore(run_root, run_id)
     ref = store.put_json("work_order.v1", {"k": "v"})
@@ -32,11 +32,13 @@ def test_payload_exists_before_index_commit(workspace_root: Path):
     assert store.get(ref) == {"k": "v"}, "get(ref) should return stored payload"
 
 
-def test_index_row_accurate(workspace_root: Path):
+def test_index_row_accurate(workspace_root: Path) -> None:
     """Index row matches ArtifactRef returned by put_json."""
     run_id, run_root = create_run(workspace_root)
     store = ArtifactStore(run_root, run_id)
-    ref = store.put_json("work_order.v1", {"a": 1}, artifact_name="wo")
+    ref = store.put_json(
+        "work_order.v1", {"a": 1}, options=PutArtifactOptions(artifact_name="wo")
+    )
     listed = store.list()
     assert len(listed) == 1, "list() should return one ref"
     r = listed[0]
@@ -48,7 +50,7 @@ def test_index_row_accurate(workspace_root: Path):
     assert r.artifact_name == ref.artifact_name, "list row artifact_name should match"
 
 
-def test_list_by_run_id(workspace_root: Path):
+def test_list_by_run_id(workspace_root: Path) -> None:
     """list() returns artifacts for the run; multiple runs do not mix."""
     run_id1, run_root1 = create_run(workspace_root)
     run_id2, run_root2 = create_run(workspace_root)
@@ -65,7 +67,7 @@ def test_list_by_run_id(workspace_root: Path):
     assert list2[0].run_id == run_id2, "list2 should contain run_id2"
 
 
-def test_concurrent_runs_do_not_corrupt_db(workspace_root: Path):
+def test_concurrent_runs_do_not_corrupt_db(workspace_root: Path) -> None:
     """Two runs writing artifacts concurrently; index has correct rows per run."""
     run_id1, run_root1 = create_run(workspace_root)
     run_id2, run_root2 = create_run(workspace_root)
@@ -74,7 +76,9 @@ def test_concurrent_runs_do_not_corrupt_db(workspace_root: Path):
     refs1: list[ArtifactRef] = []
     refs2: list[ArtifactRef] = []
 
-    def put_many(store: ArtifactStore, run_id: str, refs: list[ArtifactRef], n: int):
+    def put_many(
+        store: ArtifactStore, run_id: str, refs: list[ArtifactRef], n: int
+    ) -> None:
         for i in range(n):
             ref = store.put_json("work_order.v1", {"i": i, "run": run_id})
             refs.append(ref)

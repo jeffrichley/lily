@@ -17,7 +17,7 @@ def _run_root(tmp_path: Path, name: str) -> Path:
     return r
 
 
-def test_run_level_gate_passes_run_succeeded(tmp_path: Path):
+def test_run_level_gate_passes_run_succeeded(tmp_path: Path) -> None:
     """Run-level gate passes -> run succeeded."""
     graph = GraphSpec(
         graph_id="g1",
@@ -51,7 +51,7 @@ def test_run_level_gate_passes_run_succeeded(tmp_path: Path):
     )
 
 
-def test_required_run_level_gate_fails_run_failed(tmp_path: Path):
+def test_required_run_level_gate_fails_run_failed(tmp_path: Path) -> None:
     """Required run-level gate fails -> run failed."""
     graph = GraphSpec(
         graph_id="g1",

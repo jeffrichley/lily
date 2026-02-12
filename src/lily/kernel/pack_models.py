@@ -11,7 +11,18 @@ from lily.kernel.routing_models import RoutingRule
 
 
 def _require_namespaced_id(value: str, kind: str) -> str:
-    """Require at least one dot (e.g. domain.name.v1). Raises ValueError if invalid."""
+    """Require at least one dot (e.g. domain.name.v1). Raises ValueError if invalid.
+
+    Args:
+        value: String to check (e.g. schema_id, template_id).
+        kind: Label for error message (e.g. 'schema_id').
+
+    Returns:
+        value if valid.
+
+    Raises:
+        ValueError: If value is empty or contains no dot.
+    """
     if "." not in value or not value.strip():
         raise ValueError(
             f"{kind} must be namespaced (e.g. domain.name.v1), got: {value!r}"
@@ -71,7 +82,7 @@ class GateTemplate(BaseModel):
 
 
 class PackDefinition(BaseModel):
-    """Structured representation of a pack. Declarative; import must not cause side effects."""
+    """Structured pack. Declarative; import must not cause side effects."""
 
     name: str
     version: str
@@ -90,7 +101,7 @@ class PackDefinition(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def _schemas_and_templates_namespaced(self) -> "PackDefinition":
+    def _schemas_and_templates_namespaced(self) -> PackDefinition:
         for s in self.schemas:
             _require_namespaced_id(s.schema_id, "schema_id")
         for st in self.step_templates:

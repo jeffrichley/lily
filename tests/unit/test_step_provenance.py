@@ -3,7 +3,9 @@
 from pathlib import Path
 
 from lily.kernel import create_run, run_graph
+from lily.kernel.gate_models import GateRunnerSpec, GateSpec
 from lily.kernel.graph_models import ExecutorSpec, GraphSpec, StepSpec
+from lily.kernel.policy_models import SafetyPolicy
 from lily.kernel.run_state import StepStatus
 
 
@@ -16,9 +18,9 @@ def _make_step(step_id: str, depends_on: list[str] | None = None) -> StepSpec:
     )
 
 
-def test_input_hashes_recorded(tmp_path: Path):
+def test_input_hashes_recorded(tmp_path: Path) -> None:
     """When a step has no upstream artifacts, input_artifact_hashes is empty."""
-    run_id, run_root = create_run(tmp_path)
+    _run_id, run_root = create_run(tmp_path)
     graph = GraphSpec(
         graph_id="g1",
         steps=[_make_step("a")],
@@ -33,9 +35,9 @@ def test_input_hashes_recorded(tmp_path: Path):
     )
 
 
-def test_output_hashes_recorded(tmp_path: Path):
-    """output_artifact_hashes is populated from produced_artifact_ids (empty when none produced)."""
-    run_id, run_root = create_run(tmp_path)
+def test_output_hashes_recorded(tmp_path: Path) -> None:
+    """output_artifact_hashes populated from produced_artifact_ids (empty when none)."""
+    _run_id, run_root = create_run(tmp_path)
     graph = GraphSpec(
         graph_id="g1",
         steps=[_make_step("a")],
@@ -50,9 +52,9 @@ def test_output_hashes_recorded(tmp_path: Path):
     )
 
 
-def test_duration_populated(tmp_path: Path):
-    """duration_ms is set after step execution and reflects non-negative elapsed time."""
-    run_id, run_root = create_run(tmp_path)
+def test_duration_populated(tmp_path: Path) -> None:
+    """duration_ms set after step execution; non-negative elapsed time."""
+    _run_id, run_root = create_run(tmp_path)
     graph = GraphSpec(
         graph_id="g1",
         steps=[_make_step("a")],
@@ -64,11 +66,9 @@ def test_duration_populated(tmp_path: Path):
     assert rec.duration_ms >= 0, "duration_ms should be non-negative"
 
 
-def test_gate_ids_attached(tmp_path: Path):
+def test_gate_ids_attached(tmp_path: Path) -> None:
     """When a step has gates, gate_result_ids (and gate_results) are populated."""
-    from lily.kernel.gate_models import GateRunnerSpec, GateSpec
-
-    run_id, run_root = create_run(tmp_path)
+    _run_id, run_root = create_run(tmp_path)
     graph = GraphSpec(
         graph_id="g1",
         steps=[
@@ -101,12 +101,11 @@ def test_gate_ids_attached(tmp_path: Path):
     )
 
 
-def test_policy_ids_attached(tmp_path: Path):
-    """When a policy violation occurs (executor not in allowed_tools), policy_violation_ids is populated."""
-    from lily.kernel.policy_models import SafetyPolicy
-
-    run_id, run_root = create_run(tmp_path)
-    # Use local_command in step but allow only another tool — triggers tool_not_allowed violation.
+def test_policy_ids_attached(tmp_path: Path) -> None:
+    """Executor not in allowed_tools populates policy_violation_ids."""
+    _run_id, run_root = create_run(tmp_path)
+    # Use local_command in step but allow only another tool — triggers
+    # tool_not_allowed violation.
     policy = SafetyPolicy(allowed_tools=["other_tool_only"])
     graph = GraphSpec(
         graph_id="g1",

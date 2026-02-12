@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-
 from lily.kernel.graph_models import ExecutorSpec, GraphSpec, StepSpec
 from lily.kernel.run_state import (
     RunStatus,
@@ -27,7 +26,7 @@ def _make_graph() -> GraphSpec:
     )
 
 
-def test_save_then_load_round_trip(tmp_path: Path):
+def test_save_then_load_round_trip(tmp_path: Path) -> None:
     """Save RunState and load it back; data matches."""
     graph = _make_graph()
     state = create_initial_run_state("run-123", graph)
@@ -44,12 +43,12 @@ def test_save_then_load_round_trip(tmp_path: Path):
     assert loaded.step_records["a"].attempts == 1
 
 
-def test_load_nonexistent_returns_none(tmp_path: Path):
+def test_load_nonexistent_returns_none(tmp_path: Path) -> None:
     """load_run_state returns None when file does not exist."""
     assert load_run_state(tmp_path) is None
 
 
-def test_atomic_write_file_exists_and_parses(tmp_path: Path):
+def test_atomic_write_file_exists_and_parses(tmp_path: Path) -> None:
     """After save, file exists and is valid JSON."""
     graph = _make_graph()
     state = create_initial_run_state("r1", graph)
@@ -63,7 +62,7 @@ def test_atomic_write_file_exists_and_parses(tmp_path: Path):
     assert "a" in data["step_records"]
 
 
-def test_create_initial_run_state():
+def test_create_initial_run_state() -> None:
     """create_initial_run_state creates pending records for all steps."""
     graph = _make_graph()
     state = create_initial_run_state("r1", graph)

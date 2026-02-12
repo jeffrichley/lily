@@ -1,18 +1,17 @@
-"""Unit tests for run creation (create_run_with_optional_work_order). CLI entrypoint coverage optional."""
+"""Tests for run creation (create_run_with_optional_work_order)."""
 
 import json
 from pathlib import Path
 
-
-from lily.kernel import read_manifest, get_manifest_path, RunStatus
-from lily.kernel.paths import IRIS_DIR, RUNS_DIR, ARTIFACTS_DIR, LOGS_DIR, TMP_DIR
-from lily.kernel.run import create_run_with_optional_work_order, RunInfo
+from lily.kernel import RunStatus, get_manifest_path, read_manifest
+from lily.kernel.paths import ARTIFACTS_DIR, IRIS_DIR, LOGS_DIR, RUNS_DIR, TMP_DIR
+from lily.kernel.run import RunInfo, create_run_with_optional_work_order
 
 
 def test_create_run_with_optional_work_order_creates_directory_and_manifest(
     workspace_root: Path,
 ) -> None:
-    """create_run_with_optional_work_order(no work order) creates directory structure and manifest."""
+    """create_run_with_optional_work_order(no work order) creates dir and manifest."""
     info = create_run_with_optional_work_order(workspace_root, work_order_path=None)
     assert isinstance(info, RunInfo)
     assert info.run_id
@@ -37,7 +36,7 @@ def test_create_run_with_optional_work_order_creates_directory_and_manifest(
 def test_create_run_with_work_order_sets_ref_and_stores_artifact(
     workspace_root: Path,
 ) -> None:
-    """Providing a work order path populates work_order_ref and stores the artifact under the run."""
+    """Work order path populates work_order_ref and stores artifact under run."""
     work_order_file = workspace_root / "wo.txt"
     work_order_file.write_text("work order content")
 

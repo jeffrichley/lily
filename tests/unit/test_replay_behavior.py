@@ -4,13 +4,13 @@ from pathlib import Path
 
 from lily.kernel import create_run, run_graph
 from lily.kernel.graph_models import ExecutorSpec, GraphSpec, StepSpec
+from lily.kernel.rerun import rerun_from
 from lily.kernel.run_state import (
-    load_run_state,
-    save_run_state_atomic,
     RunStatus,
     StepStatus,
+    load_run_state,
+    save_run_state_atomic,
 )
-from lily.kernel.rerun import rerun_from
 
 
 def _make_step(step_id: str, depends_on: list[str] | None = None) -> StepSpec:
@@ -22,9 +22,9 @@ def _make_step(step_id: str, depends_on: list[str] | None = None) -> StepSpec:
     )
 
 
-def test_downstream_reset_correct(tmp_path: Path):
+def test_downstream_reset_correct(tmp_path: Path) -> None:
     """After rerun_from(b), b and c are pending; a and d unchanged."""
-    run_id, run_root = create_run(tmp_path)
+    _run_id, run_root = create_run(tmp_path)
     graph = GraphSpec(
         graph_id="g1",
         steps=[
@@ -54,9 +54,9 @@ def test_downstream_reset_correct(tmp_path: Path):
     )
 
 
-def test_upstream_unchanged(tmp_path: Path):
+def test_upstream_unchanged(tmp_path: Path) -> None:
     """Rerun from step b leaves step a succeeded and its records intact."""
-    run_id, run_root = create_run(tmp_path)
+    _run_id, run_root = create_run(tmp_path)
     graph = GraphSpec(
         graph_id="g1",
         steps=[
@@ -80,9 +80,9 @@ def test_upstream_unchanged(tmp_path: Path):
     ), "upstream a artifact ids preserved"
 
 
-def test_artifacts_remain_on_disk(tmp_path: Path):
+def test_artifacts_remain_on_disk(tmp_path: Path) -> None:
     """Replay does not delete artifacts; run dir still has artifacts and index."""
-    run_id, run_root = create_run(tmp_path)
+    _run_id, run_root = create_run(tmp_path)
     graph = GraphSpec(
         graph_id="g1",
         steps=[_make_step("a")],
@@ -101,9 +101,9 @@ def test_artifacts_remain_on_disk(tmp_path: Path):
     assert len(after) >= len(before), "rerun_from should not remove existing artifacts"
 
 
-def test_run_completes_successfully_after_replay(tmp_path: Path):
+def test_run_completes_successfully_after_replay(tmp_path: Path) -> None:
     """After rerun_from and save, run_graph can be called again and completes."""
-    run_id, run_root = create_run(tmp_path)
+    _run_id, run_root = create_run(tmp_path)
     graph = GraphSpec(
         graph_id="g1",
         steps=[
@@ -129,10 +129,9 @@ def test_run_completes_successfully_after_replay(tmp_path: Path):
     )
 
 
-def test_log_paths_preserved_for_reset_steps(tmp_path: Path):
+def test_log_paths_preserved_for_reset_steps(tmp_path: Path) -> None:
     """rerun_from preserves log_paths on reset steps (Layer 5)."""
-
-    run_id, run_root = create_run(tmp_path)
+    _run_id, run_root = create_run(tmp_path)
     graph = GraphSpec(
         graph_id="g1",
         steps=[

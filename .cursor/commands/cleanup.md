@@ -24,6 +24,7 @@ The agent must:
 - Keep fixes **local and scoped** to failures.
 - Never change behavior unless tests/requirements demand it.
 - Never "paper over" failures (e.g., disabling a lint rule, skipping tests) unless the user explicitly authorizes it.
+- **Suppression rule:** Do not add or leave in place any `# noqa`, `type: ignore`, or config exclusion to fix a quality failure unless the user has explicitly approved it. If the only way to get green is to suppress, stop and ask the user first.
 - Never rewrite large chunks to "make it work."
 
 ---
@@ -104,14 +105,20 @@ If it fails:
 **Fix policy for common quality failures**
 
 - **Formatting / lint:** apply mechanical corrections (remove unused imports, fix line length, reorder imports, etc.).
+- **Line length (E501):** prefer **wrapping** long comments and docstrings onto multiple lines (each ≤88 chars) rather than shortening or compressing the text; preserve clarity.
 - **Type errors:** prefer correcting types properly (signatures, return types, narrowing) over `Any` or broad ignores.
 - **Static analysis:** fix root cause; don't suppress warnings by default.
 
 **Forbidden without explicit user approval**
 
-- Adding blanket ignores (`# noqa`, `type: ignore`) unless tightly scoped to a single line and justified.
+- Adding or retaining `# noqa`, `type: ignore`, or per-file/rule exclusions. If you need to suppress to get green, **stop and ask the user** ("Quality fails on [rule] in [place]. Fix would require [refactor/suppression]. May I add a scoped noqa?"). Do not suppress until they say yes.
 - Disabling rules in config.
 - Marking checks as "excluded" to avoid work.
+
+**Hints**
+
+- **E501 (line length):** Prefer wrapping long lines (e.g. docstrings, comments) onto multiple lines; avoid compressing or abbreviating the text.
+- **PLC0415 (import not at top):** If an import inside a function/method is only there because the same name is needed, check whether it is already imported at the top of the file. If so, remove the inner import and any `# noqa: PLC0415`; use the top-level import. Keep nested imports only when justified (e.g. circular import avoidance, lazy/optional dependency).
 
 ---
 

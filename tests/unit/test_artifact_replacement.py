@@ -2,11 +2,15 @@
 
 from pathlib import Path
 
-from lily.kernel import create_run, replace_artifact, run_graph
+from lily.kernel import (
+    ReplacementSpec,
+    create_run,
+    replace_artifact,
+    run_graph,
+)
 from lily.kernel.artifact_store import ArtifactStore
 from lily.kernel.graph_models import ExecutorSpec, GraphSpec, StepSpec
 from lily.kernel.run_state import RunStatus, StepStatus
-
 from tests.unit.helpers import build_run_state_with_step_overrides
 
 
@@ -26,7 +30,7 @@ def _graph_one_step() -> GraphSpec:
     )
 
 
-def test_replacement_envelope_stored(tmp_path: Path):
+def test_replacement_envelope_stored(tmp_path: Path) -> None:
     """replace_artifact stores an artifact_replacement.v1 envelope."""
     run_id, run_root = create_run(tmp_path)
     graph = _graph_one_step()
@@ -45,9 +49,11 @@ def test_replacement_envelope_stored(tmp_path: Path):
         run_root,
         state,
         graph,
-        old_id="old_artifact_1",
-        new_id="new_artifact_1",
-        reason="test replacement",
+        ReplacementSpec(
+            old_id="old_artifact_1",
+            new_id="new_artifact_1",
+            reason="test replacement",
+        ),
     )
 
     store = ArtifactStore(run_root, run_id)
@@ -85,7 +91,7 @@ def _graph_two_steps() -> GraphSpec:
     )
 
 
-def test_downstream_steps_reset(tmp_path: Path):
+def test_downstream_steps_reset(tmp_path: Path) -> None:
     """replace_artifact triggers rerun_from so producer and downstream are pending."""
     run_id, run_root = create_run(tmp_path)
     graph = _graph_two_steps()
@@ -102,9 +108,7 @@ def test_downstream_steps_reset(tmp_path: Path):
         run_root,
         state,
         graph,
-        old_id="old_x",
-        new_id="new_x",
-        reason="inject",
+        ReplacementSpec(old_id="old_x", new_id="new_x", reason="inject"),
     )
 
     assert state.step_records["a"].status == StepStatus.PENDING, (
@@ -121,7 +125,7 @@ def test_downstream_steps_reset(tmp_path: Path):
     )
 
 
-def test_provenance_chain_intact(tmp_path: Path):
+def test_provenance_chain_intact(tmp_path: Path) -> None:
     """After replacement, run_graph can complete and provenance is preserved."""
     run_id, run_root = create_run(tmp_path)
     graph = _graph_two_steps()
@@ -138,9 +142,11 @@ def test_provenance_chain_intact(tmp_path: Path):
         run_root,
         state,
         graph,
-        old_id="old_art",
-        new_id="new_art",
-        reason="provenance test",
+        ReplacementSpec(
+            old_id="old_art",
+            new_id="new_art",
+            reason="provenance test",
+        ),
     )
 
     state2 = run_graph(run_root, graph)

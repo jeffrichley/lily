@@ -4,13 +4,15 @@ from pathlib import Path
 
 from lily.kernel import (
     ArtifactStore,
-    create_run,
-    execute_gate,
+    GateExecuteOptions,
     GateResultPayload,
     GateStatus,
-    register_gate_schemas,
     SchemaRegistry,
+    create_run,
+    execute_gate,
+    register_gate_schemas,
 )
+from lily.kernel.envelope_validator import EnvelopeValidator
 from lily.kernel.gate_models import GateRunnerSpec, GateSpec
 
 
@@ -28,7 +30,7 @@ def _gate_spec(
     )
 
 
-def test_success_gate_produces_passed_gate_result(workspace_root: Path):
+def test_success_gate_produces_passed_gate_result(workspace_root: Path) -> None:
     """Successful gate produces passed GateResult envelope."""
     run_id, run_root = create_run(workspace_root)
     store = ArtifactStore(run_root, run_id)
@@ -40,7 +42,7 @@ def test_success_gate_produces_passed_gate_result(workspace_root: Path):
         run_root,
         store,
         registry,
-        attempt=1,
+        options=GateExecuteOptions(attempt=1),
     )
 
     assert artifact_id
@@ -56,7 +58,7 @@ def test_success_gate_produces_passed_gate_result(workspace_root: Path):
     assert payload["reason"] is None
 
 
-def test_failed_gate_produces_failed_gate_result(workspace_root: Path):
+def test_failed_gate_produces_failed_gate_result(workspace_root: Path) -> None:
     """Failed gate produces failed GateResult envelope."""
     run_id, run_root = create_run(workspace_root)
     store = ArtifactStore(run_root, run_id)
@@ -68,7 +70,7 @@ def test_failed_gate_produces_failed_gate_result(workspace_root: Path):
         run_root,
         store,
         registry,
-        attempt=1,
+        options=GateExecuteOptions(attempt=1),
     )
 
     assert success is False
@@ -80,7 +82,7 @@ def test_failed_gate_produces_failed_gate_result(workspace_root: Path):
     assert payload["reason"] is not None
 
 
-def test_envelope_stored_and_validated(workspace_root: Path):
+def test_envelope_stored_and_validated(workspace_root: Path) -> None:
     """Stored envelope can be validated via registry."""
     run_id, run_root = create_run(workspace_root)
     store = ArtifactStore(run_root, run_id)
@@ -91,8 +93,6 @@ def test_envelope_stored_and_validated(workspace_root: Path):
 
     refs = store.list(run_id=run_id)
     ref = next(r for r in refs if r.artifact_id == artifact_id)
-    from lily.kernel.envelope_validator import EnvelopeValidator
-
     validator = EnvelopeValidator(registry)
     meta, model = store.get_validated(ref, validator)
     assert meta.schema_id == "gate_result.v1"
