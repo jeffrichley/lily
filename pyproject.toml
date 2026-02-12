@@ -20,6 +20,16 @@ dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "ruff>=0.8.0",
+    "xenon>=0.9.3",
+    "vulture>=2.11",
+    "darglint>=1.8",
+    "bandit[toml]>=1.7",
+    "pip-audit>=2.6",
+    "pylint>=3.0",
+    "radon>=6.0",
+    "commitizen>=3.0",
+    "docstr-coverage>=2.3",
+    "pre-commit>=4.0",
 ]
 
 [build-system]
@@ -38,12 +48,59 @@ markers = [
     "slow: Tests that take a long time to run",
 ]
 
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "B",      # flake8-bugbear
+    "Q",      # flake8-quotes
+    "SIM",    # flake8-simplify
+    "C90",    # mccabe complexity
+    "ARG",    # flake8-unused-arguments
+    "TID",    # flake8-tidy-imports
+    "UP",     # pyupgrade
+    "PL",     # pylint
+    "PERF",   # perflint
+    "D",      # pydocstyle
+    "ANN",    # flake8-annotations
+    "RUF",    # ruff-specific
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+# Tests: allow literal numbers in assertions (PLR2004 "magic value")
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLR2004"]
+
 [tool.mypy]
 python_version = "3.13"
+mypy_path = "src"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false
-packages = ["src/lily"]
+warn_unused_ignores = true
+disallow_untyped_defs = true
+plugins = ["pydantic.mypy"]
+packages = ["lily"]
+
+# Third-party modules without stubs: allow untyped so strict mode stays tractable
+[[tool.mypy.overrides]]
+module = ["typer", "filelock"]
+ignore_missing_imports = true
 
 [tool.coverage.run]
 source = ["src/lily"]
@@ -51,6 +108,7 @@ omit = ["tests/*"]
 
 [tool.coverage.report]
 fail_under = 80
+show_missing = true
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
@@ -59,3 +117,28 @@ exclude_lines = [
     "if __name__ == '__main__':",
     "if TYPE_CHECKING:",
 ]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.xenon]
+# Complexity grades A (best) to F (worst). Fail if any block > B, any module > A, or average > A.
+max-absolute = "B"
+max-modules = "A"
+max-average = "A"
+
+[tool.vulture]
+paths = ["src", "tests"]
+exclude = [".venv", "htmlcov", "**/__pycache__"]
+min_confidence = 80
+ignore_names = ["*Protocol*", "Protocol"]
+
+[tool.bandit]
+exclude_dirs = [".venv", "htmlcov", "__pycache__"]
+# Allow assert in test code (B101 = assert_used)
+skips = ["B101"]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version_provider = "pep621"
+update_changelog_on_bump = true
