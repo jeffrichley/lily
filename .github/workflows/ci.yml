@@ -1,0 +1,44 @@
+# CI: same quality gates as `just quality-check` + `just test-cov`.
+# If it passes locally with those two commands, it passes in the PR.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  quality-and-test:
+    name: "quality + test (${{ matrix.os }}, py${{ matrix.python-version }})"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.13"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install just
+        uses: extractions/setup-just@v3
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
+
+      - name: Quality check (same as just quality-check)
+        run: just quality-check
+
+      - name: Tests with coverage (same as just test-cov, fail_under from pyproject)
+        run: just test-cov
