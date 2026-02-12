@@ -16,10 +16,10 @@
 
 ## Layer 2 — Execution Graph Runtime
 
-- Step model (inputs/outputs/executor/retry/timeout)
-- Graph model (nodes/edges)
-- Run state persistence (resume/replay)
-- Executor interface (local process + LLM later)
+- [x] Step model (inputs/outputs/executor/retry/timeout)
+- [x] Graph model (nodes/edges)
+- [x] Run state persistence (resume/replay)
+- [x] Executor interface (local process + LLM later) — *done*
 
 ## Layer 3 — Gates
 
@@ -91,10 +91,10 @@ end
 %% Layer 2
 %% =========================
 subgraph L2["Layer 2 - Execution Graph Runtime"]
-L2A["Step Model - inputs outputs executor retry timeout"]:::red
-L2B["Graph Model - nodes and edges"]:::red
-L2C["Run State Persistence - resume replay"]:::red
-L2D["Executor Interface - local process baseline"]:::red
+L2A["Step Model - inputs outputs executor retry timeout"]:::green
+L2B["Graph Model - nodes and edges"]:::green
+L2C["Run State Persistence - resume replay"]:::green
+L2D["Executor Interface - local process baseline"]:::green
 end
 
 %% =========================

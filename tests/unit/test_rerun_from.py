@@ -1,0 +1,108 @@
+"""Layer 2: rerun_from utility."""
+
+
+from lily.kernel.graph_models import ExecutorSpec, GraphSpec, StepSpec
+from lily.kernel.run_state import RunState, RunStatus, StepRunRecord, StepStatus
+from lily.kernel.rerun import rerun_from
+
+
+def _make_step(step_id: str, depends_on: list[str] | None = None) -> StepSpec:
+    return StepSpec(
+        step_id=step_id,
+        name=step_id,
+        depends_on=depends_on or [],
+        executor=ExecutorSpec(kind="local_command", argv=["echo", "x"]),
+    )
+
+
+def test_downstream_detection_correct():
+    """Downstream of a step includes itself and all steps that depend on it."""
+    graph = GraphSpec(
+        graph_id="g1",
+        steps=[
+            _make_step("a"),
+            _make_step("b", depends_on=["a"]),
+            _make_step("c", depends_on=["b"]),
+            _make_step("d", depends_on=["a"]),
+        ],
+    )
+    state = RunState(
+        run_id="r1",
+        status=RunStatus.SUCCEEDED,
+        graph_id="g1",
+        step_records={
+            "a": StepRunRecord(
+                step_id="a", status=StepStatus.SUCCEEDED, produced_artifact_ids=["x"]
+            ),
+            "b": StepRunRecord(
+                step_id="b", status=StepStatus.SUCCEEDED, produced_artifact_ids=["y"]
+            ),
+            "c": StepRunRecord(
+                step_id="c", status=StepStatus.SUCCEEDED, produced_artifact_ids=["z"]
+            ),
+            "d": StepRunRecord(
+                step_id="d", status=StepStatus.SUCCEEDED, produced_artifact_ids=["w"]
+            ),
+        },
+    )
+
+    result = rerun_from(state, graph, "b")
+
+    assert result.step_records["a"].status == StepStatus.SUCCEEDED
+    assert result.step_records["a"].produced_artifact_ids == ["x"]
+    assert result.step_records["b"].status == StepStatus.PENDING
+    assert result.step_records["b"].produced_artifact_ids == []
+    assert result.step_records["c"].status == StepStatus.PENDING
+    assert result.step_records["c"].produced_artifact_ids == []
+    assert result.step_records["d"].status == StepStatus.SUCCEEDED
+    assert result.step_records["d"].produced_artifact_ids == ["w"]
+
+
+def test_statuses_reset_as_expected():
+    """Reset steps have status pending, attempts 0, cleared timestamps and errors."""
+    graph = GraphSpec(
+        graph_id="g1",
+        steps=[
+            _make_step("a"),
+            _make_step("b", depends_on=["a"]),
+        ],
+    )
+    state = RunState(
+        run_id="r1",
+        status=RunStatus.SUCCEEDED,
+        graph_id="g1",
+        step_records={
+            "a": StepRunRecord(
+                step_id="a",
+                status=StepStatus.SUCCEEDED,
+                attempts=1,
+                started_at="2024-01-01T00:00:00Z",
+                finished_at="2024-01-01T00:01:00Z",
+                last_error=None,
+                produced_artifact_ids=["x"],
+                log_paths={"stdout": "/tmp/out"},
+            ),
+            "b": StepRunRecord(
+                step_id="b",
+                status=StepStatus.FAILED,
+                attempts=2,
+                started_at="2024-01-01T00:01:00Z",
+                finished_at="2024-01-01T00:02:00Z",
+                last_error="oops",
+                produced_artifact_ids=[],
+                log_paths={"stderr": "/tmp/err"},
+            ),
+        },
+    )
+
+    result = rerun_from(state, graph, "a")
+
+    assert result.step_records["a"].status == StepStatus.PENDING
+    assert result.step_records["a"].attempts == 0
+    assert result.step_records["a"].started_at is None
+    assert result.step_records["a"].finished_at is None
+    assert result.step_records["a"].last_error is None
+    assert result.step_records["a"].produced_artifact_ids == []
+    assert result.step_records["a"].log_paths == {}
+    assert result.step_records["b"].status == StepStatus.PENDING
+    assert result.step_records["b"].attempts == 0

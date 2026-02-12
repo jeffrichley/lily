@@ -28,6 +28,26 @@ from lily.kernel.envelope import Envelope, EnvelopeMeta
 from lily.kernel.canonical import canonical_json_bytes, hash_payload, sha256_bytes
 from lily.kernel.schema_registry import SchemaRegistry, SchemaRegistryError
 from lily.kernel.envelope_validator import EnvelopeValidator, EnvelopeValidationError
+from lily.kernel.graph_models import (
+    ExecutorSpec,
+    GraphSpec,
+    RetryPolicy,
+    StepSpec,
+    TimeoutPolicy,
+    validate_graph_spec,
+)
+from lily.kernel.executors.local_command import ExecResult, run_local_command
+from lily.kernel.rerun import rerun_from
+from lily.kernel.runner import run_graph
+from lily.kernel.run_state import (
+    RunState,
+    RunStatus,
+    StepRunRecord,
+    StepStatus,
+    create_initial_run_state,
+    load_run_state,
+    save_run_state_atomic,
+)
 
 __all__ = [
     "generate_run_id",
@@ -59,4 +79,21 @@ __all__ = [
     "SchemaRegistryError",
     "EnvelopeValidator",
     "EnvelopeValidationError",
+    "ExecutorSpec",
+    "GraphSpec",
+    "RetryPolicy",
+    "StepSpec",
+    "TimeoutPolicy",
+    "validate_graph_spec",
+    "ExecResult",
+    "run_local_command",
+    "run_graph",
+    "rerun_from",
+    "RunState",
+    "RunStatus",
+    "StepRunRecord",
+    "StepStatus",
+    "create_initial_run_state",
+    "load_run_state",
+    "save_run_state_atomic",
 ]

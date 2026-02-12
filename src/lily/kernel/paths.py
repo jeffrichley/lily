@@ -6,6 +6,7 @@ from pathlib import Path
 IRIS_DIR = ".iris"
 RUNS_DIR = "runs"
 MANIFEST_FILENAME = "run_manifest.json"
+RUN_STATE_FILENAME = "run_state.json"
 LOCK_FILENAME = ".lock"
 
 # Subdirs under each run
@@ -37,6 +38,11 @@ def get_lock_path(run_root: Path) -> Path:
 def get_manifest_path(run_root: Path) -> Path:
     """Return path to run_manifest.json."""
     return run_root / MANIFEST_FILENAME
+
+
+def get_run_state_path(run_root: Path) -> Path:
+    """Return path to run_state.json."""
+    return run_root / RUN_STATE_FILENAME
 
 
 INDEX_FILENAME = "index.sqlite"
