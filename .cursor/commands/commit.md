@@ -27,6 +27,40 @@ When `/commit` is invoked, the agent will:
 
 ## Step-by-Step Execution
 
+### Pre-Commit Gate (Required)
+
+Before preparing a commit, the agent must ensure the workspace passes all quality and test gates by invoking:
+
+```
+/cleanup
+```
+
+This step is mandatory and must not be skipped unless the user explicitly overrides it.
+
+#### Behavior
+
+1. Invoke `/cleanup`.
+2. Wait for `/cleanup` to complete.
+3. If `/cleanup` reports success → continue with the normal commit workflow.
+4. If `/cleanup` stops due to a guardrail or unresolved failure → abort the commit and report that the repository is not in a committable state.
+
+#### Failure Message
+
+If `/cleanup` cannot reach green:
+
+- **Commit aborted: quality/test gates are not passing. Resolve reported issues before committing.**
+- Do not create a commit in this case.
+
+#### Rationale (for the agent, not the user)
+
+This enforces:
+
+- No red commits.
+- No "fix later" debt.
+- Every commit is releasable.
+- History remains bisectable.
+- CI should never fail on main.
+
 ### 1. Inspect Changes
 
 Run:
@@ -100,10 +134,10 @@ Scope = subsystem, not filename.
 
 Rules:
 
-- Imperative voice ("add", not "added")
-- ≤ 72 chars summary
-- No fluff words
-- Explain why in body if needed
+- Imperative voice ("add", not "added").
+- ≤ 72 chars summary.
+- No fluff words.
+- Explain why in body if needed.
 
 Example:
 
