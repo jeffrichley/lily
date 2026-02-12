@@ -1,0 +1,18 @@
+# Dependabot: keep uv and GitHub Actions up to date.
+# https://docs.github.com/en/code-security/dependabot
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+
+  # pip ecosystem reads pyproject.toml; after merging, run `uv lock` to refresh uv.lock
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "build"
