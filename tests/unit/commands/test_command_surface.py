@@ -306,3 +306,17 @@ def test_built_in_command_precedence_over_alias() -> None:
         "alpha - Alpha summary",
         "echo",
     ]
+
+
+def test_runtime_records_turns_in_conversation_state() -> None:
+    """Runtime should append user/assistant entries to session conversation state."""
+    runtime = RuntimeFacade()
+    session = _make_session(skills=())
+
+    result = runtime.handle_input("/skills", session)
+
+    assert result.status.value == "ok"
+    assert len(session.conversation_state) == 2
+    assert session.conversation_state[0].role.value == "user"
+    assert session.conversation_state[0].content == "/skills"
+    assert session.conversation_state[1].role.value == "assistant"

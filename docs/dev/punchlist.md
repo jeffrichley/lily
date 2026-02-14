@@ -24,14 +24,14 @@ Purpose: concrete engineering checklist to get Lily to a solid, usable state.
   - [ ] Update handlers/executors to return stable machine-readable outputs
   - [ ] Update CLI rendering path accordingly
 
-- [ ] Add session persistence + reload semantics
-  - [ ] Persist session state to disk (`session_id`, `active_agent`, `model_config`, `skill_snapshot`, conversation)
-  - [ ] Add session schema version field and migration stub path
-  - [ ] Define recovery behavior for missing/corrupt persisted state
+- [x] Add session persistence + reload semantics
+  - [x] Persist session state to disk (`session_id`, `active_agent`, `model_config`, `skill_snapshot`, conversation)
+  - [x] Add session schema version field and migration stub path
+  - [x] Define recovery behavior for missing/corrupt persisted state
 
-- [ ] Add per-session execution serialization
-  - [ ] Introduce a per-session queue/lane boundary for command + execution flow
-  - [ ] Prevent interleaving/race issues under concurrent inputs
+- [x] Add per-session execution serialization
+  - [x] Introduce a per-session queue/lane boundary for command + execution flow
+  - [x] Prevent interleaving/race issues under concurrent inputs
 
 - [ ] Add reliability coverage
   - [ ] Restart simulation tests (session restore + snapshot continuity)

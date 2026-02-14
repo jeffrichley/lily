@@ -1,0 +1,70 @@
+"""Unit tests for session persistence store."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from lily.session.models import ModelConfig, Session
+from lily.session.store import (
+    SESSION_SCHEMA_VERSION,
+    SessionSchemaVersionError,
+    load_session,
+    recover_corrupt_session,
+    save_session,
+)
+from lily.skills.types import SkillSnapshot
+
+
+def _session() -> Session:
+    """Create minimal session fixture for store tests."""
+    return Session(
+        session_id="session-store-test",
+        active_agent="default",
+        skill_snapshot=SkillSnapshot(version="v-store", skills=()),
+        model_config=ModelConfig(model_name="stub-model"),
+    )
+
+
+def test_save_and_load_roundtrip(tmp_path: Path) -> None:
+    """Store should roundtrip persisted session payload."""
+    path = tmp_path / "session.json"
+    source = _session()
+
+    save_session(source, path)
+    loaded = load_session(path)
+
+    assert loaded.session_id == source.session_id
+    assert loaded.model_settings.model_name == "stub-model"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == SESSION_SCHEMA_VERSION
+
+
+def test_load_unsupported_schema_version_raises(tmp_path: Path) -> None:
+    """Unsupported schema should raise explicit version error."""
+    path = tmp_path / "session.json"
+    path.write_text(
+        json.dumps({"schema_version": 999, "session": {}}),
+        encoding="utf-8",
+    )
+
+    try:
+        load_session(path)
+    except SessionSchemaVersionError as exc:
+        assert "Unsupported session schema version" in str(exc)
+    else:  # pragma: no cover - safety assertion
+        raise AssertionError("Expected SessionSchemaVersionError")
+
+
+def test_recover_corrupt_session_moves_file_aside(tmp_path: Path) -> None:
+    """Recovery should move invalid session to .corrupt backup path."""
+    path = tmp_path / "session.json"
+    path.write_text("{bad json", encoding="utf-8")
+
+    backup = recover_corrupt_session(path)
+
+    assert backup is not None
+    assert backup.name.startswith("session.json.corrupt-")
+    assert not path.exists()
+    assert backup.exists()
+
