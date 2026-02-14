@@ -94,3 +94,7 @@ quality-check: format-check lint-check types complexity vulture darglint audit b
 # --- Lighter targets for day-to-day dev ---
 # Recommended while developing: format + lint + types. Fast except mypy; catches most issues.
 quality-dev: format lint types
+
+# Run interactive CLI REPL (slash-command testing)
+repl:
+    uv run lily repl
