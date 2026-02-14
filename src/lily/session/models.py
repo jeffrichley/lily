@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from pathlib import Path
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -49,3 +50,18 @@ class Session(BaseModel):
     skill_snapshot: SkillSnapshot
     model_settings: ModelConfig = Field(alias="model_config")
     conversation_state: list[Message] = Field(default_factory=list)
+    skill_snapshot_config: SkillSnapshotConfig | None = None
+
+
+class SkillSnapshotConfig(BaseModel):
+    """Session-scoped config used to rebuild skill snapshots deterministically."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bundled_dir: Path
+    workspace_dir: Path
+    user_dir: Path | None = None
+    reserved_commands: tuple[str, ...] = ()
+    available_tools: tuple[str, ...] | None = None
+    platform: str | None = None
+    env: dict[str, str] | None = None

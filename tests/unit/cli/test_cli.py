@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from _pytest.monkeypatch import MonkeyPatch
@@ -146,3 +147,121 @@ def test_repl_exit_parentheses_exits_cleanly(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "bye" in result.stdout
+
+
+def test_run_persists_session_and_requires_reload_for_new_skills(
+    tmp_path: Path,
+) -> None:
+    """Run mode should persist snapshot and keep it stable until /reload_skills."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    session_file = tmp_path / "session.json"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    _write_echo_skill(bundled_dir)
+
+    first = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "/skills",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+            "--session-file",
+            str(session_file),
+        ],
+    )
+    assert first.exit_code == 0
+    assert "echo - Echo" in first.stdout
+    assert session_file.exists()
+
+    demo_dir = workspace_dir / "demo"
+    demo_dir.mkdir()
+    (demo_dir / "SKILL.md").write_text(
+        ("---\nsummary: Demo\ninvocation_mode: llm_orchestration\n---\n# Demo\n"),
+        encoding="utf-8",
+    )
+
+    second = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "/skills",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+            "--session-file",
+            str(session_file),
+        ],
+    )
+    assert second.exit_code == 0
+    assert "echo - Echo" in second.stdout
+    assert "demo - Demo" not in second.stdout
+
+    reload_result = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "/reload_skills",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+            "--session-file",
+            str(session_file),
+        ],
+    )
+    assert reload_result.exit_code == 0
+    assert "Reloaded skills for current session." in reload_result.stdout
+
+    third = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "/skills",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+            "--session-file",
+            str(session_file),
+        ],
+    )
+    assert third.exit_code == 0
+    assert "demo - Demo" in third.stdout
+
+
+def test_repl_recovers_corrupt_session_file(tmp_path: Path) -> None:
+    """REPL should recover by moving corrupt session aside and creating new session."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    session_file = tmp_path / "session.json"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    _write_echo_skill(bundled_dir)
+
+    session_file.write_text("{not json", encoding="utf-8")
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "repl",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+            "--session-file",
+            str(session_file),
+        ],
+        input="exit\n",
+    )
+
+    assert result.exit_code == 0
+    assert "Session file was invalid." in result.stdout
+    backups = list(tmp_path.glob("session.json.corrupt-*"))
+    assert backups
+    payload = json.loads(session_file.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 1

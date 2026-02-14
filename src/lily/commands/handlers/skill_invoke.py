@@ -47,14 +47,20 @@ class SkillInvokeCommand:
             Command result with explicit success/failure outcome.
         """
         if not call.args:
-            return CommandResult.error("Error: /skill requires a skill name.")
+            return CommandResult.error(
+                "Error: /skill requires a skill name.",
+                code="invalid_args",
+                data={"command": "skill"},
+            )
 
         skill_name = call.args[0]
         user_text = " ".join(call.args[1:])
         target = self._find_skill(session, skill_name)
         if target is None:
             return CommandResult.error(
-                f"Error: skill '{skill_name}' not found in snapshot."
+                f"Error: skill '{skill_name}' not found in snapshot.",
+                code="skill_not_found",
+                data={"skill": skill_name},
             )
 
         return self._invoker.invoke(target, session, user_text)

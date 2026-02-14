@@ -9,12 +9,22 @@ from typing import Annotated
 import click
 import typer
 from rich.console import Console
+from rich.json import JSON
 from rich.logging import RichHandler
+from rich.markdown import Markdown
+from rich.panel import Panel
 
-from lily.commands.types import CommandStatus
+from lily.commands.types import CommandResult, CommandStatus
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
 from lily.session.models import ModelConfig, Session
+from lily.session.store import (
+    SessionDecodeError,
+    SessionSchemaVersionError,
+    load_session,
+    recover_corrupt_session,
+    save_session,
+)
 
 app = typer.Typer(help="Lily CLI")
 _CONSOLE = Console()
@@ -63,11 +73,25 @@ def _default_workspace_dir() -> Path:
     return workspace
 
 
+def _default_session_file(workspace_dir: Path) -> Path:
+    """Return default persisted session file path.
+
+    Args:
+        workspace_dir: Workspace skills directory path.
+
+    Returns:
+        Session persistence file path.
+    """
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    return workspace_dir.parent / "session.json"
+
+
 def _build_session(
     *,
     bundled_dir: Path,
     workspace_dir: Path,
     model_name: str,
+    session_file: Path,
 ) -> Session:
     """Build runtime session for CLI command handling.
 
@@ -75,19 +99,54 @@ def _build_session(
         bundled_dir: Bundled skills root.
         workspace_dir: Workspace skills root.
         model_name: Session model name.
+        session_file: Session persistence file path.
 
     Returns:
-        Initialized session.
+        Initialized session (loaded from disk when possible).
     """
     workspace_dir.mkdir(parents=True, exist_ok=True)
     factory = SessionFactory(
         SessionFactoryConfig(
             bundled_dir=bundled_dir,
             workspace_dir=workspace_dir,
-            reserved_commands={"skills", "skill"},
+            reserved_commands={"skills", "skill", "help", "reload_skills"},
         )
     )
-    return factory.create(model_config=ModelConfig(model_name=model_name))
+    try:
+        return load_session(session_file)
+    except FileNotFoundError:
+        session = factory.create(model_config=ModelConfig(model_name=model_name))
+        save_session(session, session_file)
+        return session
+    except (SessionDecodeError, SessionSchemaVersionError) as exc:
+        backup = recover_corrupt_session(session_file)
+        if backup is not None:
+            _CONSOLE.print(
+                f"[yellow]Session file was invalid. Moved to {backup}.[/yellow]"
+            )
+        else:
+            _CONSOLE.print(
+                "[yellow]Session file was invalid. Creating a new session.[/yellow]"
+            )
+        _CONSOLE.print(f"[yellow]Reason: {exc}[/yellow]")
+        session = factory.create(model_config=ModelConfig(model_name=model_name))
+        save_session(session, session_file)
+        return session
+
+
+def _persist_session(session: Session, session_file: Path) -> None:
+    """Persist session with best-effort user-visible error reporting.
+
+    Args:
+        session: Session to persist.
+        session_file: Persistence target path.
+    """
+    try:
+        save_session(session, session_file)
+    except OSError as exc:
+        _CONSOLE.print(
+            f"[bold red]Failed to persist session to {session_file}: {exc}[/bold red]"
+        )
 
 
 def _build_runtime() -> RuntimeFacade:
@@ -99,17 +158,48 @@ def _build_runtime() -> RuntimeFacade:
     return RuntimeFacade()
 
 
-def _render_result(message: str, status: CommandStatus) -> None:
+def _render_result(result: CommandResult) -> None:
     """Render command result with Rich styles.
 
     Args:
-        message: User-facing command output.
-        status: Result status.
+        result: Structured command output envelope.
     """
-    if status == CommandStatus.OK:
-        _CONSOLE.print(message, style="green")
+    if result.status == CommandStatus.OK:
+        _CONSOLE.print(
+            Panel(
+                Markdown(result.message),
+                title=f"Lily [{result.code}]",
+                border_style="green",
+                expand=True,
+            )
+        )
+        if result.data:
+            _CONSOLE.print(
+                Panel(
+                    JSON.from_data(result.data),
+                    title="Data",
+                    border_style="cyan",
+                    expand=True,
+                )
+            )
         return
-    _CONSOLE.print(message, style="bold red")
+    _CONSOLE.print(
+        Panel(
+            result.message,
+            title=f"Error [{result.code}]",
+            border_style="bold red",
+            expand=True,
+        )
+    )
+    if result.data:
+        _CONSOLE.print(
+            Panel(
+                JSON.from_data(result.data),
+                title="Data",
+                border_style="cyan",
+                expand=True,
+            )
+        )
 
 
 def _execute_once(
@@ -118,6 +208,7 @@ def _execute_once(
     bundled_dir: Path,
     workspace_dir: Path,
     model_name: str,
+    session_file: Path,
 ) -> int:
     """Execute one input line through runtime facade.
 
@@ -126,6 +217,7 @@ def _execute_once(
         bundled_dir: Bundled skills root.
         workspace_dir: Workspace skills root.
         model_name: Model name for session construction.
+        session_file: Session persistence file path.
 
     Returns:
         Process exit code.
@@ -134,10 +226,12 @@ def _execute_once(
         bundled_dir=bundled_dir,
         workspace_dir=workspace_dir,
         model_name=model_name,
+        session_file=session_file,
     )
     runtime = _build_runtime()
     result = runtime.handle_input(text, session)
-    _render_result(result.message, result.status)
+    _persist_session(session, session_file)
+    _render_result(result)
     return 0 if result.status == CommandStatus.OK else 1
 
 
@@ -156,6 +250,14 @@ def run_command(
         str,
         typer.Option(help="Model identifier used by llm_orchestration."),
     ] = "ollama:llama3.2",
+    session_file: Annotated[
+        Path | None,
+        typer.Option(
+            file_okay=True,
+            dir_okay=False,
+            help="Path to persisted session JSON file.",
+        ),
+    ] = None,
 ) -> None:
     """Execute one input line and print deterministic result.
 
@@ -164,6 +266,7 @@ def run_command(
         bundled_dir: Optional bundled skills root override.
         workspace_dir: Optional workspace skills root override.
         model_name: Model identifier for session execution.
+        session_file: Optional persisted session file path override.
 
     Raises:
         Exit: Raised with command status code for shell integration.
@@ -171,11 +274,15 @@ def run_command(
     _configure_logging()
     effective_bundled_dir = bundled_dir or _default_bundled_dir()
     effective_workspace_dir = workspace_dir or _default_workspace_dir()
+    effective_session_file = session_file or _default_session_file(
+        effective_workspace_dir
+    )
     exit_code = _execute_once(
         text=text,
         bundled_dir=effective_bundled_dir,
         workspace_dir=effective_workspace_dir,
         model_name=model_name,
+        session_file=effective_session_file,
     )
     raise typer.Exit(code=exit_code)
 
@@ -194,6 +301,14 @@ def repl_command(
         str,
         typer.Option(help="Model identifier used by llm_orchestration."),
     ] = "ollama:llama3.2",
+    session_file: Annotated[
+        Path | None,
+        typer.Option(
+            file_okay=True,
+            dir_okay=False,
+            help="Path to persisted session JSON file.",
+        ),
+    ] = None,
 ) -> None:
     """Run interactive REPL for slash-command testing.
 
@@ -201,6 +316,7 @@ def repl_command(
         bundled_dir: Optional bundled skills root override.
         workspace_dir: Optional workspace skills root override.
         model_name: Model identifier for session execution.
+        session_file: Optional persisted session file path override.
     """
     _configure_logging()
     _CONSOLE.print(
@@ -208,10 +324,14 @@ def repl_command(
     )
     effective_bundled_dir = bundled_dir or _default_bundled_dir()
     effective_workspace_dir = workspace_dir or _default_workspace_dir()
+    effective_session_file = session_file or _default_session_file(
+        effective_workspace_dir
+    )
     session = _build_session(
         bundled_dir=effective_bundled_dir,
         workspace_dir=effective_workspace_dir,
         model_name=model_name,
+        session_file=effective_session_file,
     )
     runtime = _build_runtime()
 
@@ -230,4 +350,5 @@ def repl_command(
             continue
 
         result = runtime.handle_input(text, session)
-        _render_result(result.message, result.status)
+        _persist_session(session, effective_session_file)
+        _render_result(result)

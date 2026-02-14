@@ -8,6 +8,7 @@ from lily.runtime.llm_backend import (
     LangChainBackend,
     LlmRunRequest,
 )
+from lily.runtime.llm_backend.langchain_adapter import _LangChainV1Invoker
 
 
 class _SuccessInvoker:
@@ -115,3 +116,20 @@ def test_langchain_backend_fails_fast_on_invalid_response() -> None:
         assert "empty output" in str(exc)
     else:  # pragma: no cover - safety assertion
         raise AssertionError("Expected BackendInvalidResponseError")
+
+
+def test_system_prompt_uses_skill_instructions_without_skill_name_hardcoding() -> None:
+    """Prompt construction should use instructions generically with no echo branch."""
+    request = LlmRunRequest(
+        session_id="session-test",
+        skill_name="echo",
+        skill_summary="Echo skill",
+        skill_instructions="Return the text in lowercase.",
+        user_text="HELLO",
+        model_name="default",
+    )
+
+    prompt = _LangChainV1Invoker._build_system_prompt(request)
+
+    assert "Skill instructions:\nReturn the text in lowercase." in prompt
+    assert "user payload transformed to uppercase" not in prompt

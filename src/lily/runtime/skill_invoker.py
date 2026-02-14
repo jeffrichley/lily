@@ -49,5 +49,7 @@ class SkillInvoker:
             Error result.
         """
         return CommandResult.error(
-            f"Error: no executor bound for mode '{mode.value}' (skill '{skill_name}')."
+            f"Error: no executor bound for mode '{mode.value}' (skill '{skill_name}').",
+            code="executor_unbound",
+            data={"mode": mode.value, "skill": skill_name},
         )

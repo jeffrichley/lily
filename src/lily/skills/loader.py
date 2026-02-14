@@ -140,6 +140,7 @@ def _hash_snapshot(
                 "source": entry.source.value,
                 "path": entry.path.as_posix(),
                 "summary": entry.summary,
+                "instructions": entry.instructions,
                 "invocation_mode": entry.invocation_mode.value,
                 "command": entry.command,
                 "command_tool": entry.command_tool,
@@ -258,7 +259,7 @@ def _resolve_candidate(
     Returns:
         A tuple of optional resolved entry and diagnostics for this candidate.
     """
-    metadata, _body, parse_error = _read_skill_metadata(candidate.path)
+    metadata, body, parse_error = _read_skill_metadata(candidate.path)
     if parse_error:
         return None, (
             SkillDiagnostic(
@@ -293,6 +294,7 @@ def _resolve_candidate(
         source=candidate.source,
         path=(candidate.path / SKILL_FILENAME).resolve(),
         summary=metadata.summary,
+        instructions=body.strip(),
         invocation_mode=metadata.invocation_mode,
         command=metadata.command,
         command_tool=metadata.command_tool,

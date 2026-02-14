@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from lily.session.models import ModelConfig, Session
+from lily.session.models import ModelConfig, Session, SkillSnapshotConfig
 from lily.skills.loader import SkillSnapshotRequest, build_skill_snapshot
 
 
@@ -68,6 +68,19 @@ class SessionFactory:
             "active_agent": active_agent,
             "skill_snapshot": snapshot,
             "model_config": model_config or ModelConfig(),
+            "skill_snapshot_config": SkillSnapshotConfig(
+                bundled_dir=self._config.bundled_dir,
+                workspace_dir=self._config.workspace_dir,
+                user_dir=self._config.user_dir,
+                reserved_commands=tuple(sorted(self._config.reserved_commands)),
+                available_tools=(
+                    tuple(sorted(self._config.available_tools))
+                    if self._config.available_tools is not None
+                    else None
+                ),
+                platform=self._config.platform,
+                env=self._config.env,
+            ),
         }
         if session_id is not None:
             payload["session_id"] = session_id

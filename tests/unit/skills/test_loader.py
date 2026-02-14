@@ -61,6 +61,7 @@ invocation_mode: llm_orchestration
     assert [entry.name for entry in snapshot.skills] == ["echo"]
     assert snapshot.skills[0].source == SkillSource.WORKSPACE
     assert snapshot.skills[0].summary == "workspace echo"
+    assert snapshot.skills[0].instructions == "# Echo"
     assert any(diag.code == "precedence_conflict" for diag in snapshot.diagnostics)
 
 
