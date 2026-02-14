@@ -49,9 +49,8 @@ class ReloadSkillsCommand:
         )
         session.skill_snapshot = snapshot
         return CommandResult.ok(
-            (
+            
                 f"Reloaded skills for current session. "
                 f"version={snapshot.version} count={len(snapshot.skills)}"
-            )
+            
         )
-

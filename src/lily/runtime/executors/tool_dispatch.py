@@ -15,7 +15,9 @@ class ToolDispatchTool(Protocol):
 
     name: str
 
-    def execute(self, payload: str, *, session: Session, skill_name: str) -> CommandResult:
+    def execute(
+        self, payload: str, *, session: Session, skill_name: str
+    ) -> CommandResult:
         """Execute tool with raw payload."""
 
 
@@ -23,17 +25,19 @@ class AddTool:
     """Deterministic add tool for simple arithmetic expressions."""
 
     name = "add"
-    _EXPR_RE = re.compile(
-        r"^\s*(-?\d+(?:\.\d+)?)\s*\+\s*(-?\d+(?:\.\d+)?)\s*$"
-    )
+    _EXPR_RE = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*\+\s*(-?\d+(?:\.\d+)?)\s*$")
 
-    def execute(self, payload: str, *, session: Session, skill_name: str) -> CommandResult:
+    def execute(
+        self, payload: str, *, session: Session, skill_name: str
+    ) -> CommandResult:
         """Evaluate `<number>+<number>` and return deterministic result."""
         del session
         del skill_name
         text = payload.strip()
         if not text:
-            return CommandResult.error("Error: add tool requires an expression like '2+2'.")
+            return CommandResult.error(
+                "Error: add tool requires an expression like '2+2'."
+            )
 
         match = self._EXPR_RE.fullmatch(text)
         if match is None:

@@ -68,4 +68,3 @@ def test_tool_dispatch_fails_for_unknown_tool() -> None:
         result.message
         == "Error: command tool 'missing_tool' is not registered for skill 'add'."
     )
-

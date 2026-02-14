@@ -10,6 +10,8 @@ import click
 import typer
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.markdown import Markdown
+from rich.panel import Panel
 
 from lily.commands.types import CommandStatus
 from lily.runtime.facade import RuntimeFacade
@@ -84,7 +86,7 @@ def _build_session(
         SessionFactoryConfig(
             bundled_dir=bundled_dir,
             workspace_dir=workspace_dir,
-            reserved_commands={"skills", "skill", "reload_skills"},
+            reserved_commands={"skills", "skill", "help", "reload_skills"},
         )
     )
     return factory.create(model_config=ModelConfig(model_name=model_name))
@@ -107,9 +109,23 @@ def _render_result(message: str, status: CommandStatus) -> None:
         status: Result status.
     """
     if status == CommandStatus.OK:
-        _CONSOLE.print(message, style="green")
+        _CONSOLE.print(
+            Panel(
+                Markdown(message),
+                title="Lily",
+                border_style="green",
+                expand=True,
+            )
+        )
         return
-    _CONSOLE.print(message, style="bold red")
+    _CONSOLE.print(
+        Panel(
+            message,
+            title="Error",
+            border_style="bold red",
+            expand=True,
+        )
+    )
 
 
 def _execute_once(

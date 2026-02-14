@@ -16,7 +16,7 @@ Purpose: concrete engineering checklist to get Lily to a solid, usable state.
 
 - [ ] Expand core command surface
   - [x] Add `/reload_skills`
-  - [ ] Add `/help <skill>`
+  - [x] Add `/help <skill>`
   - [ ] Add `/agent <name>`
   - [ ] Add skill alias commands from frontmatter `command` with built-in collision protection
 

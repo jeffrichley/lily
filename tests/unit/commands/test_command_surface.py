@@ -147,13 +147,7 @@ def test_reload_skills_refreshes_current_session_snapshot(tmp_path: Path) -> Non
     echo_dir = bundled_dir / "echo"
     echo_dir.mkdir()
     (echo_dir / "SKILL.md").write_text(
-        (
-            "---\n"
-            "summary: Echo\n"
-            "invocation_mode: llm_orchestration\n"
-            "---\n"
-            "# Echo\n"
-        ),
+        ("---\nsummary: Echo\ninvocation_mode: llm_orchestration\n---\n# Echo\n"),
         encoding="utf-8",
     )
 
@@ -210,3 +204,47 @@ def test_reload_skills_errors_without_snapshot_config() -> None:
 
     assert result.status.value == "error"
     assert result.message == "Error: /reload_skills is unavailable for this session."
+
+
+def test_help_requires_exactly_one_skill_name() -> None:
+    """`/help` should require exactly one skill argument."""
+    runtime = RuntimeFacade()
+    session = _make_session(skills=())
+
+    result = runtime.handle_input("/help", session)
+
+    assert result.status.value == "error"
+    assert result.message == "Error: /help requires exactly one skill name."
+
+
+def test_help_fails_for_unknown_skill() -> None:
+    """`/help <skill>` should fail clearly when skill is missing."""
+    runtime = RuntimeFacade()
+    session = _make_session(skills=(_make_skill("echo"),))
+
+    result = runtime.handle_input("/help missing", session)
+
+    assert result.status.value == "error"
+    assert result.message == "Error: skill 'missing' not found in snapshot."
+
+
+def test_help_returns_snapshot_metadata_without_execution() -> None:
+    """`/help <skill>` should return deterministic snapshot metadata."""
+    runtime = RuntimeFacade()
+    session = _make_session(
+        skills=(
+            _make_skill(
+                "add",
+                summary="Add two numbers",
+                mode=InvocationMode.TOOL_DISPATCH,
+                command_tool="add",
+            ),
+        )
+    )
+
+    result = runtime.handle_input("/help add", session)
+
+    assert result.status.value == "ok"
+    assert "# /help add" in result.message
+    assert "- `invocation_mode`: tool_dispatch" in result.message
+    assert "- `command_tool`: add" in result.message

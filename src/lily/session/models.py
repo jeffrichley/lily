@@ -50,7 +50,7 @@ class Session(BaseModel):
     skill_snapshot: SkillSnapshot
     model_settings: ModelConfig = Field(alias="model_config")
     conversation_state: list[Message] = Field(default_factory=list)
-    skill_snapshot_config: "SkillSnapshotConfig | None" = None
+    skill_snapshot_config: SkillSnapshotConfig | None = None
 
 
 class SkillSnapshotConfig(BaseModel):
