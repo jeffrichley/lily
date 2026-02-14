@@ -10,6 +10,7 @@ from lily.commands.parser import CommandCall
 from lily.commands.types import CommandHandler, CommandResult
 from lily.runtime.skill_invoker import SkillInvoker
 from lily.session.models import Session
+from lily.skills.types import SkillEntry
 
 
 class CommandRegistry:
@@ -27,6 +28,7 @@ class CommandRegistry:
             skill_invoker: Invoker dependency for `/skill` command execution.
             handlers: Optional custom handlers keyed by command name.
         """
+        self._skill_invoker = skill_invoker
         self._handlers: dict[str, CommandHandler] = {
             "skills": SkillsListCommand(),
             "skill": SkillInvokeCommand(skill_invoker),
@@ -47,6 +49,25 @@ class CommandRegistry:
             Command execution result.
         """
         handler = self._handlers.get(call.name)
-        if handler is None:
-            return CommandResult.error(f"Error: unknown command '/{call.name}'.")
-        return handler.execute(call, session)
+        if handler is not None:
+            return handler.execute(call, session)
+
+        alias_targets = self._find_alias_targets(session, call.name)
+        if len(alias_targets) > 1:
+            return CommandResult.error(
+                f"Error: command alias '/{call.name}' is ambiguous in snapshot."
+            )
+        if len(alias_targets) == 1:
+            user_text = " ".join(call.args)
+            return self._skill_invoker.invoke(alias_targets[0], session, user_text)
+
+        return CommandResult.error(f"Error: unknown command '/{call.name}'.")
+
+    @staticmethod
+    def _find_alias_targets(session: Session, alias_name: str) -> list[SkillEntry]:
+        """Return skills in snapshot that expose matching command alias."""
+        return [
+            entry
+            for entry in session.skill_snapshot.skills
+            if entry.command is not None and entry.command == alias_name
+        ]

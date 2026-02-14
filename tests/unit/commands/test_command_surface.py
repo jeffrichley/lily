@@ -34,6 +34,7 @@ def _make_skill(
     *,
     mode: InvocationMode = InvocationMode.LLM_ORCHESTRATION,
     command_tool: str | None = None,
+    command: str | None = None,
 ) -> SkillEntry:
     """Create a deterministic skill entry fixture.
 
@@ -50,6 +51,7 @@ def _make_skill(
         path=Path(f"/skills/{name}/SKILL.md"),
         summary=summary,
         invocation_mode=mode,
+        command=command,
         command_tool=command_tool,
     )
 
@@ -248,3 +250,59 @@ def test_help_returns_snapshot_metadata_without_execution() -> None:
     assert "# /help add" in result.message
     assert "- `invocation_mode`: tool_dispatch" in result.message
     assert "- `command_tool`: add" in result.message
+
+
+def test_alias_command_invokes_matching_skill() -> None:
+    """`/<alias>` should invoke snapshot skill by frontmatter command alias."""
+    runtime = RuntimeFacade()
+    session = _make_session(
+        skills=(
+            _make_skill(
+                "add",
+                summary="Add two numbers",
+                mode=InvocationMode.TOOL_DISPATCH,
+                command_tool="add",
+                command="sum",
+            ),
+        )
+    )
+
+    result = runtime.handle_input("/sum 2+2", session)
+
+    assert result.status.value == "ok"
+    assert result.message == "4"
+
+
+def test_alias_collision_returns_deterministic_error() -> None:
+    """Ambiguous alias across skills should fail without fallback."""
+    runtime = RuntimeFacade()
+    session = _make_session(
+        skills=(
+            _make_skill("add", mode=InvocationMode.TOOL_DISPATCH, command_tool="add", command="go"),
+            _make_skill("echo", command="go"),
+        )
+    )
+
+    result = runtime.handle_input("/go payload", session)
+
+    assert result.status.value == "error"
+    assert result.message == "Error: command alias '/go' is ambiguous in snapshot."
+
+
+def test_built_in_command_precedence_over_alias() -> None:
+    """Built-in commands should win even if a skill defines same alias."""
+    runtime = RuntimeFacade()
+    session = _make_session(
+        skills=(
+            _make_skill("echo", command="skills"),
+            _make_skill("alpha", summary="Alpha summary"),
+        )
+    )
+
+    result = runtime.handle_input("/skills", session)
+
+    assert result.status.value == "ok"
+    assert result.message.splitlines() == [
+        "alpha - Alpha summary",
+        "echo",
+    ]

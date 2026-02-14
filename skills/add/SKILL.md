@@ -1,6 +1,7 @@
 ---
 summary: Add two numbers from a simple expression.
 invocation_mode: tool_dispatch
+command: add
 command_tool: add
 ---
 # Add

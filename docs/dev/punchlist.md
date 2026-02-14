@@ -14,11 +14,10 @@ Purpose: concrete engineering checklist to get Lily to a solid, usable state.
   - [x] Add strict `command_tool` validation and deterministic error outputs
   - [x] Wire dispatch path through runtime facade/executor setup
 
-- [ ] Expand core command surface
+- [x] Expand core command surface
   - [x] Add `/reload_skills`
   - [x] Add `/help <skill>`
-  - [ ] Add `/agent <name>`
-  - [ ] Add skill alias commands from frontmatter `command` with built-in collision protection
+  - [x] Add skill alias commands from frontmatter `command` with built-in collision protection
 
 - [ ] Standardize command envelope
   - [ ] Extend `CommandResult` to include `code` and `data` in addition to `status` and `message`
@@ -41,6 +40,7 @@ Purpose: concrete engineering checklist to get Lily to a solid, usable state.
 
 ## Priority 4 (Next Elevation)
 
+- [ ] Add `/agent <name>` (deferred until real agents/persona subsystem exists)
 - [ ] Typed skill I/O contracts
   - [ ] Add optional input/output schema fields to skill metadata
   - [ ] Validate input pre-execution and output post-execution
