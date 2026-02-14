@@ -119,7 +119,7 @@ Force invocation of a specific skill.
 
 Invocation rules:
 
-* If `invocation_mode: prompt_rewrite`
+* If `invocation_mode: llm_orchestration`
 
   * Inject skill instructions.
 * If `invocation_mode: tool_dispatch`
