@@ -43,6 +43,7 @@ class LlmOrchestrationExecutor:
             session_id=session.session_id,
             skill_name=entry.name,
             skill_summary=entry.summary,
+            skill_instructions=entry.instructions,
             user_text=user_text,
             model_name=session.model_settings.model_name,
         )

@@ -6,7 +6,7 @@ from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
 from lily.runtime.executors.llm_orchestration import LlmOrchestrationExecutor
-from lily.runtime.executors.tool_dispatch import ToolDispatchExecutor
+from lily.runtime.executors.tool_dispatch import AddTool, ToolDispatchExecutor
 from lily.runtime.llm_backend import LangChainBackend
 from lily.runtime.skill_invoker import SkillInvoker
 from lily.session.models import Session
@@ -55,7 +55,7 @@ class RuntimeFacade:
         llm_backend = LangChainBackend()
         executors = (
             LlmOrchestrationExecutor(llm_backend),
-            ToolDispatchExecutor(),
+            ToolDispatchExecutor(tools=(AddTool(),)),
         )
         invoker = SkillInvoker(executors=executors)
         return CommandRegistry(skill_invoker=invoker)

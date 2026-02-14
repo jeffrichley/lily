@@ -69,16 +69,12 @@ class _LangChainV1Invoker:
             "You are Lily executing a specific skill.\n"
             f"Skill name: {request.skill_name}\n"
             f"Skill summary: {request.skill_summary or 'No summary provided.'}\n"
-            "Follow the skill intent precisely and respond directly."
+            "Follow the skill intent precisely and respond directly.\n"
         )
-        if request.skill_name == "echo":
-            return (
-                f"{base}\n"
-                "For this skill, return exactly the user payload transformed to "
-                "uppercase. "
-                "Return only the uppercase text."
-            )
-        return base
+        instructions = request.skill_instructions.strip()
+        if not instructions:
+            return base
+        return f"{base}Skill instructions:\n{instructions}"
 
     @staticmethod
     def _extract_text(result: object) -> str:
@@ -240,6 +236,7 @@ class LangChainBackend:
             session_id=request.session_id,
             skill_name=request.skill_name,
             skill_summary=request.skill_summary.strip(),
+            skill_instructions=request.skill_instructions.strip(),
             user_text=request.user_text.strip(),
             model_name=request.model_name,
         )

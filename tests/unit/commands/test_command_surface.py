@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from lily.runtime.facade import RuntimeFacade
+from lily.session.factory import SessionFactory, SessionFactoryConfig
 from lily.session.models import ModelConfig, Session
 from lily.skills.types import InvocationMode, SkillEntry, SkillSnapshot, SkillSource
 
@@ -27,7 +28,13 @@ def _make_session(skills: tuple[SkillEntry, ...]) -> Session:
     )
 
 
-def _make_skill(name: str, summary: str = "") -> SkillEntry:
+def _make_skill(
+    name: str,
+    summary: str = "",
+    *,
+    mode: InvocationMode = InvocationMode.LLM_ORCHESTRATION,
+    command_tool: str | None = None,
+) -> SkillEntry:
     """Create a deterministic skill entry fixture.
 
     Args:
@@ -42,7 +49,8 @@ def _make_skill(name: str, summary: str = "") -> SkillEntry:
         source=SkillSource.BUNDLED,
         path=Path(f"/skills/{name}/SKILL.md"),
         summary=summary,
-        invocation_mode=InvocationMode.LLM_ORCHESTRATION,
+        invocation_mode=mode,
+        command_tool=command_tool,
     )
 
 
@@ -107,3 +115,98 @@ def test_skill_command_delegates_to_hidden_llm_adapter_path() -> None:
 
     assert result.status.value == "error"
     assert result.message == "Error: LLM backend is unavailable."
+
+
+def test_skill_command_tool_dispatch_executes_without_llm() -> None:
+    """`/skill` should execute tool_dispatch skills deterministically."""
+    runtime = RuntimeFacade()
+    session = _make_session(
+        skills=(
+            _make_skill(
+                "add",
+                summary="Add two numbers",
+                mode=InvocationMode.TOOL_DISPATCH,
+                command_tool="add",
+            ),
+        )
+    )
+
+    result = runtime.handle_input("/skill add 2+2", session)
+
+    assert result.status.value == "ok"
+    assert result.message == "4"
+
+
+def test_reload_skills_refreshes_current_session_snapshot(tmp_path: Path) -> None:
+    """`/reload_skills` should update only current session snapshot contents."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+
+    echo_dir = bundled_dir / "echo"
+    echo_dir.mkdir()
+    (echo_dir / "SKILL.md").write_text(
+        (
+            "---\n"
+            "summary: Echo\n"
+            "invocation_mode: llm_orchestration\n"
+            "---\n"
+            "# Echo\n"
+        ),
+        encoding="utf-8",
+    )
+
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"skills", "skill", "reload_skills"},
+        )
+    )
+    session = factory.create()
+    runtime = RuntimeFacade()
+
+    assert [entry.name for entry in session.skill_snapshot.skills] == ["echo"]
+
+    add_dir = workspace_dir / "add"
+    add_dir.mkdir()
+    (add_dir / "SKILL.md").write_text(
+        (
+            "---\n"
+            "summary: Add\n"
+            "invocation_mode: tool_dispatch\n"
+            "command_tool: add\n"
+            "---\n"
+            "# Add\n"
+        ),
+        encoding="utf-8",
+    )
+
+    result = runtime.handle_input("/reload_skills", session)
+
+    assert result.status.value == "ok"
+    assert "Reloaded skills for current session." in result.message
+    assert [entry.name for entry in session.skill_snapshot.skills] == ["add", "echo"]
+
+
+def test_reload_skills_rejects_arguments() -> None:
+    """`/reload_skills` should reject unexpected arguments deterministically."""
+    runtime = RuntimeFacade()
+    session = _make_session(skills=())
+
+    result = runtime.handle_input("/reload_skills now", session)
+
+    assert result.status.value == "error"
+    assert result.message == "Error: /reload_skills does not accept arguments."
+
+
+def test_reload_skills_errors_without_snapshot_config() -> None:
+    """`/reload_skills` should fail when session cannot rebuild snapshots."""
+    runtime = RuntimeFacade()
+    session = _make_session(skills=())
+
+    result = runtime.handle_input("/reload_skills", session)
+
+    assert result.status.value == "error"
+    assert result.message == "Error: /reload_skills is unavailable for this session."

@@ -2,6 +2,8 @@
 
 Purpose: track important deferred items while we keep Slice 001 narrow.
 
+Priority source of truth: `docs/dev/roadmap.md`.
+
 ## Core Runtime
 
 - [ ] Persist session state to disk (including `skill_snapshot`) so sessions can survive process restarts.
@@ -15,6 +17,7 @@ Purpose: track important deferred items while we keep Slice 001 narrow.
 - [ ] Add optional user skills root and include it in precedence (`workspace > user > bundled`).
 - [ ] Add skill alias commands from frontmatter `command` with collision checks.
 - [ ] Add `tool_dispatch` execution path with strict `command_tool` validation.
+- [ ] Add deterministic tool discovery/registration so skills can introduce their own tools without manual runtime wiring.
 - [ ] Add richer loader diagnostics output surface for malformed/ineligible skills.
 - [ ] Remove temporary `if skill_name == "echo"` branch in backend and make behavior sourcing skill-driven.
 - [ ] Load and pass `SKILL.md` body/instructions to execution layer so orchestration is not hardcoded per skill.
@@ -49,6 +52,7 @@ Purpose: track important deferred items while we keep Slice 001 narrow.
 - [ ] Add schema version field to persisted session payloads.
 - [ ] Add migration stubs for future session schema changes.
 - [ ] Define canonical normalization rules for skill names and command aliases.
+- [ ] Add typed skill I/O contracts (validated input/output schemas) for deterministic skill execution.
 
 ## Persona And Context
 

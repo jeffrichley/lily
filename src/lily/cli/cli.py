@@ -84,7 +84,7 @@ def _build_session(
         SessionFactoryConfig(
             bundled_dir=bundled_dir,
             workspace_dir=workspace_dir,
-            reserved_commands={"skills", "skill"},
+            reserved_commands={"skills", "skill", "reload_skills"},
         )
     )
     return factory.create(model_config=ModelConfig(model_name=model_name))

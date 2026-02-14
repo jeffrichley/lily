@@ -16,6 +16,7 @@ class LlmRunRequest(BaseModel):
     session_id: str = Field(min_length=1)
     skill_name: str = Field(min_length=1)
     skill_summary: str
+    skill_instructions: str = ""
     user_text: str
     model_name: str = Field(min_length=1)
 

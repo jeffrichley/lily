@@ -77,6 +77,7 @@ class SkillEntry(BaseModel):
     source: SkillSource
     path: Path
     summary: str = ""
+    instructions: str = ""
     invocation_mode: InvocationMode = InvocationMode.LLM_ORCHESTRATION
     command: str | None = None
     command_tool: str | None = None

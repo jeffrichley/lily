@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from lily.commands.handlers.reload_skills import ReloadSkillsCommand
 from lily.commands.handlers.skill_invoke import SkillInvokeCommand
 from lily.commands.handlers.skills_list import SkillsListCommand
 from lily.commands.parser import CommandCall
@@ -28,6 +29,7 @@ class CommandRegistry:
         self._handlers: dict[str, CommandHandler] = {
             "skills": SkillsListCommand(),
             "skill": SkillInvokeCommand(skill_invoker),
+            "reload_skills": ReloadSkillsCommand(),
         }
         if handlers:
             self._handlers.update(handlers)
