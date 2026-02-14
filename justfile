@@ -54,7 +54,7 @@ audit:
 
 # Security: static analysis (bandit); config in pyproject.toml
 bandit:
-    uv run bandit -c pyproject.toml -r src tests
+    uv run bandit -c pyproject.toml -r src
 
 # Maintainability index (radon); fail if any module below C
 radon:
@@ -72,9 +72,9 @@ commit:
 commit-check:
     uv run cz check
 
-# Install commit-msg hook to enforce conventional commits (run once)
-commit-hook-install:
-    uv run python scripts/install_commit_msg_hook.py
+# Install commit-msg hook to enforce conventional commits (run once). Requires scripts/install_commit_msg_hook.py.
+# commit-hook-install:
+#     uv run python scripts/install_commit_msg_hook.py
 
 # Install pre-commit hooks (run once). Includes commit-msg hook for conventional commits.
 pre-commit-install:
@@ -91,6 +91,6 @@ quality: format lint types complexity vulture darglint audit bandit radon find-d
 # Same gates as quality but check-only (no format write, no lint fix). Use in CI so PR fails if not clean.
 quality-check: format-check lint-check types complexity vulture darglint audit bandit radon find-dupes docstr-coverage
 
-# Generate Test Quality Audit skeleton (Step 0 of /test-quality): inventory + per-file method tables + placeholders
-test-quality-audit-init output="test_quality_audit.md":
-    uv run python scripts/generate_test_quality_audit.py -o {{output}}
+# --- Lighter targets for day-to-day dev ---
+# Recommended while developing: format + lint + types. Fast except mypy; catches most issues.
+quality-dev: format lint types

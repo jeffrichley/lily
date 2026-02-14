@@ -9,6 +9,10 @@ dependencies = [
     "typer>=0.21.1",
     "filelock>=3.17.0",
     "rich>=14.3.2",
+    "pyyaml>=6.0.2",
+    "langchain>=1.0.0",
+    "langchain-openai>=1.1.9",
+    "langchain-ollama>=1.0.1",
 ]
 
 [project.scripts]
@@ -17,6 +21,7 @@ lily = "lily.cli:app"
 [dependency-groups]
 dev = [
     "mypy>=1.19.1",
+    "types-pyyaml>=6.0.12.20250915",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "ruff>=0.8.0",

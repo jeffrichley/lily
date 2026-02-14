@@ -7,7 +7,7 @@ This document defines the **minimal skill format** required for Lily Agent Mode 
 - Loader contract
 - Deterministic command dispatch
 - Eligibility filtering
-- Invocation mode (prompt_rewrite vs tool_dispatch)
+- Invocation mode (llm_orchestration vs tool_dispatch)
 
 If metadata does not influence execution decisions, it does not belong in v0.
 
@@ -41,7 +41,7 @@ Example:
 ```markdown
 ---
 summary: Short description of what the skill does.
-invocation_mode: prompt_rewrite
+invocation_mode: llm_orchestration
 command: plan
 requires_tools:
   - read
@@ -79,9 +79,9 @@ Only the following keys are recognized in v0. Anything else must be ignored.
 | Property | Value |
 |----------|--------|
 | Type | string |
-| Allowed values | `prompt_rewrite` (default), `tool_dispatch` |
+| Allowed values | `llm_orchestration` (default), `tool_dispatch` |
 
-**`prompt_rewrite`** (default):
+**`llm_orchestration`** (default):
 
 - Lily selects skill, reads `SKILL.md`, injects skill instructions into model context.
 - Model executes via reasoning + tool calls.
@@ -174,7 +174,7 @@ No fallback to lower-precedence skill (per loader contract).
 The Markdown body of `SKILL.md`:
 
 - Is treated as instructional content.
-- Is injected into context when skill is selected (prompt_rewrite mode).
+- Is injected into context when skill is selected (llm_orchestration mode).
 - Must not contain executable code or reference hidden runtime APIs.
 
 In v0 the body is trusted content; there is no security scanning or sandbox isolation layer.
@@ -232,7 +232,7 @@ skills/
 ```markdown
 ---
 summary: Convert conversation into a structured implementation plan.
-invocation_mode: prompt_rewrite
+invocation_mode: llm_orchestration
 command: plan
 requires_tools:
   - read

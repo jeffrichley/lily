@@ -126,7 +126,7 @@ skills/
     └── SKILL.md
 ```
 
-Make it `prompt_rewrite`.
+Make it `llm_orchestration`.
 
 Something dead simple:
 

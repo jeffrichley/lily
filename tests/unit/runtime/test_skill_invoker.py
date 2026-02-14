@@ -1,0 +1,114 @@
+"""Unit tests for skill invoker dispatch behavior."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from lily.commands.types import CommandResult
+from lily.runtime.executors.base import SkillExecutor
+from lily.runtime.executors.llm_orchestration import LlmOrchestrationExecutor
+from lily.runtime.llm_backend.base import LlmRunRequest, LlmRunResponse
+from lily.runtime.skill_invoker import SkillInvoker
+from lily.session.models import ModelConfig, Session
+from lily.skills.types import InvocationMode, SkillEntry, SkillSnapshot, SkillSource
+
+
+class _StubLlmBackend:
+    """Test double for private LLM backend port."""
+
+    def run(self, request: LlmRunRequest) -> LlmRunResponse:
+        """Return stable response for tests.
+
+        Args:
+            request: Run request payload.
+
+        Returns:
+            Fixed response payload.
+        """
+        del request
+
+        return LlmRunResponse(text="stub-response")
+
+
+class _EchoToolDispatchExecutor:
+    """Test executor for tool dispatch mode."""
+
+    mode = InvocationMode.TOOL_DISPATCH
+
+    def execute(
+        self, entry: SkillEntry, session: Session, user_text: str
+    ) -> CommandResult:
+        del session
+        return CommandResult.ok(f"tool:{entry.name}:{user_text}")
+
+
+def _make_session() -> Session:
+    """Create minimal session fixture for invoker tests.
+
+    Returns:
+        Session fixture.
+    """
+    return Session(
+        session_id="session-runtime-test",
+        active_agent="default",
+        skill_snapshot=SkillSnapshot(version="v-test", skills=()),
+        model_config=ModelConfig(),
+    )
+
+
+def _make_entry(name: str, mode: InvocationMode) -> SkillEntry:
+    """Create skill entry fixture for invoker tests.
+
+    Args:
+        name: Skill name.
+        mode: Invocation mode.
+
+    Returns:
+        Skill entry fixture.
+    """
+    return SkillEntry(
+        name=name,
+        source=SkillSource.BUNDLED,
+        path=Path(f"/skills/{name}/SKILL.md"),
+        invocation_mode=mode,
+    )
+
+
+def test_invoker_dispatches_to_llm_executor() -> None:
+    """Invoker should route llm_orchestration entries to LLM executor."""
+    invoker = SkillInvoker(executors=(LlmOrchestrationExecutor(_StubLlmBackend()),))
+    session = _make_session()
+    entry = _make_entry("echo", InvocationMode.LLM_ORCHESTRATION)
+
+    result = invoker.invoke(entry, session, "hello")
+
+    assert result.status.value == "ok"
+    assert result.message == "stub-response"
+
+
+def test_invoker_returns_explicit_error_for_unbound_mode() -> None:
+    """Invoker should return explicit error when executor binding is missing."""
+    invoker = SkillInvoker(executors=())
+    session = _make_session()
+    entry = _make_entry("dispatch_me", InvocationMode.TOOL_DISPATCH)
+
+    result = invoker.invoke(entry, session, "hello")
+
+    assert result.status.value == "error"
+    assert (
+        result.message
+        == "Error: no executor bound for mode 'tool_dispatch' (skill 'dispatch_me')."
+    )
+
+
+def test_invoker_dispatches_to_tool_executor() -> None:
+    """Invoker should route tool_dispatch entries to tool executor."""
+    executors: tuple[SkillExecutor, ...] = (_EchoToolDispatchExecutor(),)
+    invoker = SkillInvoker(executors=executors)
+    session = _make_session()
+    entry = _make_entry("dispatch_me", InvocationMode.TOOL_DISPATCH)
+
+    result = invoker.invoke(entry, session, "payload")
+
+    assert result.status.value == "ok"
+    assert result.message == "tool:dispatch_me:payload"
