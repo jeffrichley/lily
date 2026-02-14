@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
@@ -36,7 +35,12 @@ class PersistedSessionV1(BaseModel):
 
 
 def save_session(session: Session, path: Path) -> None:
-    """Persist full session payload atomically."""
+    """Persist full session payload atomically.
+
+    Args:
+        session: Session payload to persist.
+        path: Target file path.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = PersistedSessionV1(session=session)
     temp_path = path.with_name(f"{path.name}.tmp")
@@ -48,7 +52,17 @@ def save_session(session: Session, path: Path) -> None:
 
 
 def load_session(path: Path) -> Session:
-    """Load persisted session payload from disk."""
+    """Load persisted session payload from disk.
+
+    Args:
+        path: Session file path.
+
+    Returns:
+        Loaded session model.
+
+    Raises:
+        SessionDecodeError: If JSON decode or payload validation fails.
+    """
     raw = path.read_text(encoding="utf-8")
     try:
         decoded = json.loads(raw)
@@ -64,7 +78,14 @@ def load_session(path: Path) -> Session:
 
 
 def recover_corrupt_session(path: Path) -> Path | None:
-    """Move unreadable/invalid session aside and return backup path."""
+    """Move unreadable/invalid session aside and return backup path.
+
+    Args:
+        path: Session file path.
+
+    Returns:
+        Backup path when source exists, else None.
+    """
     if not path.exists():
         return None
     timestamp = int(time.time())
@@ -73,10 +94,20 @@ def recover_corrupt_session(path: Path) -> Path | None:
     return backup
 
 
-def _migrate_payload(payload: Any) -> dict[str, Any]:
+def _migrate_payload(payload: object) -> dict[str, object]:
     """Migrate persisted payload into latest schema.
 
     Migration stubs for future versions belong here.
+
+    Args:
+        payload: Decoded JSON payload object.
+
+    Returns:
+        Migrated payload matching latest schema.
+
+    Raises:
+        SessionDecodeError: If payload is not a JSON object.
+        SessionSchemaVersionError: If schema version is unsupported.
     """
     if not isinstance(payload, dict):
         raise SessionDecodeError("Invalid session payload: expected JSON object.")
@@ -87,4 +118,3 @@ def _migrate_payload(payload: Any) -> dict[str, Any]:
         f"Unsupported session schema version: {version!r}. "
         f"Expected {SESSION_SCHEMA_VERSION}."
     )
-

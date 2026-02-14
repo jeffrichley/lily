@@ -6,9 +6,9 @@ from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
 from lily.runtime.executors.llm_orchestration import LlmOrchestrationExecutor
-from lily.runtime.session_lanes import run_in_session_lane
 from lily.runtime.executors.tool_dispatch import AddTool, ToolDispatchExecutor
 from lily.runtime.llm_backend import LangChainBackend
+from lily.runtime.session_lanes import run_in_session_lane
 from lily.runtime.skill_invoker import SkillInvoker
 from lily.session.models import Message, MessageRole, Session
 
@@ -40,11 +40,23 @@ class RuntimeFacade:
         )
 
     def _handle_input_serialized(self, *, text: str, session: Session) -> CommandResult:
-        """Handle one input while holding per-session execution lane."""
+        """Handle one input while holding per-session execution lane.
+
+        Args:
+            text: Raw input text.
+            session: Active session receiving the turn.
+
+        Returns:
+            Deterministic command result.
+        """
         try:
             parsed = parse_input(text)
         except CommandParseError as exc:
-            return CommandResult.error(str(exc))
+            return CommandResult.error(
+                str(exc),
+                code="parse_error",
+                data={"input": text},
+            )
 
         if parsed.kind == ParsedInputKind.COMMAND and parsed.command is not None:
             result = self._command_registry.dispatch(parsed.command, session)
@@ -52,7 +64,8 @@ class RuntimeFacade:
             return result
 
         result = CommandResult.error(
-            "Error: non-command conversational routing is not implemented yet."
+            "Error: non-command conversational routing is not implemented yet.",
+            code="conversation_unimplemented",
         )
         self._record_turn(session, user_text=text, assistant_text=result.message)
         return result
@@ -74,7 +87,13 @@ class RuntimeFacade:
 
     @staticmethod
     def _record_turn(session: Session, *, user_text: str, assistant_text: str) -> None:
-        """Append deterministic user/assistant events to conversation state."""
+        """Append deterministic user/assistant events to conversation state.
+
+        Args:
+            session: Active session to mutate.
+            user_text: User turn content.
+            assistant_text: Assistant/result turn content.
+        """
         session.conversation_state.append(
             Message(role=MessageRole.USER, content=user_text)
         )

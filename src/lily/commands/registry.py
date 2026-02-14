@@ -55,17 +55,31 @@ class CommandRegistry:
         alias_targets = self._find_alias_targets(session, call.name)
         if len(alias_targets) > 1:
             return CommandResult.error(
-                f"Error: command alias '/{call.name}' is ambiguous in snapshot."
+                f"Error: command alias '/{call.name}' is ambiguous in snapshot.",
+                code="alias_ambiguous",
+                data={"alias": call.name},
             )
         if len(alias_targets) == 1:
             user_text = " ".join(call.args)
             return self._skill_invoker.invoke(alias_targets[0], session, user_text)
 
-        return CommandResult.error(f"Error: unknown command '/{call.name}'.")
+        return CommandResult.error(
+            f"Error: unknown command '/{call.name}'.",
+            code="unknown_command",
+            data={"command": call.name},
+        )
 
     @staticmethod
     def _find_alias_targets(session: Session, alias_name: str) -> list[SkillEntry]:
-        """Return skills in snapshot that expose matching command alias."""
+        """Return skills in snapshot that expose matching command alias.
+
+        Args:
+            session: Active session whose snapshot should be queried.
+            alias_name: Alias name from parsed slash command.
+
+        Returns:
+            Matching skill entries with same alias.
+        """
         return [
             entry
             for entry in session.skill_snapshot.skills

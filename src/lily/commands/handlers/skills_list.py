@@ -36,11 +36,23 @@ class SkillsListCommand:
             Command result with deterministic skill list output.
         """
         if call.args:
-            return CommandResult.error("Error: /skills does not accept arguments.")
+            return CommandResult.error(
+                "Error: /skills does not accept arguments.",
+                code="invalid_args",
+                data={"command": "skills"},
+            )
 
         entries = sorted(session.skill_snapshot.skills, key=lambda entry: entry.name)
         if not entries:
-            return CommandResult.ok("No skills available in snapshot.")
+            return CommandResult.ok(
+                "No skills available in snapshot.",
+                code="skills_empty",
+                data={"count": 0},
+            )
 
         lines = [_format_skill_line(entry.name, entry.summary) for entry in entries]
-        return CommandResult.ok("\n".join(lines))
+        return CommandResult.ok(
+            "\n".join(lines),
+            code="skills_listed",
+            data={"count": len(entries)},
+        )

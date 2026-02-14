@@ -23,13 +23,16 @@ class ReloadSkillsCommand:
         """
         if call.args:
             return CommandResult.error(
-                "Error: /reload_skills does not accept arguments."
+                "Error: /reload_skills does not accept arguments.",
+                code="invalid_args",
+                data={"command": "reload_skills"},
             )
 
         config = session.skill_snapshot_config
         if config is None:
             return CommandResult.error(
-                "Error: /reload_skills is unavailable for this session."
+                "Error: /reload_skills is unavailable for this session.",
+                code="reload_unavailable",
             )
 
         snapshot = build_skill_snapshot(
@@ -49,8 +52,10 @@ class ReloadSkillsCommand:
         )
         session.skill_snapshot = snapshot
         return CommandResult.ok(
-            
+            (
                 f"Reloaded skills for current session. "
                 f"version={snapshot.version} count={len(snapshot.skills)}"
-            
+            ),
+            code="skills_reloaded",
+            data={"version": snapshot.version, "count": len(snapshot.skills)},
         )

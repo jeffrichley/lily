@@ -67,4 +67,3 @@ def test_recover_corrupt_session_moves_file_aside(tmp_path: Path) -> None:
     assert backup.name.startswith("session.json.corrupt-")
     assert not path.exists()
     assert backup.exists()
-

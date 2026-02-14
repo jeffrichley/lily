@@ -41,6 +41,9 @@ def _make_skill(
     Args:
         name: Skill name.
         summary: Skill summary text.
+        mode: Invocation mode for the skill fixture.
+        command_tool: Optional tool name for tool_dispatch fixtures.
+        command: Optional alias command exposed by the skill.
 
     Returns:
         Skill entry fixture.
@@ -278,7 +281,12 @@ def test_alias_collision_returns_deterministic_error() -> None:
     runtime = RuntimeFacade()
     session = _make_session(
         skills=(
-            _make_skill("add", mode=InvocationMode.TOOL_DISPATCH, command_tool="add", command="go"),
+            _make_skill(
+                "add",
+                mode=InvocationMode.TOOL_DISPATCH,
+                command_tool="add",
+                command="go",
+            ),
             _make_skill("echo", command="go"),
         )
     )

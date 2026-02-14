@@ -26,8 +26,7 @@ class _TrackingRegistry:
         del session
         with self.lock:
             self.active += 1
-            if self.active > self.max_active:
-                self.max_active = self.active
+            self.max_active = max(self.max_active, self.active)
         try:
             time.sleep(0.05)
             return CommandResult.ok("ok")

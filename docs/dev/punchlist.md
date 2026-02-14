@@ -19,10 +19,10 @@ Purpose: concrete engineering checklist to get Lily to a solid, usable state.
   - [x] Add `/help <skill>`
   - [x] Add skill alias commands from frontmatter `command` with built-in collision protection
 
-- [ ] Standardize command envelope
-  - [ ] Extend `CommandResult` to include `code` and `data` in addition to `status` and `message`
-  - [ ] Update handlers/executors to return stable machine-readable outputs
-  - [ ] Update CLI rendering path accordingly
+- [x] Standardize command envelope
+  - [x] Extend `CommandResult` to include `code` and `data` in addition to `status` and `message`
+  - [x] Update handlers/executors to return stable machine-readable outputs
+  - [x] Update CLI rendering path accordingly
 
 - [x] Add session persistence + reload semantics
   - [x] Persist session state to disk (`session_id`, `active_agent`, `model_config`, `skill_snapshot`, conversation)
@@ -33,10 +33,10 @@ Purpose: concrete engineering checklist to get Lily to a solid, usable state.
   - [x] Introduce a per-session queue/lane boundary for command + execution flow
   - [x] Prevent interleaving/race issues under concurrent inputs
 
-- [ ] Add reliability coverage
-  - [ ] Restart simulation tests (session restore + snapshot continuity)
-  - [ ] Snapshot drift tests (filesystem mutation does not alter current session snapshot)
-  - [ ] Concurrency/serialization tests
+- [x] Add reliability coverage
+  - [x] Restart simulation tests (session restore + snapshot continuity)
+  - [x] Snapshot drift tests (filesystem mutation does not alter current session snapshot)
+  - [x] Concurrency/serialization tests
 
 ## Priority 4 (Next Elevation)
 

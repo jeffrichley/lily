@@ -9,11 +9,12 @@ from typing import Annotated
 import click
 import typer
 from rich.console import Console
+from rich.json import JSON
 from rich.logging import RichHandler
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from lily.commands.types import CommandStatus
+from lily.commands.types import CommandResult, CommandStatus
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
 from lily.session.models import ModelConfig, Session
@@ -73,7 +74,14 @@ def _default_workspace_dir() -> Path:
 
 
 def _default_session_file(workspace_dir: Path) -> Path:
-    """Return default persisted session file path."""
+    """Return default persisted session file path.
+
+    Args:
+        workspace_dir: Workspace skills directory path.
+
+    Returns:
+        Session persistence file path.
+    """
     workspace_dir.mkdir(parents=True, exist_ok=True)
     return workspace_dir.parent / "session.json"
 
@@ -91,6 +99,7 @@ def _build_session(
         bundled_dir: Bundled skills root.
         workspace_dir: Workspace skills root.
         model_name: Session model name.
+        session_file: Session persistence file path.
 
     Returns:
         Initialized session (loaded from disk when possible).
@@ -126,7 +135,12 @@ def _build_session(
 
 
 def _persist_session(session: Session, session_file: Path) -> None:
-    """Persist session with best-effort user-visible error reporting."""
+    """Persist session with best-effort user-visible error reporting.
+
+    Args:
+        session: Session to persist.
+        session_file: Persistence target path.
+    """
     try:
         save_session(session, session_file)
     except OSError as exc:
@@ -144,31 +158,48 @@ def _build_runtime() -> RuntimeFacade:
     return RuntimeFacade()
 
 
-def _render_result(message: str, status: CommandStatus) -> None:
+def _render_result(result: CommandResult) -> None:
     """Render command result with Rich styles.
 
     Args:
-        message: User-facing command output.
-        status: Result status.
+        result: Structured command output envelope.
     """
-    if status == CommandStatus.OK:
+    if result.status == CommandStatus.OK:
         _CONSOLE.print(
             Panel(
-                Markdown(message),
-                title="Lily",
+                Markdown(result.message),
+                title=f"Lily [{result.code}]",
                 border_style="green",
                 expand=True,
             )
         )
+        if result.data:
+            _CONSOLE.print(
+                Panel(
+                    JSON.from_data(result.data),
+                    title="Data",
+                    border_style="cyan",
+                    expand=True,
+                )
+            )
         return
     _CONSOLE.print(
         Panel(
-            message,
-            title="Error",
+            result.message,
+            title=f"Error [{result.code}]",
             border_style="bold red",
             expand=True,
         )
     )
+    if result.data:
+        _CONSOLE.print(
+            Panel(
+                JSON.from_data(result.data),
+                title="Data",
+                border_style="cyan",
+                expand=True,
+            )
+        )
 
 
 def _execute_once(
@@ -186,6 +217,7 @@ def _execute_once(
         bundled_dir: Bundled skills root.
         workspace_dir: Workspace skills root.
         model_name: Model name for session construction.
+        session_file: Session persistence file path.
 
     Returns:
         Process exit code.
@@ -199,7 +231,7 @@ def _execute_once(
     runtime = _build_runtime()
     result = runtime.handle_input(text, session)
     _persist_session(session, session_file)
-    _render_result(result.message, result.status)
+    _render_result(result)
     return 0 if result.status == CommandStatus.OK else 1
 
 
@@ -234,6 +266,7 @@ def run_command(
         bundled_dir: Optional bundled skills root override.
         workspace_dir: Optional workspace skills root override.
         model_name: Model identifier for session execution.
+        session_file: Optional persisted session file path override.
 
     Raises:
         Exit: Raised with command status code for shell integration.
@@ -283,6 +316,7 @@ def repl_command(
         bundled_dir: Optional bundled skills root override.
         workspace_dir: Optional workspace skills root override.
         model_name: Model identifier for session execution.
+        session_file: Optional persisted session file path override.
     """
     _configure_logging()
     _CONSOLE.print(
@@ -317,4 +351,4 @@ def repl_command(
 
         result = runtime.handle_input(text, session)
         _persist_session(session, effective_session_file)
-        _render_result(result.message, result.status)
+        _render_result(result)

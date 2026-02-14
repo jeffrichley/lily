@@ -49,9 +49,17 @@ class LlmOrchestrationExecutor:
         )
         try:
             response = self._backend.run(request)
-            return CommandResult.ok(response.text)
+            return CommandResult.ok(
+                response.text,
+                code="llm_ok",
+                data={"skill": entry.name},
+            )
         except LlmBackendError as exc:
-            return CommandResult.error(self._map_backend_error(exc.code))
+            return CommandResult.error(
+                self._map_backend_error(exc.code),
+                code=f"llm_{exc.code.value}",
+                data={"skill": entry.name, "backend_code": exc.code.value},
+            )
 
     @staticmethod
     def _map_backend_error(code: LlmBackendErrorCode) -> str:

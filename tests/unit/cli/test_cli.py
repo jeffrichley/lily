@@ -149,7 +149,9 @@ def test_repl_exit_parentheses_exits_cleanly(tmp_path: Path) -> None:
     assert "bye" in result.stdout
 
 
-def test_run_persists_session_and_requires_reload_for_new_skills(tmp_path: Path) -> None:
+def test_run_persists_session_and_requires_reload_for_new_skills(
+    tmp_path: Path,
+) -> None:
     """Run mode should persist snapshot and keep it stable until /reload_skills."""
     bundled_dir = tmp_path / "bundled"
     workspace_dir = tmp_path / "workspace"
@@ -178,13 +180,7 @@ def test_run_persists_session_and_requires_reload_for_new_skills(tmp_path: Path)
     demo_dir = workspace_dir / "demo"
     demo_dir.mkdir()
     (demo_dir / "SKILL.md").write_text(
-        (
-            "---\n"
-            "summary: Demo\n"
-            "invocation_mode: llm_orchestration\n"
-            "---\n"
-            "# Demo\n"
-        ),
+        ("---\nsummary: Demo\ninvocation_mode: llm_orchestration\n---\n# Demo\n"),
         encoding="utf-8",
     )
 
