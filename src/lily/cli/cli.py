@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 
@@ -13,6 +14,7 @@ from rich.json import JSON
 from rich.logging import RichHandler
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.table import Table
 
 from lily.commands.types import CommandResult, CommandStatus
 from lily.runtime.facade import RuntimeFacade
@@ -29,6 +31,22 @@ from lily.session.store import (
 app = typer.Typer(help="Lily CLI")
 _CONSOLE = Console()
 _LOGGING_CONFIGURED = False
+_HIDE_DATA_CODES = {
+    "persona_listed",
+    "persona_set",
+    "persona_shown",
+    "persona_reloaded",
+    "persona_exported",
+    "persona_imported",
+    "agent_listed",
+    "agent_set",
+    "agent_shown",
+    "style_set",
+    "memory_listed",
+    "memory_empty",
+    "memory_saved",
+    "memory_deleted",
+}
 
 
 def _configure_logging() -> None:
@@ -109,7 +127,19 @@ def _build_session(
         SessionFactoryConfig(
             bundled_dir=bundled_dir,
             workspace_dir=workspace_dir,
-            reserved_commands={"skills", "skill", "help", "reload_skills"},
+            reserved_commands={
+                "skills",
+                "skill",
+                "help",
+                "reload_skills",
+                "persona",
+                "reload_persona",
+                "agent",
+                "style",
+                "remember",
+                "forget",
+                "memory",
+            },
         )
     )
     try:
@@ -165,6 +195,8 @@ def _render_result(result: CommandResult) -> None:
         result: Structured command output envelope.
     """
     if result.status == CommandStatus.OK:
+        if _render_rich_success(result):
+            return
         _CONSOLE.print(
             Panel(
                 Markdown(result.message),
@@ -173,7 +205,7 @@ def _render_result(result: CommandResult) -> None:
                 expand=True,
             )
         )
-        if result.data:
+        if result.data and result.code not in _HIDE_DATA_CODES:
             _CONSOLE.print(
                 Panel(
                     JSON.from_data(result.data),
@@ -200,6 +232,245 @@ def _render_result(result: CommandResult) -> None:
                 expand=True,
             )
         )
+
+
+def _render_rich_success(result: CommandResult) -> bool:
+    """Render specialized success view for selected command result codes.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when a specialized render path handled output.
+    """
+    renderers: dict[str, Callable[[CommandResult], bool]] = {
+        "persona_listed": _render_persona_list,
+        "persona_set": _render_persona_set,
+        "persona_shown": _render_persona_show,
+        "agent_listed": _render_agent_list,
+        "agent_set": _render_agent_set,
+        "agent_shown": _render_agent_show,
+        "memory_listed": _render_memory_list,
+    }
+    renderer = renderers.get(result.code)
+    if renderer is None:
+        return False
+    return renderer(result)
+
+
+def _render_persona_list(result: CommandResult) -> bool:
+    """Render `/persona list` in table form.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when table render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    raw_rows = data.get("personas") if data is not None else None
+    if not isinstance(raw_rows, list):
+        return False
+
+    table = Table(title="Personas", show_header=True, header_style="bold cyan")
+    table.add_column("Active", style="green", no_wrap=True)
+    table.add_column("Persona", style="bold")
+    table.add_column("Default Style", style="magenta")
+    table.add_column("Summary")
+    for row in raw_rows:
+        if not isinstance(row, dict):
+            continue
+        active = "yes" if bool(row.get("active")) else ""
+        table.add_row(
+            active,
+            str(row.get("persona", "")),
+            str(row.get("default_style", "")),
+            str(row.get("summary", "")),
+        )
+    _CONSOLE.print(table)
+    return True
+
+
+def _render_persona_set(result: CommandResult) -> bool:
+    """Render `/persona use` confirmation in concise panel.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when panel render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    persona = str(data.get("persona", "")).strip()
+    style = str(data.get("style", "")).strip()
+    if not persona or not style:
+        return False
+    _CONSOLE.print(
+        Panel(
+            f"Active Persona: [bold]{persona}[/bold]\nStyle: [bold]{style}[/bold]",
+            title="Persona Updated",
+            border_style="green",
+            expand=True,
+        )
+    )
+    return True
+
+
+def _render_persona_show(result: CommandResult) -> bool:
+    """Render `/persona show` details as fields + instructions panel.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when rich render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    persona = str(data.get("persona", "")).strip()
+    summary = str(data.get("summary", "")).strip()
+    default_style = str(data.get("default_style", "")).strip()
+    effective_style = str(data.get("effective_style", "")).strip()
+    instructions = str(data.get("instructions", "")).strip()
+    if not persona:
+        return False
+
+    details = Table(show_header=False, box=None, expand=True)
+    details.add_column("Field", style="bold cyan", no_wrap=True)
+    details.add_column("Value")
+    details.add_row("Persona", persona)
+    details.add_row("Summary", summary)
+    details.add_row("Default Style", default_style)
+    details.add_row("Effective Style", effective_style)
+    _CONSOLE.print(Panel(details, title="Persona", border_style="green", expand=True))
+    if instructions:
+        _CONSOLE.print(
+            Panel(
+                instructions,
+                title="Instructions",
+                border_style="cyan",
+                expand=True,
+            )
+        )
+    return True
+
+
+def _render_memory_list(result: CommandResult) -> bool:
+    """Render `/memory show` records in table form.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when table render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    raw_records = data.get("records") if data is not None else None
+    if not isinstance(raw_records, list):
+        return False
+    table = Table(
+        title=f"Memory ({len(raw_records)} records)",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("ID", style="green")
+    table.add_column("Namespace", style="magenta", no_wrap=True)
+    table.add_column("Content")
+    for record in raw_records:
+        if not isinstance(record, dict):
+            continue
+        table.add_row(
+            str(record.get("id", "")),
+            str(record.get("namespace", "")),
+            str(record.get("content", "")),
+        )
+    _CONSOLE.print(table)
+    return True
+
+
+def _render_agent_list(result: CommandResult) -> bool:
+    """Render `/agent list` in table form.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when table render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    raw_rows = data.get("agents") if data is not None else None
+    if not isinstance(raw_rows, list):
+        return False
+    table = Table(title="Agents", show_header=True, header_style="bold cyan")
+    table.add_column("Active", style="green", no_wrap=True)
+    table.add_column("Agent", style="bold")
+    table.add_column("Summary")
+    for row in raw_rows:
+        if not isinstance(row, dict):
+            continue
+        table.add_row(
+            "yes" if bool(row.get("active")) else "",
+            str(row.get("agent", "")),
+            str(row.get("summary", "")),
+        )
+    _CONSOLE.print(table)
+    return True
+
+
+def _render_agent_set(result: CommandResult) -> bool:
+    """Render `/agent use` confirmation in concise panel.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when panel render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    agent = str(data.get("agent", "")).strip()
+    if not agent:
+        return False
+    _CONSOLE.print(
+        Panel(
+            f"Active Agent: [bold]{agent}[/bold]",
+            title="Agent Updated",
+            border_style="green",
+            expand=True,
+        )
+    )
+    return True
+
+
+def _render_agent_show(result: CommandResult) -> bool:
+    """Render `/agent show` details panel.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when panel render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    agent = str(data.get("agent", "")).strip()
+    summary = str(data.get("summary", "")).strip()
+    if not agent:
+        return False
+    _CONSOLE.print(
+        Panel(
+            f"Agent: [bold]{agent}[/bold]\nSummary: {summary}",
+            title="Agent",
+            border_style="green",
+            expand=True,
+        )
+    )
+    return True
 
 
 def _execute_once(

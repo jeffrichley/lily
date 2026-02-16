@@ -149,6 +149,109 @@ def test_repl_exit_parentheses_exits_cleanly(tmp_path: Path) -> None:
     assert "bye" in result.stdout
 
 
+def test_run_persona_list_renders_readable_persona_output(tmp_path: Path) -> None:
+    """`lily run /persona list` should render persona output without JSON blob."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    _write_echo_skill(bundled_dir)
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "/persona list",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Personas" in result.stdout
+    assert "lily" in result.stdout
+    assert "chad" in result.stdout
+    assert "barbie" in result.stdout
+    assert '"persona":' not in result.stdout
+
+
+def test_run_persona_use_renders_human_friendly_panel(tmp_path: Path) -> None:
+    """`lily run /persona use` should render friendly panel instead of JSON data."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    session_file = tmp_path / "session.json"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    _write_echo_skill(bundled_dir)
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "/persona use chad",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+            "--session-file",
+            str(session_file),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Persona Updated" in result.stdout
+    assert "Active Persona" in result.stdout
+    assert "chad" in result.stdout
+    assert '"persona":' not in result.stdout
+
+
+def test_run_memory_show_renders_table_instead_of_json(tmp_path: Path) -> None:
+    """`/memory show` should render readable memory rows without raw JSON data pane."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    session_file = tmp_path / "session.json"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    _write_echo_skill(bundled_dir)
+
+    remember = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "/remember favorite color is dark royal purple",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+            "--session-file",
+            str(session_file),
+        ],
+    )
+    assert remember.exit_code == 0
+
+    shown = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "/memory show",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+            "--session-file",
+            str(session_file),
+        ],
+    )
+    assert shown.exit_code == 0
+    assert "Memory (" in shown.stdout
+    assert "favorite" in shown.stdout
+    assert "dark royal" in shown.stdout
+    assert "purple" in shown.stdout
+    assert '"records":' not in shown.stdout
+
+
 def test_run_persists_session_and_requires_reload_for_new_skills(
     tmp_path: Path,
 ) -> None:

@@ -8,6 +8,7 @@ from collections.abc import Callable
 from typing import Protocol
 
 from langchain.agents import create_agent
+from pydantic import BaseModel, ConfigDict, Field
 
 from lily.runtime.llm_backend.base import (
     BackendInvalidResponseError,
@@ -19,6 +20,14 @@ from lily.runtime.llm_backend.base import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class _StructuredSkillResponse(BaseModel):
+    """Structured output contract for LLM-orchestrated skill responses."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    text: str = Field(min_length=1)
 
 
 class AgentInvoker(Protocol):
@@ -49,6 +58,7 @@ class _LangChainV1Invoker:
             model=request.model_name,
             tools=[],
             system_prompt=system_prompt,
+            response_format=_StructuredSkillResponse,
         )
         result = agent.invoke(
             {"messages": [{"role": "user", "content": request.user_text}]}
@@ -93,14 +103,31 @@ class _LangChainV1Invoker:
             raise BackendInvalidResponseError(
                 "LangChain response was not a dictionary."
             )
+        structured_text = _LangChainV1Invoker._extract_structured_text(result)
+        if structured_text is not None:
+            return structured_text
+
         messages = result.get("messages")
         if not isinstance(messages, list) or not messages:
             raise BackendInvalidResponseError(
                 "LangChain response did not include messages."
             )
+        return _LangChainV1Invoker._extract_message_text(messages[-1])
 
-        last = messages[-1]
-        content = getattr(last, "content", None)
+    @staticmethod
+    def _extract_message_text(message: object) -> str:
+        """Extract text from the last response message object.
+
+        Args:
+            message: Last message object from LangChain response.
+
+        Returns:
+            Extracted text string.
+
+        Raises:
+            BackendInvalidResponseError: If message content is malformed.
+        """
+        content = getattr(message, "content", None)
         if isinstance(content, str):
             return content.strip()
         if isinstance(content, list):
@@ -113,6 +140,25 @@ class _LangChainV1Invoker:
         raise BackendInvalidResponseError(
             "LangChain response message content was invalid."
         )
+
+    @staticmethod
+    def _extract_structured_text(result: dict[str, object]) -> str | None:
+        """Extract text from structured response payload when present.
+
+        Args:
+            result: Raw invocation result dictionary.
+
+        Returns:
+            Structured response text when available, else None.
+        """
+        structured = result.get("structured_response")
+        if isinstance(structured, _StructuredSkillResponse):
+            return structured.text.strip()
+        if isinstance(structured, dict):
+            maybe_text = structured.get("text")
+            if isinstance(maybe_text, str):
+                return maybe_text.strip()
+        return None
 
 
 class LangChainBackend:
