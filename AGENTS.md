@@ -1,0 +1,36 @@
+# AGENTS
+
+## Feature vs Internal Work Separation
+
+- Keep roadmap and punchlist items split into:
+  - `User-visible features`
+  - `Internal engineering tasks`
+- Do not mix internal implementation details into user-visible feature bullets.
+
+## Phase Execution Contract
+
+- Before implementing a phase, define:
+  - explicit acceptance criteria
+  - explicit non-goals
+  - required tests and gates
+- Treat phase scope as fixed unless changed explicitly by the user.
+
+## Commit Policy
+
+- Commit at the end of each completed phase.
+- For follow-up work after a completed phase:
+  - use one commit for UX polish
+  - use one commit for docs-only updates
+
+## PR Expectations
+
+- PR description must clearly state:
+  - what is fully complete
+  - what is compatibility/temporary
+  - what remains deferred
+- Avoid implying full subsystem completion when only compatibility surfaces exist.
+
+## CLI Output UX Rule
+
+- User-facing commands should prefer structured Rich rendering (tables/panels).
+- Avoid raw JSON data panels for default interactive output unless a dedicated JSON mode is requested.
