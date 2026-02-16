@@ -5,6 +5,7 @@ from __future__ import annotations
 from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
+from lily.prompting import PersonaContext, PromptMode
 from lily.runtime.conversation import (
     ConversationExecutionError,
     ConversationExecutor,
@@ -98,6 +99,13 @@ class RuntimeFacade:
             model_name=session.model_settings.model_name,
             history=tuple(session.conversation_state),
             limits=session.model_settings.conversation_limits,
+            persona_context=PersonaContext(
+                active_persona_id=session.active_agent,
+                session_hints=(
+                    f"conversation_events={len(session.conversation_state)}",
+                ),
+            ),
+            prompt_mode=PromptMode.FULL,
         )
         try:
             response = self._conversation_executor.run(request)

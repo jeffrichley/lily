@@ -15,8 +15,8 @@ Related:
 ## Gate A (Must Pass Before Persona Command Expansion)
 
 - [x] Non-command conversation turn path implemented
-- [ ] `PersonaContext` interface implemented and wired
-- [ ] `PromptBuilder` interface implemented and wired
+- [x] `PersonaContext` interface implemented and wired
+- [x] `PromptBuilder` interface implemented and wired
 - [x] ADR-001 memory model status updated to `Accepted`
 - [ ] Policy precedence contract documented in code/docs:
   - [ ] `safety > user style > persona default > stochastic expression`
@@ -45,27 +45,40 @@ Related:
 
 ## Phase 2: Persona Compiler Foundations (`P5`)
 
-- [ ] Implement `PersonaContext` model
-  - [ ] Active persona id
-  - [ ] Active style level
-  - [ ] User preference summary
-  - [ ] Session/task hints
-- [ ] Implement `PromptBuilder` as section-based builder
-  - [ ] Identity section
-  - [ ] Safety section
-  - [ ] Skills section
-  - [ ] Memory section
-  - [ ] Runtime section
-- [ ] Add prompt modes
-  - [ ] `full`
-  - [ ] `minimal`
-- [ ] Wire PersonaContext into LangChain middleware/runtime context
-  - [ ] Add `context_schema` for invocation-scoped persona/task metadata
-  - [ ] Add `@dynamic_prompt` middleware for deterministic prompt section injection
-  - [ ] Add `@before_model`/`@after_model` hooks for tracing and guardrail entry points
-- [ ] Add bounded/truncated context injection
-  - [ ] Deterministic truncation marker format
-  - [ ] Tests for boundary behavior
+- [x] Implement `PersonaContext` model
+  - [x] Active persona id
+  - [x] Active style level
+  - [x] User preference summary
+  - [x] Session/task hints
+- [x] Implement `PromptBuilder` as section-based builder
+  - [x] Identity section
+  - [x] Safety section
+  - [x] Skills section
+  - [x] Memory section
+  - [x] Runtime section
+- [x] Add prompt modes
+  - [x] `full`
+  - [x] `minimal`
+- [x] Wire PersonaContext into LangChain middleware/runtime context
+  - [x] Add `context_schema` for invocation-scoped persona/task metadata
+  - [x] Add `@dynamic_prompt` middleware for deterministic prompt section injection
+  - [x] Add `@before_model`/`@after_model` hooks for tracing and guardrail entry points
+- [x] Add bounded/truncated context injection
+  - [x] Deterministic truncation marker format
+  - [x] Tests for boundary behavior
+
+Phase 2 current-state note:
+- Prompt rendering is live and deterministic, but several sections are baseline content until later phases.
+- Currently baseline/simple:
+  - identity/style values (until `/persona` and `/style` command surface lands)
+  - safety wording (initial baseline policy text)
+  - skills section (name list only)
+  - memory section (summary string, not repository-backed retrieval yet)
+  - runtime hints (basic session/task hints)
+- Planned enrichment:
+  - policy precedence enforcement (Phase 4)
+  - split-store memory retrieval wiring (Phase 3)
+  - richer persona controls and persisted profile data (Phase 6)
 
 ## Phase 3: Memory Repositories (`P5`)
 
@@ -147,13 +160,15 @@ Related:
 - 2026-02-16: Phase 1 conversation baseline landed (LangChain `create_agent` path, deterministic conversation envelopes, per-session thread routing, tests, and quality checks green).
 - 2026-02-16: Added boolean-first conversation limit settings (`enabled` + explicit value fields) with strict validation tests and documented defaults.
 - 2026-02-16: Implemented tool-loop boundary enforcement with deterministic timeout/retry/loop-limit handling and tests.
+- 2026-02-16: Completed Phase 2 foundations (`PersonaContext`, sectioned `PromptBuilder`, prompt modes, LangChain `context_schema` + middleware hooks, deterministic bounded/truncated injection).
+- 2026-02-16: Verified rendered prompt output manually; documented current baseline section content vs planned enrichments.
 
 ## LangChain v1 Leverage (Out-of-the-Box)
 
 - [x] `create_agent` runtime used for conversation path
 - [x] LangGraph checkpointer persistence used for thread/session continuity
-- [ ] Runtime context (`context_schema`) used for persona/task invocation metadata
-- [ ] Middleware hooks used for prompt assembly + policy guardrails
+- [x] Runtime context (`context_schema`) used for persona/task invocation metadata
+- [x] Middleware hooks used for prompt assembly + policy guardrails
 - [ ] HITL interrupt middleware available for sensitive tools
 - [ ] Long-term memory store API used for repository adapters
 - [ ] Structured output strategy used where response schemas are required

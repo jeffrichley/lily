@@ -3,21 +3,41 @@
 from __future__ import annotations
 
 import concurrent.futures
+import logging
 from collections.abc import Callable
 from typing import Any, Protocol, cast
 
 from langchain.agents import create_agent
+from langchain.agents.middleware import (
+    AgentState,
+    ModelRequest,
+    after_model,
+    before_model,
+    dynamic_prompt,
+)
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
+from langgraph.runtime import Runtime
 from pydantic import BaseModel, ConfigDict, Field
 
+from lily.prompting import PersonaContext, PromptBuildContext, PromptBuilder, PromptMode
 from lily.session.models import ConversationLimitsConfig, Message
 
+_LOGGER = logging.getLogger(__name__)
 _DEFAULT_SYSTEM_PROMPT = (
     "You are Lily, an AI assistant.\n"
     "Provide clear, direct, helpful responses.\n"
     "If information is missing, say what is missing instead of guessing.\n"
 )
+
+
+def _default_persona_context() -> PersonaContext:
+    """Return default persona context for generic conversation turns.
+
+    Returns:
+        Default persona context with balanced style.
+    """
+    return PersonaContext(active_persona_id="default")
 
 
 class ConversationRequest(BaseModel):
@@ -30,6 +50,19 @@ class ConversationRequest(BaseModel):
     model_name: str = Field(min_length=1)
     history: tuple[Message, ...] = ()
     limits: ConversationLimitsConfig = Field(default_factory=ConversationLimitsConfig)
+    persona_context: PersonaContext = Field(default_factory=_default_persona_context)
+    prompt_mode: PromptMode = PromptMode.FULL
+
+
+class ConversationRuntimeContext(BaseModel):
+    """LangChain runtime context schema for conversation execution."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: str = Field(min_length=1)
+    model_name: str = Field(min_length=1)
+    persona_context: PersonaContext
+    prompt_mode: PromptMode
 
 
 class ConversationResponse(BaseModel):
@@ -83,13 +116,20 @@ class AgentRunner(Protocol):
 class _LangChainAgentRunner:
     """Default LangChain v1/graph runner with in-memory checkpointer."""
 
-    def __init__(self, checkpointer: InMemorySaver | None = None) -> None:
+    def __init__(
+        self,
+        checkpointer: InMemorySaver | None = None,
+        *,
+        prompt_builder: PromptBuilder | None = None,
+    ) -> None:
         """Create default runner.
 
         Args:
             checkpointer: Optional checkpoint saver for testability.
+            prompt_builder: Optional prompt builder override.
         """
         self._checkpointer = checkpointer or InMemorySaver()
+        self._prompt_builder = prompt_builder or PromptBuilder()
 
     def run(self, *, request: ConversationRequest) -> object:
         """Invoke LangChain agent for one conversation turn.
@@ -100,19 +140,100 @@ class _LangChainAgentRunner:
         Returns:
             Raw LangChain invocation payload.
         """
+        middleware = self._build_middleware()
         agent = create_agent(
             model=request.model_name,
             tools=[],
             system_prompt=_DEFAULT_SYSTEM_PROMPT,
             checkpointer=self._checkpointer,
+            context_schema=ConversationRuntimeContext,
+            middleware=middleware,
         )
         messages = _build_messages(request)
         payload: dict[str, Any] = {"messages": messages}
         config = _build_agent_invoke_config(request)
+        runtime_context = ConversationRuntimeContext(
+            session_id=request.session_id,
+            model_name=request.model_name,
+            persona_context=request.persona_context,
+            prompt_mode=request.prompt_mode,
+        )
         return agent.invoke(
             cast(Any, payload),
             config=cast(Any, config),
+            context=runtime_context,
         )
+
+    def _build_middleware(self) -> tuple[Any, ...]:
+        """Build deterministic middleware stack for prompt and trace hooks.
+
+        Returns:
+            Ordered middleware tuple.
+        """
+        prompt_builder = self._prompt_builder
+
+        @dynamic_prompt
+        def lily_dynamic_prompt(
+            request: ModelRequest[ConversationRuntimeContext],
+        ) -> str:
+            """Build dynamic prompt from runtime persona context.
+
+            Args:
+                request: Model request carrying runtime context.
+
+            Returns:
+                Deterministic system prompt text.
+            """
+            runtime_context = request.runtime.context
+            build_context = PromptBuildContext(
+                persona=runtime_context.persona_context,
+                mode=runtime_context.prompt_mode,
+                session_id=runtime_context.session_id,
+                model_name=runtime_context.model_name,
+            )
+            return prompt_builder.build(build_context)
+
+        @before_model
+        def lily_before_model(
+            state: AgentState[object],
+            runtime: Runtime[ConversationRuntimeContext],
+        ) -> None:
+            """Emit trace hook before model execution.
+
+            Args:
+                state: Current agent state payload.
+                runtime: LangGraph runtime context.
+            """
+            del state
+            context = runtime.context
+            _LOGGER.debug(
+                "conversation.before_model session=%s persona=%s mode=%s",
+                context.session_id,
+                context.persona_context.active_persona_id,
+                context.prompt_mode.value,
+            )
+
+        @after_model
+        def lily_after_model(
+            state: AgentState[object],
+            runtime: Runtime[ConversationRuntimeContext],
+        ) -> None:
+            """Emit trace hook after model execution.
+
+            Args:
+                state: Current agent state payload.
+                runtime: LangGraph runtime context.
+            """
+            del state
+            context = runtime.context
+            _LOGGER.debug(
+                "conversation.after_model session=%s persona=%s mode=%s",
+                context.session_id,
+                context.persona_context.active_persona_id,
+                context.prompt_mode.value,
+            )
+
+        return (lily_dynamic_prompt, lily_before_model, lily_after_model)
 
 
 def _build_messages(request: ConversationRequest) -> list[dict[str, str]]:

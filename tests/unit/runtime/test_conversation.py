@@ -130,6 +130,8 @@ class _ConversationSuccessExecutor:
         assert request.user_text == "hello lily"
         assert request.limits.tool_loop.enabled is False
         assert request.limits.tool_loop.max_rounds == 8
+        assert request.persona_context.active_persona_id == "default"
+        assert request.prompt_mode.value == "full"
         return ConversationResponse(text="hello human")
 
 
