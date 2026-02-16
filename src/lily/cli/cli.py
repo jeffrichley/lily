@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 
@@ -34,6 +35,12 @@ _HIDE_DATA_CODES = {
     "persona_listed",
     "persona_set",
     "persona_shown",
+    "persona_reloaded",
+    "persona_exported",
+    "persona_imported",
+    "agent_listed",
+    "agent_set",
+    "agent_shown",
     "style_set",
     "memory_listed",
     "memory_empty",
@@ -126,6 +133,8 @@ def _build_session(
                 "help",
                 "reload_skills",
                 "persona",
+                "reload_persona",
+                "agent",
                 "style",
                 "remember",
                 "forget",
@@ -234,15 +243,19 @@ def _render_rich_success(result: CommandResult) -> bool:
     Returns:
         True when a specialized render path handled output.
     """
-    if result.code == "persona_listed":
-        return _render_persona_list(result)
-    if result.code == "persona_set":
-        return _render_persona_set(result)
-    if result.code == "persona_shown":
-        return _render_persona_show(result)
-    if result.code == "memory_listed":
-        return _render_memory_list(result)
-    return False
+    renderers: dict[str, Callable[[CommandResult], bool]] = {
+        "persona_listed": _render_persona_list,
+        "persona_set": _render_persona_set,
+        "persona_shown": _render_persona_show,
+        "agent_listed": _render_agent_list,
+        "agent_set": _render_agent_set,
+        "agent_shown": _render_agent_show,
+        "memory_listed": _render_memory_list,
+    }
+    renderer = renderers.get(result.code)
+    if renderer is None:
+        return False
+    return renderer(result)
 
 
 def _render_persona_list(result: CommandResult) -> bool:
@@ -375,6 +388,88 @@ def _render_memory_list(result: CommandResult) -> bool:
             str(record.get("content", "")),
         )
     _CONSOLE.print(table)
+    return True
+
+
+def _render_agent_list(result: CommandResult) -> bool:
+    """Render `/agent list` in table form.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when table render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    raw_rows = data.get("agents") if data is not None else None
+    if not isinstance(raw_rows, list):
+        return False
+    table = Table(title="Agents", show_header=True, header_style="bold cyan")
+    table.add_column("Active", style="green", no_wrap=True)
+    table.add_column("Agent", style="bold")
+    table.add_column("Summary")
+    for row in raw_rows:
+        if not isinstance(row, dict):
+            continue
+        table.add_row(
+            "yes" if bool(row.get("active")) else "",
+            str(row.get("agent", "")),
+            str(row.get("summary", "")),
+        )
+    _CONSOLE.print(table)
+    return True
+
+
+def _render_agent_set(result: CommandResult) -> bool:
+    """Render `/agent use` confirmation in concise panel.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when panel render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    agent = str(data.get("agent", "")).strip()
+    if not agent:
+        return False
+    _CONSOLE.print(
+        Panel(
+            f"Active Agent: [bold]{agent}[/bold]",
+            title="Agent Updated",
+            border_style="green",
+            expand=True,
+        )
+    )
+    return True
+
+
+def _render_agent_show(result: CommandResult) -> bool:
+    """Render `/agent show` details panel.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when panel render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    agent = str(data.get("agent", "")).strip()
+    summary = str(data.get("summary", "")).strip()
+    if not agent:
+        return False
+    _CONSOLE.print(
+        Panel(
+            f"Agent: [bold]{agent}[/bold]\nSummary: {summary}",
+            title="Agent",
+            border_style="green",
+            expand=True,
+        )
+    )
     return True
 
 

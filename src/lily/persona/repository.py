@@ -37,18 +37,30 @@ class FilePersonaRepository:
             root_dir: Persona markdown directory.
         """
         self._root_dir = root_dir
+        self._catalog_cache: PersonaCatalog | None = None
 
     def load_catalog(self) -> PersonaCatalog:
         """Load all persona profiles into a deterministic catalog.
 
         Returns:
             Sorted persona catalog.
+        """
+        if self._catalog_cache is None:
+            return self.reload_catalog()
+        return self._catalog_cache
+
+    def reload_catalog(self) -> PersonaCatalog:
+        """Reload persona catalog from disk and refresh in-memory cache.
+
+        Returns:
+            Reloaded sorted persona catalog.
 
         Raises:
             PersonaRepositoryError: If one or more persona files are invalid.
         """
         if not self._root_dir.exists():
-            return PersonaCatalog(personas=())
+            self._catalog_cache = PersonaCatalog(personas=())
+            return self._catalog_cache
         if not self._root_dir.is_dir():
             raise PersonaRepositoryError(
                 f"Persona root is not a directory: {self._root_dir}"
@@ -58,7 +70,8 @@ class FilePersonaRepository:
             _parse_persona_file(path) for path in sorted(self._root_dir.glob("*.md"))
         ]
         ordered = tuple(sorted(profiles, key=lambda profile: profile.persona_id))
-        return PersonaCatalog(personas=ordered)
+        self._catalog_cache = PersonaCatalog(personas=ordered)
+        return self._catalog_cache
 
     def get(self, persona_id: str) -> PersonaProfile | None:
         """Resolve one persona by id from the current catalog.
@@ -70,6 +83,65 @@ class FilePersonaRepository:
             Matching profile when available.
         """
         return self.load_catalog().get(persona_id)
+
+    def export_persona(self, *, persona_id: str, destination: Path) -> Path:
+        """Export one persona profile as markdown with frontmatter.
+
+        Args:
+            persona_id: Persona identifier to export.
+            destination: Output markdown path.
+
+        Returns:
+            Written destination path.
+
+        Raises:
+            PersonaRepositoryError: If persona does not exist or write fails.
+        """
+        profile = self.get(persona_id)
+        if profile is None:
+            raise PersonaRepositoryError(f"Persona '{persona_id}' was not found.")
+        payload = _render_persona_markdown(profile)
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(payload, encoding="utf-8")
+        except OSError as exc:
+            raise PersonaRepositoryError(
+                f"Failed to export persona to '{destination}': {exc}"
+            ) from exc
+        return destination
+
+    def import_persona(self, *, source: Path) -> PersonaProfile:
+        """Import one persona markdown file into repository root.
+
+        Args:
+            source: Persona markdown source path.
+
+        Returns:
+            Imported persona profile.
+
+        Raises:
+            PersonaRepositoryError: If source is unreadable or invalid.
+        """
+        if not source.exists():
+            raise PersonaRepositoryError(
+                f"Persona import path does not exist: {source}"
+            )
+        profile = _parse_persona_file(source)
+        target = self._root_dir / f"{profile.persona_id}.md"
+        try:
+            self._root_dir.mkdir(parents=True, exist_ok=True)
+            target.write_text(_render_persona_markdown(profile), encoding="utf-8")
+        except OSError as exc:
+            raise PersonaRepositoryError(
+                f"Failed to import persona from '{source}': {exc}"
+            ) from exc
+        self.reload_catalog()
+        imported = self.get(profile.persona_id)
+        if imported is None:  # pragma: no cover - defensive
+            raise PersonaRepositoryError(
+                f"Persona '{profile.persona_id}' failed to load after import."
+            )
+        return imported
 
 
 def default_persona_root() -> Path:
@@ -172,3 +244,24 @@ def _parse_frontmatter(frontmatter: str | None, path: Path) -> _PersonaFrontmatt
         raise PersonaRepositoryError(
             f"Invalid persona frontmatter in '{path.name}': {exc}"
         ) from exc
+
+
+def _render_persona_markdown(profile: PersonaProfile) -> str:
+    """Render one persona profile to markdown format.
+
+    Args:
+        profile: Persona profile to serialize.
+
+    Returns:
+        Markdown text with frontmatter and instructions body.
+    """
+    lines = [
+        "---",
+        f"id: {profile.persona_id}",
+        f"summary: {profile.summary}",
+        f"default_style: {profile.default_style.value}",
+        "---",
+        profile.instructions.rstrip(),
+        "",
+    ]
+    return "\n".join(lines)

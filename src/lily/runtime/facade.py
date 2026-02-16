@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import cast
 
 from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
@@ -28,6 +29,16 @@ from lily.runtime.llm_backend import LangChainBackend
 from lily.runtime.session_lanes import run_in_session_lane
 from lily.runtime.skill_invoker import SkillInvoker
 from lily.session.models import Message, MessageRole, Session
+
+_FOCUS_HINT_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(
+        r"\b(urgent|asap|critical|incident|prod|production|outage)\b", re.IGNORECASE
+    ),
+    re.compile(r"\b(error|failure|broken|fix now)\b", re.IGNORECASE),
+)
+_PLAYFUL_HINT_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\b(fun|joke|playful|celebrate|party|lighten up)\b", re.IGNORECASE),
+)
 
 
 class RuntimeFacade:
@@ -108,7 +119,9 @@ class RuntimeFacade:
             Deterministic conversation command result envelope.
         """
         persona = self._resolve_persona(session.active_agent)
-        style_level = session.active_style or persona.default_style
+        style_level = (
+            session.active_style or _derive_context_style(text) or persona.default_style
+        )
         request = ConversationRequest(
             session_id=session.session_id,
             user_text=text,
@@ -122,6 +135,7 @@ class RuntimeFacade:
                 persona_instructions=persona.instructions,
                 session_hints=(
                     f"conversation_events={len(session.conversation_state)}",
+                    f"style={style_level.value}",
                 ),
             ),
             prompt_mode=PromptMode.FULL,
@@ -210,3 +224,22 @@ class RuntimeFacade:
         session.conversation_state.append(
             Message(role=MessageRole.ASSISTANT, content=assistant_text)
         )
+
+
+def _derive_context_style(user_text: str) -> PersonaStyleLevel | None:
+    """Derive style hint from user turn content.
+
+    Args:
+        user_text: Raw user input text.
+
+    Returns:
+        Suggested style level when a context marker is detected.
+    """
+    text = user_text.strip()
+    for pattern in _FOCUS_HINT_PATTERNS:
+        if pattern.search(text):
+            return PersonaStyleLevel.FOCUS
+    for pattern in _PLAYFUL_HINT_PATTERNS:
+        if pattern.search(text):
+            return PersonaStyleLevel.PLAYFUL
+    return None

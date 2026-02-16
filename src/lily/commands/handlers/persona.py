@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Protocol
 
 from lily.commands.parser import CommandCall
 from lily.commands.types import CommandResult
-from lily.persona import PersonaCatalog, PersonaProfile
+from lily.persona import PersonaCatalog, PersonaProfile, PersonaRepositoryError
 from lily.session.models import Session
 
 
@@ -23,6 +24,21 @@ class PersonaRepositoryPort(Protocol):
             persona_id: Persona identifier.
         """
 
+    def export_persona(self, *, persona_id: str, destination: Path) -> Path:
+        """Export one persona profile to destination path.
+
+        Args:
+            persona_id: Persona identifier.
+            destination: Output file path.
+        """
+
+    def import_persona(self, *, source: Path) -> PersonaProfile:
+        """Import one persona profile from source path.
+
+        Args:
+            source: Persona markdown file path.
+        """
+
 
 class PersonaCommand:
     """Deterministic `/persona` command handler."""
@@ -36,7 +52,7 @@ class PersonaCommand:
         self._repository = repository
 
     def execute(self, call: CommandCall, session: Session) -> CommandResult:
-        """Execute `/persona list|use|show` against session state.
+        """Execute `/persona list|use|show|export|import` against session state.
 
         Args:
             call: Parsed command call.
@@ -78,6 +94,10 @@ class PersonaCommand:
             return self._handle_use(session, args)
         if subcommand == "show":
             return self._handle_show(session, args)
+        if subcommand == "export":
+            return self._handle_export(args)
+        if subcommand == "import":
+            return self._handle_import(args)
         return self._invalid_subcommand_error(subcommand)
 
     def _handle_list(self, session: Session, args: tuple[str, ...]) -> CommandResult:
@@ -134,6 +154,78 @@ class PersonaCommand:
             )
         return self._show_persona(session)
 
+    def _handle_export(self, args: tuple[str, ...]) -> CommandResult:
+        """Validate and execute `/persona export <name> [path]`.
+
+        Args:
+            args: Remaining arguments.
+
+        Returns:
+            Deterministic command result.
+        """
+        if len(args) not in {1, 2}:
+            return CommandResult.error(
+                "Error: /persona export requires <name> and optional <path>.",
+                code="invalid_args",
+                data={"command": "persona"},
+            )
+        persona_id = args[0].strip().lower()
+        with_path_arg_count = 2
+        destination = (
+            Path(args[1]).expanduser()
+            if len(args) == with_path_arg_count
+            else Path(f"{persona_id}.persona.md")
+        )
+        try:
+            written = self._repository.export_persona(
+                persona_id=persona_id,
+                destination=destination,
+            )
+        except PersonaRepositoryError as exc:
+            return CommandResult.error(
+                f"Error: {exc}",
+                code="persona_export_failed",
+            )
+        return CommandResult.ok(
+            f"Exported persona '{persona_id}' to {written}.",
+            code="persona_exported",
+            data={"persona": persona_id, "path": str(written)},
+        )
+
+    def _handle_import(self, args: tuple[str, ...]) -> CommandResult:
+        """Validate and execute `/persona import <path>`.
+
+        Args:
+            args: Remaining arguments.
+
+        Returns:
+            Deterministic command result.
+        """
+        if len(args) != 1:
+            return CommandResult.error(
+                "Error: /persona import requires exactly one file path.",
+                code="invalid_args",
+                data={"command": "persona"},
+            )
+        source = Path(args[0]).expanduser()
+        try:
+            imported = self._repository.import_persona(source=source)
+        except PersonaRepositoryError as exc:
+            return CommandResult.error(
+                f"Error: {exc}",
+                code="persona_import_failed",
+            )
+        return CommandResult.ok(
+            f"Imported persona '{imported.persona_id}' from {source}.",
+            code="persona_imported",
+            data={
+                "persona": imported.persona_id,
+                "summary": imported.summary,
+                "style": imported.default_style.value,
+                "source": str(source),
+            },
+        )
+
     @staticmethod
     def _invalid_subcommand_error(subcommand: str | None) -> CommandResult:
         """Build deterministic invalid-subcommand error result.
@@ -145,7 +237,9 @@ class PersonaCommand:
             Deterministic command error envelope.
         """
         if subcommand is None:
-            message = "Error: /persona requires one subcommand: list|use|show."
+            message = (
+                "Error: /persona requires one subcommand: list|use|show|export|import."
+            )
             data = {"command": "persona"}
         else:
             message = f"Error: unsupported /persona subcommand '{subcommand}'."

@@ -5,10 +5,24 @@ from __future__ import annotations
 from pathlib import Path
 
 from lily.persona import FilePersonaRepository
+from lily.runtime.conversation import ConversationRequest, ConversationResponse
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
 from lily.session.models import ModelConfig, Session
 from lily.skills.types import InvocationMode, SkillEntry, SkillSnapshot, SkillSource
+
+
+class _ConversationCaptureExecutor:
+    """Conversation executor fixture that captures last request."""
+
+    def __init__(self) -> None:
+        """Initialize capture slots."""
+        self.last_request: ConversationRequest | None = None
+
+    def run(self, request: ConversationRequest) -> ConversationResponse:
+        """Capture request and return deterministic reply."""
+        self.last_request = request
+        return ConversationResponse(text="ok")
 
 
 def _make_session(skills: tuple[SkillEntry, ...]) -> Session:
@@ -435,3 +449,106 @@ def test_memory_commands_roundtrip(tmp_path: Path) -> None:
     shown_after_forget = runtime.handle_input("/memory show", session)
     assert shown_after_forget.status.value == "ok"
     assert shown_after_forget.code == "memory_empty"
+
+
+def test_reload_persona_refreshes_cache_for_current_session(tmp_path: Path) -> None:
+    """`/reload_persona` should refresh repository cache and expose new personas."""
+    personas_dir = tmp_path / "personas"
+    _write_persona(personas_dir, "lily", "Executive assistant", "focus")
+    repository = FilePersonaRepository(root_dir=personas_dir)
+    runtime = RuntimeFacade(persona_repository=repository)
+    session = _make_session(skills=())
+
+    before = runtime.handle_input("/persona list", session)
+    assert "chad" not in before.message
+
+    _write_persona(personas_dir, "chad", "Beach bro", "playful")
+    still_cached = runtime.handle_input("/persona list", session)
+    assert "chad" not in still_cached.message
+
+    reloaded = runtime.handle_input("/reload_persona", session)
+    after = runtime.handle_input("/persona list", session)
+    assert reloaded.status.value == "ok"
+    assert reloaded.code == "persona_reloaded"
+    assert "chad" in after.message
+
+
+def test_persona_export_and_import_commands(tmp_path: Path) -> None:
+    """`/persona export|import` should roundtrip persona markdown artifacts."""
+    personas_dir = tmp_path / "personas"
+    _write_persona(personas_dir, "lily", "Executive assistant", "focus")
+    runtime = RuntimeFacade(
+        persona_repository=FilePersonaRepository(root_dir=personas_dir)
+    )
+    session = _make_session(skills=())
+    export_path = tmp_path / "exports" / "lily.md"
+
+    exported = runtime.handle_input(f"/persona export lily {export_path}", session)
+    assert exported.status.value == "ok"
+    assert exported.code == "persona_exported"
+    assert export_path.exists()
+
+    incoming = tmp_path / "incoming" / "zen.md"
+    incoming.parent.mkdir(parents=True, exist_ok=True)
+    incoming.write_text(
+        (
+            "---\n"
+            "id: zen\n"
+            "summary: Calm helper\n"
+            "default_style: balanced\n"
+            "---\n"
+            "You are zen.\n"
+        ),
+        encoding="utf-8",
+    )
+    imported = runtime.handle_input(f"/persona import {incoming}", session)
+    assert imported.status.value == "ok"
+    assert imported.code == "persona_imported"
+
+    listed = runtime.handle_input("/persona list", session)
+    assert "zen - Calm helper" in listed.message
+
+
+def test_agent_commands_persona_backed_compatibility(tmp_path: Path) -> None:
+    """`/agent` commands should use persona-backed compatibility behavior."""
+    personas_dir = tmp_path / "personas"
+    _write_persona(personas_dir, "lily", "Executive assistant", "focus")
+    _write_persona(personas_dir, "chad", "Beach bro", "playful")
+    runtime = RuntimeFacade(
+        persona_repository=FilePersonaRepository(root_dir=personas_dir)
+    )
+    session = _make_session(skills=())
+
+    listed = runtime.handle_input("/agent list", session)
+    assert listed.status.value == "ok"
+    assert listed.code == "agent_listed"
+
+    used = runtime.handle_input("/agent use chad", session)
+    assert used.status.value == "ok"
+    assert used.code == "agent_set"
+    assert session.active_agent == "chad"
+
+    shown = runtime.handle_input("/agent show", session)
+    assert shown.status.value == "ok"
+    assert shown.code == "agent_shown"
+    assert "Agent: chad" in shown.message
+
+
+def test_context_aware_tone_adaptation_without_style_override(tmp_path: Path) -> None:
+    """Conversation route should derive style from context when no explicit override."""
+    personas_dir = tmp_path / "personas"
+    _write_persona(personas_dir, "lily", "Executive assistant", "balanced")
+    capture = _ConversationCaptureExecutor()
+    runtime = RuntimeFacade(
+        conversation_executor=capture,
+        persona_repository=FilePersonaRepository(root_dir=personas_dir),
+    )
+    session = _make_session(skills=())
+    session.active_agent = "lily"
+    session.active_style = None
+
+    result = runtime.handle_input("urgent: prod incident, fix now", session)
+
+    assert result.status.value == "ok"
+    assert capture.last_request is not None
+    assert capture.last_request.persona_context.style_level.value == "focus"

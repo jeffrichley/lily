@@ -56,3 +56,49 @@ def test_repository_returns_empty_catalog_when_root_missing(tmp_path: Path) -> N
     catalog = repository.load_catalog()
 
     assert catalog.personas == ()
+
+
+def test_repository_reload_refreshes_cached_catalog(tmp_path: Path) -> None:
+    """Repository should keep cache stable until explicit reload."""
+    root = tmp_path / "personas"
+    _write_persona(root, name="lily", style="focus")
+    repository = FilePersonaRepository(root_dir=root)
+
+    first = repository.load_catalog()
+    _write_persona(root, name="chad", style="playful")
+    still_cached = repository.load_catalog()
+    reloaded = repository.reload_catalog()
+
+    assert [profile.persona_id for profile in first.personas] == ["lily"]
+    assert [profile.persona_id for profile in still_cached.personas] == ["lily"]
+    assert [profile.persona_id for profile in reloaded.personas] == ["chad", "lily"]
+
+
+def test_repository_export_and_import_roundtrip(tmp_path: Path) -> None:
+    """Repository should export and import personas deterministically."""
+    root = tmp_path / "personas"
+    _write_persona(root, name="lily", style="focus")
+    repository = FilePersonaRepository(root_dir=root)
+    export_path = tmp_path / "exports" / "lily.md"
+
+    written = repository.export_persona(persona_id="lily", destination=export_path)
+    assert written == export_path
+    assert export_path.exists()
+
+    imported_source = tmp_path / "incoming" / "zen.md"
+    imported_source.parent.mkdir(parents=True, exist_ok=True)
+    imported_source.write_text(
+        (
+            "---\n"
+            "id: zen\n"
+            "summary: Calm and focused helper\n"
+            "default_style: balanced\n"
+            "---\n"
+            "You are zen.\n"
+        ),
+        encoding="utf-8",
+    )
+    imported = repository.import_persona(source=imported_source)
+
+    assert imported.persona_id == "zen"
+    assert (root / "zen.md").exists()

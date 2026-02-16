@@ -160,10 +160,12 @@ Phase 2 current-state note:
 
 ## Phase 8: Next Elevation (`P4+`)
 
-- [ ] `/reload_persona`
-- [ ] Persona export/import
-- [ ] Context-aware tone adaptation
-- [ ] Multi-agent personalities (when agent subsystem is ready)
+- [x] `/reload_persona`
+- [x] Persona export/import
+- [x] Context-aware tone adaptation
+- [x] Multi-agent personalities (when agent subsystem is ready)
+  - [x] Initial persona-backed `/agent list|use|show` compatibility surface
+  - [ ] Full multi-agent orchestration subsystem (deferred)
 
 ## Status Log
 
@@ -180,6 +182,7 @@ Phase 2 current-state note:
 - 2026-02-16: Completed Gate B baseline quality enforcement with 10-20 canonical eval coverage and pass-rate threshold tests.
 - 2026-02-16: Completed Phase 6 persona command surface (`/persona`, `/style`, `/remember`, `/forget`, `/memory show`) with bundled persona profiles (`lily`, `chad`, `barbie`) and docs in `docs/dev/persona_commands.md`.
 - 2026-02-16: Completed Phase 7 quality gates with deterministic personality/task/fun/safety eval suites and CI threshold enforcement (`just ci-gates`).
+- 2026-02-16: Completed Phase 8 baseline enhancements (`/reload_persona`, persona export/import, context-aware tone adaptation, and persona-backed `/agent` compatibility commands).
 
 ## LangChain v1 Leverage (Out-of-the-Box)
 

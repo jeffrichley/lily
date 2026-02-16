@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from lily.commands.handlers.agent import AgentCommand
 from lily.commands.handlers.forget import ForgetCommand
 from lily.commands.handlers.help_skill import HelpSkillCommand
 from lily.commands.handlers.memory import MemoryCommand
 from lily.commands.handlers.persona import PersonaCommand
+from lily.commands.handlers.reload_persona import ReloadPersonaCommand
 from lily.commands.handlers.reload_skills import ReloadSkillsCommand
 from lily.commands.handlers.remember import RememberCommand
 from lily.commands.handlers.skill_invoke import SkillInvokeCommand
@@ -46,6 +48,8 @@ class CommandRegistry:
             "help": HelpSkillCommand(),
             "reload_skills": ReloadSkillsCommand(),
             "persona": PersonaCommand(repository),
+            "reload_persona": ReloadPersonaCommand(repository),
+            "agent": AgentCommand(repository),
             "style": StyleCommand(),
             "remember": RememberCommand(),
             "forget": ForgetCommand(),

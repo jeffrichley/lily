@@ -11,6 +11,12 @@ Phase 6 command surface for persona and memory controls.
   - Resets explicit style override so the selected persona default style is used.
 - `/persona show`
   - Show active persona summary, default style, effective style, and instructions.
+- `/persona export <name> [path]`
+  - Export persona profile markdown to disk.
+- `/persona import <path>`
+  - Import persona profile markdown into the persona catalog.
+- `/reload_persona`
+  - Reload persona catalog from disk for the current runtime/session.
 
 ## Style
 
@@ -27,3 +33,11 @@ Phase 6 command surface for persona and memory controls.
   - When query is omitted, shows recent records.
 - `/forget <memory_id>`
   - Delete one personality memory record by id.
+
+## Agent Compatibility
+
+- `/agent list`
+- `/agent use <name>`
+- `/agent show`
+
+Current behavior: persona-backed compatibility surface until full multi-agent orchestration lands.
