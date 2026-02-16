@@ -133,3 +133,12 @@ def test_system_prompt_uses_skill_instructions_without_skill_name_hardcoding() -
 
     assert "Skill instructions:\nReturn the text in lowercase." in prompt
     assert "user payload transformed to uppercase" not in prompt
+
+
+def test_extract_text_supports_structured_response_payload() -> None:
+    """Structured response payload should be accepted when messages are absent."""
+    result = {"structured_response": {"text": "structured hello"}}
+
+    text = _LangChainV1Invoker._extract_text(result)
+
+    assert text == "structured hello"

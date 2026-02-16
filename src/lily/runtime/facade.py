@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
@@ -14,7 +16,13 @@ from lily.runtime.conversation import (
     LangChainConversationExecutor,
 )
 from lily.runtime.executors.llm_orchestration import LlmOrchestrationExecutor
-from lily.runtime.executors.tool_dispatch import AddTool, ToolDispatchExecutor
+from lily.runtime.executors.tool_dispatch import (
+    AddTool,
+    MultiplyTool,
+    SubtractTool,
+    ToolContract,
+    ToolDispatchExecutor,
+)
 from lily.runtime.llm_backend import LangChainBackend
 from lily.runtime.session_lanes import run_in_session_lane
 from lily.runtime.skill_invoker import SkillInvoker
@@ -140,9 +148,17 @@ class RuntimeFacade:
             Command registry with invoker and executor dependencies.
         """
         llm_backend = LangChainBackend()
+        tools = cast(
+            tuple[ToolContract, ...],
+            (
+                AddTool(),
+                SubtractTool(),
+                MultiplyTool(),
+            ),
+        )
         executors = (
             LlmOrchestrationExecutor(llm_backend),
-            ToolDispatchExecutor(tools=(AddTool(),)),
+            ToolDispatchExecutor(tools=tools),
         )
         invoker = SkillInvoker(executors=executors)
         return CommandRegistry(skill_invoker=invoker)

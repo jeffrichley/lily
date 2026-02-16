@@ -113,16 +113,16 @@ Phase 2 current-state note:
 
 ## Phase 5: Typed Skill/Tool Contracts (`P5`)
 
-- [ ] Add input schema validation in tool dispatch pipeline
-- [ ] Add output schema validation in tool dispatch pipeline
-- [ ] Keep deterministic error envelopes for validation failures
-- [ ] Use LangChain structured output where applicable for final-response schema guarantees
-- [ ] Add conformance tests for at least 3 skills/tools
+- [x] Add input schema validation in tool dispatch pipeline
+- [x] Add output schema validation in tool dispatch pipeline
+- [x] Keep deterministic error envelopes for validation failures
+- [x] Use LangChain structured output where applicable for final-response schema guarantees
+- [x] Add conformance tests for at least 3 skills/tools
 
 ## Gate B (Must Pass Before Broader Feature Expansion)
 
-- [ ] Typed tool/skill validation enabled end-to-end
-- [ ] Deterministic error envelopes verified by tests
+- [x] Typed tool/skill validation enabled end-to-end
+- [x] Deterministic error envelopes verified by tests
 - [ ] Baseline eval set created (10-20 canonical cases)
 - [ ] Baseline thresholds documented and passing
 
@@ -165,6 +165,7 @@ Phase 2 current-state note:
 - 2026-02-16: Verified rendered prompt output manually; documented current baseline section content vs planned enrichments.
 - 2026-02-16: Completed Phase 3 memory repositories (split interfaces + file adapters, namespace-isolated task queries, deterministic memory error model, and tests).
 - 2026-02-16: Completed Phase 4 policy boundaries (pre/post policy checks, precedence enforcement, tool-call guardrails, conversation/memory policy-denied envelopes, and redline fixtures).
+- 2026-02-16: Completed Phase 5 typed contracts (`command_tool` input/output schemas, deterministic validation envelopes, LangChain structured-response extraction, and conformance tests for add/subtract/multiply).
 
 ## LangChain v1 Leverage (Out-of-the-Box)
 

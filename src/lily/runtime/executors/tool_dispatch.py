@@ -1,92 +1,231 @@
-"""Tool-dispatch skill executor."""
+"""Tool-dispatch skill executor with typed input/output contracts."""
 
 from __future__ import annotations
 
 import re
-from typing import Protocol
+from typing import Any, Protocol
+
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from lily.commands.types import CommandResult
 from lily.session.models import Session
 from lily.skills.types import InvocationMode, SkillEntry
 
 
-class ToolDispatchTool(Protocol):
-    """Protocol for deterministic command-tool implementations."""
+class ToolContract(Protocol):
+    """Typed contract for deterministic command-tool execution."""
 
     name: str
+    input_schema: type[BaseModel]
+    output_schema: type[BaseModel]
 
-    def execute(
-        self, payload: str, *, session: Session, skill_name: str
-    ) -> CommandResult:
-        """Execute tool with raw payload.
+    def parse_payload(self, payload: str) -> dict[str, Any]:
+        """Convert raw payload string into schema-ready input dictionary.
 
         Args:
-            payload: Raw user payload.
+            payload: Raw user payload text.
+        """
+
+    def execute_typed(
+        self,
+        typed_input: BaseModel,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> dict[str, Any]:
+        """Execute tool with validated input and return schema-ready output.
+
+        Args:
+            typed_input: Validated input payload model.
             session: Active session context.
             skill_name: Calling skill name.
         """
 
-
-class AddTool:
-    """Deterministic add tool for simple arithmetic expressions."""
-
-    name = "add"
-    _EXPR_RE = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*\+\s*(-?\d+(?:\.\d+)?)\s*$")
-
-    def execute(
-        self, payload: str, *, session: Session, skill_name: str
-    ) -> CommandResult:
-        """Evaluate `<number>+<number>` and return deterministic result.
+    def render_output(self, typed_output: BaseModel) -> str:
+        """Render validated output into deterministic user-facing text.
 
         Args:
-            payload: Raw user expression payload.
+            typed_output: Validated tool output payload model.
+        """
+
+
+class _BinaryExpressionInput(BaseModel):
+    """Validated input payload for binary arithmetic tools."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    left: float
+    right: float
+
+
+class _ArithmeticOutput(BaseModel):
+    """Validated output payload for arithmetic tools."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    value: float
+    display: str
+
+
+class _ArithmeticToolBase:
+    """Base helper for deterministic binary arithmetic command tools."""
+
+    input_schema = _BinaryExpressionInput
+    output_schema = _ArithmeticOutput
+
+    def __init__(self, *, operator_symbol: str, name: str) -> None:
+        """Create arithmetic tool.
+
+        Args:
+            operator_symbol: Binary operator symbol.
+            name: Stable tool name.
+        """
+        self.name = name
+        escaped = re.escape(operator_symbol)
+        self._expr_re = re.compile(
+            rf"^\s*(-?\d+(?:\.\d+)?)\s*{escaped}\s*(-?\d+(?:\.\d+)?)\s*$"
+        )
+
+    def parse_payload(self, payload: str) -> dict[str, Any]:
+        """Parse `<number><op><number>` payload into schema input data.
+
+        Args:
+            payload: Raw user payload.
+
+        Returns:
+            Candidate input dictionary (validated later).
+        """
+        match = self._expr_re.fullmatch(payload.strip())
+        if match is None:
+            return {}
+        return {"left": float(match.group(1)), "right": float(match.group(2))}
+
+    def render_output(self, typed_output: BaseModel) -> str:
+        """Render arithmetic output display string.
+
+        Args:
+            typed_output: Validated arithmetic output.
+
+        Returns:
+            Deterministic display text.
+        """
+        output = _ArithmeticOutput.model_validate(typed_output)
+        return output.display
+
+    @staticmethod
+    def _display(value: float) -> str:
+        """Render float with integer simplification where possible.
+
+        Args:
+            value: Numeric result value.
+
+        Returns:
+            Deterministic display text.
+        """
+        if value.is_integer():
+            return str(int(value))
+        return str(value)
+
+
+class AddTool(_ArithmeticToolBase):
+    """Deterministic add tool for `<number>+<number>` expressions."""
+
+    def __init__(self) -> None:
+        """Create add tool."""
+        super().__init__(operator_symbol="+", name="add")
+
+    def execute_typed(
+        self,
+        typed_input: BaseModel,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> dict[str, Any]:
+        """Execute typed add operation.
+
+        Args:
+            typed_input: Validated arithmetic input.
             session: Active session context.
             skill_name: Calling skill name.
 
         Returns:
-            Deterministic add-tool result.
+            Output dictionary matching output schema.
         """
         del session
         del skill_name
-        text = payload.strip()
-        if not text:
-            return CommandResult.error(
-                "Error: add tool requires an expression like '2+2'.",
-                code="tool_invalid_args",
-                data={"tool": self.name},
-            )
+        payload = _BinaryExpressionInput.model_validate(typed_input)
+        total = payload.left + payload.right
+        return {"value": total, "display": self._display(total)}
 
-        match = self._EXPR_RE.fullmatch(text)
-        if match is None:
-            return CommandResult.error(
-                "Error: add tool expects format '<number>+<number>'.",
-                code="tool_invalid_args",
-                data={"tool": self.name},
-            )
 
-        left = float(match.group(1))
-        right = float(match.group(2))
-        total = left + right
+class SubtractTool(_ArithmeticToolBase):
+    """Deterministic subtract tool for `<number>-<number>` expressions."""
 
-        if total.is_integer():
-            return CommandResult.ok(
-                str(int(total)),
-                code="tool_ok",
-                data={"tool": self.name},
-            )
-        return CommandResult.ok(
-            str(total),
-            code="tool_ok",
-            data={"tool": self.name},
-        )
+    def __init__(self) -> None:
+        """Create subtract tool."""
+        super().__init__(operator_symbol="-", name="subtract")
+
+    def execute_typed(
+        self,
+        typed_input: BaseModel,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> dict[str, Any]:
+        """Execute typed subtraction operation.
+
+        Args:
+            typed_input: Validated arithmetic input.
+            session: Active session context.
+            skill_name: Calling skill name.
+
+        Returns:
+            Output dictionary matching output schema.
+        """
+        del session
+        del skill_name
+        payload = _BinaryExpressionInput.model_validate(typed_input)
+        total = payload.left - payload.right
+        return {"value": total, "display": self._display(total)}
+
+
+class MultiplyTool(_ArithmeticToolBase):
+    """Deterministic multiply tool for `<number>*<number>` expressions."""
+
+    def __init__(self) -> None:
+        """Create multiply tool."""
+        super().__init__(operator_symbol="*", name="multiply")
+
+    def execute_typed(
+        self,
+        typed_input: BaseModel,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> dict[str, Any]:
+        """Execute typed multiplication operation.
+
+        Args:
+            typed_input: Validated arithmetic input.
+            session: Active session context.
+            skill_name: Calling skill name.
+
+        Returns:
+            Output dictionary matching output schema.
+        """
+        del session
+        del skill_name
+        payload = _BinaryExpressionInput.model_validate(typed_input)
+        total = payload.left * payload.right
+        return {"value": total, "display": self._display(total)}
 
 
 class ToolDispatchExecutor:
-    """Execute `tool_dispatch` skills by direct tool invocation."""
+    """Execute `tool_dispatch` skills by typed contract-bound tool invocation."""
 
     mode = InvocationMode.TOOL_DISPATCH
 
-    def __init__(self, tools: tuple[ToolDispatchTool, ...]) -> None:
+    def __init__(self, tools: tuple[ToolContract, ...]) -> None:
         """Build deterministic tool registry keyed by tool name.
 
         Args:
@@ -128,4 +267,44 @@ class ToolDispatchExecutor:
                 data={"skill": entry.name, "tool": entry.command_tool},
             )
 
-        return tool.execute(user_text, session=session, skill_name=entry.name)
+        try:
+            raw_input = tool.parse_payload(user_text)
+            typed_input = tool.input_schema.model_validate(raw_input)
+        except ValidationError as exc:
+            return CommandResult.error(
+                f"Error: invalid input for tool '{tool.name}'.",
+                code="tool_input_invalid",
+                data={
+                    "skill": entry.name,
+                    "tool": tool.name,
+                    "validation_errors": exc.errors(),
+                },
+            )
+
+        try:
+            raw_output = tool.execute_typed(
+                typed_input,
+                session=session,
+                skill_name=entry.name,
+            )
+            typed_output = tool.output_schema.model_validate(raw_output)
+        except ValidationError as exc:
+            return CommandResult.error(
+                f"Error: invalid output from tool '{tool.name}'.",
+                code="tool_output_invalid",
+                data={
+                    "skill": entry.name,
+                    "tool": tool.name,
+                    "validation_errors": exc.errors(),
+                },
+            )
+
+        return CommandResult.ok(
+            tool.render_output(typed_output),
+            code="tool_ok",
+            data={
+                "skill": entry.name,
+                "tool": tool.name,
+                "output": typed_output.model_dump(),
+            },
+        )
