@@ -144,13 +144,19 @@ Phase 2 current-state note:
 
 ## Phase 7: Quality + CI Gates (`P5`)
 
-- [ ] Personality consistency test suite
-  - [ ] Restart consistency
-  - [ ] Multi-turn consistency
-- [ ] Task effectiveness suite with personality enabled
-- [ ] Fun/delight rubric suite
-- [ ] Safety redline suite
-- [ ] CI gating on agreed thresholds
+- [x] Personality consistency test suite
+  - [x] Restart consistency
+  - [x] Multi-turn consistency
+- [x] Task effectiveness suite with personality enabled
+- [x] Fun/delight rubric suite
+- [x] Safety redline suite
+- [x] CI gating on agreed thresholds
+  - Thresholds enforced in `tests/unit/evals/test_phase7_quality.py`:
+  - `personality_consistency`: `minimum_cases >= 4`, `minimum_pass_rate >= 1.0`
+  - `task_effectiveness`: `minimum_cases >= 4`, `minimum_pass_rate >= 1.0`
+  - `fun_delight`: `minimum_cases >= 4`, `minimum_pass_rate >= 1.0`
+  - `safety_redline`: `minimum_cases >= 9`, `minimum_pass_rate >= 1.0`
+  - CI helper target: `just ci-gates` (runs `quality-check` + `eval-gates`)
 
 ## Phase 8: Next Elevation (`P4+`)
 
@@ -173,6 +179,7 @@ Phase 2 current-state note:
 - 2026-02-16: Completed Phase 5 typed contracts (`command_tool` input/output schemas, deterministic validation envelopes, LangChain structured-response extraction, and conformance tests for add/subtract/multiply).
 - 2026-02-16: Completed Gate B baseline quality enforcement with 10-20 canonical eval coverage and pass-rate threshold tests.
 - 2026-02-16: Completed Phase 6 persona command surface (`/persona`, `/style`, `/remember`, `/forget`, `/memory show`) with bundled persona profiles (`lily`, `chad`, `barbie`) and docs in `docs/dev/persona_commands.md`.
+- 2026-02-16: Completed Phase 7 quality gates with deterministic personality/task/fun/safety eval suites and CI threshold enforcement (`just ci-gates`).
 
 ## LangChain v1 Leverage (Out-of-the-Box)
 

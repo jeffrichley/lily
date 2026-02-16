@@ -8,6 +8,10 @@ set shell := ["sh", "-cu"]
 test:
     uv run pytest
 
+# Run personality quality gates (Gate C / Phase 7)
+eval-gates:
+    uv run pytest tests/unit/evals/test_baseline.py tests/unit/evals/test_phase7_quality.py
+
 # Run all tests with coverage report
 test-cov:
     uv run pytest --cov=src/lily --cov-report=term-missing --cov-report=html
@@ -90,6 +94,9 @@ quality: format lint types complexity vulture darglint audit bandit radon find-d
 
 # Same gates as quality but check-only (no format write, no lint fix). Use in CI so PR fails if not clean.
 quality-check: format-check lint-check types complexity vulture darglint audit bandit radon find-dupes docstr-coverage
+
+# CI-ready aggregate gates: static checks + eval thresholds.
+ci-gates: quality-check eval-gates
 
 # --- Lighter targets for day-to-day dev ---
 # Recommended while developing: format + lint + types. Fast except mypy; catches most issues.
