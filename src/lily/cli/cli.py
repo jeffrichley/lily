@@ -13,6 +13,7 @@ from rich.json import JSON
 from rich.logging import RichHandler
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.table import Table
 
 from lily.commands.types import CommandResult, CommandStatus
 from lily.runtime.facade import RuntimeFacade
@@ -29,6 +30,16 @@ from lily.session.store import (
 app = typer.Typer(help="Lily CLI")
 _CONSOLE = Console()
 _LOGGING_CONFIGURED = False
+_HIDE_DATA_CODES = {
+    "persona_listed",
+    "persona_set",
+    "persona_shown",
+    "style_set",
+    "memory_listed",
+    "memory_empty",
+    "memory_saved",
+    "memory_deleted",
+}
 
 
 def _configure_logging() -> None:
@@ -175,6 +186,8 @@ def _render_result(result: CommandResult) -> None:
         result: Structured command output envelope.
     """
     if result.status == CommandStatus.OK:
+        if _render_rich_success(result):
+            return
         _CONSOLE.print(
             Panel(
                 Markdown(result.message),
@@ -183,7 +196,7 @@ def _render_result(result: CommandResult) -> None:
                 expand=True,
             )
         )
-        if result.data:
+        if result.data and result.code not in _HIDE_DATA_CODES:
             _CONSOLE.print(
                 Panel(
                     JSON.from_data(result.data),
@@ -210,6 +223,159 @@ def _render_result(result: CommandResult) -> None:
                 expand=True,
             )
         )
+
+
+def _render_rich_success(result: CommandResult) -> bool:
+    """Render specialized success view for selected command result codes.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when a specialized render path handled output.
+    """
+    if result.code == "persona_listed":
+        return _render_persona_list(result)
+    if result.code == "persona_set":
+        return _render_persona_set(result)
+    if result.code == "persona_shown":
+        return _render_persona_show(result)
+    if result.code == "memory_listed":
+        return _render_memory_list(result)
+    return False
+
+
+def _render_persona_list(result: CommandResult) -> bool:
+    """Render `/persona list` in table form.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when table render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    raw_rows = data.get("personas") if data is not None else None
+    if not isinstance(raw_rows, list):
+        return False
+
+    table = Table(title="Personas", show_header=True, header_style="bold cyan")
+    table.add_column("Active", style="green", no_wrap=True)
+    table.add_column("Persona", style="bold")
+    table.add_column("Default Style", style="magenta")
+    table.add_column("Summary")
+    for row in raw_rows:
+        if not isinstance(row, dict):
+            continue
+        active = "yes" if bool(row.get("active")) else ""
+        table.add_row(
+            active,
+            str(row.get("persona", "")),
+            str(row.get("default_style", "")),
+            str(row.get("summary", "")),
+        )
+    _CONSOLE.print(table)
+    return True
+
+
+def _render_persona_set(result: CommandResult) -> bool:
+    """Render `/persona use` confirmation in concise panel.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when panel render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    persona = str(data.get("persona", "")).strip()
+    style = str(data.get("style", "")).strip()
+    if not persona or not style:
+        return False
+    _CONSOLE.print(
+        Panel(
+            f"Active Persona: [bold]{persona}[/bold]\nStyle: [bold]{style}[/bold]",
+            title="Persona Updated",
+            border_style="green",
+            expand=True,
+        )
+    )
+    return True
+
+
+def _render_persona_show(result: CommandResult) -> bool:
+    """Render `/persona show` details as fields + instructions panel.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when rich render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    persona = str(data.get("persona", "")).strip()
+    summary = str(data.get("summary", "")).strip()
+    default_style = str(data.get("default_style", "")).strip()
+    effective_style = str(data.get("effective_style", "")).strip()
+    instructions = str(data.get("instructions", "")).strip()
+    if not persona:
+        return False
+
+    details = Table(show_header=False, box=None, expand=True)
+    details.add_column("Field", style="bold cyan", no_wrap=True)
+    details.add_column("Value")
+    details.add_row("Persona", persona)
+    details.add_row("Summary", summary)
+    details.add_row("Default Style", default_style)
+    details.add_row("Effective Style", effective_style)
+    _CONSOLE.print(Panel(details, title="Persona", border_style="green", expand=True))
+    if instructions:
+        _CONSOLE.print(
+            Panel(
+                instructions,
+                title="Instructions",
+                border_style="cyan",
+                expand=True,
+            )
+        )
+    return True
+
+
+def _render_memory_list(result: CommandResult) -> bool:
+    """Render `/memory show` records in table form.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when table render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    raw_records = data.get("records") if data is not None else None
+    if not isinstance(raw_records, list):
+        return False
+    table = Table(
+        title=f"Memory ({len(raw_records)} records)",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("ID", style="green")
+    table.add_column("Namespace", style="magenta", no_wrap=True)
+    table.add_column("Content")
+    for record in raw_records:
+        if not isinstance(record, dict):
+            continue
+        table.add_row(
+            str(record.get("id", "")),
+            str(record.get("namespace", "")),
+            str(record.get("content", "")),
+        )
+    _CONSOLE.print(table)
+    return True
 
 
 def _execute_once(

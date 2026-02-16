@@ -168,13 +168,26 @@ class PersonaCommand:
                 code="persona_not_found",
             )
         lines = []
+        rows = []
         for profile in catalog.personas:
             marker = "*" if profile.persona_id == session.active_agent else " "
             lines.append(f"{marker} {profile.persona_id} - {profile.summary}")
+            rows.append(
+                {
+                    "persona": profile.persona_id,
+                    "summary": profile.summary,
+                    "default_style": profile.default_style.value,
+                    "active": profile.persona_id == session.active_agent,
+                }
+            )
         return CommandResult.ok(
             "\n".join(lines),
             code="persona_listed",
-            data={"count": len(catalog.personas), "active": session.active_agent},
+            data={
+                "count": len(catalog.personas),
+                "active": session.active_agent,
+                "personas": rows,
+            },
         )
 
     def _use_persona(self, session: Session, persona_id: str) -> CommandResult:
@@ -246,5 +259,7 @@ class PersonaCommand:
                 "persona": profile.persona_id,
                 "default_style": profile.default_style.value,
                 "effective_style": effective_style.value,
+                "summary": profile.summary,
+                "instructions": profile.instructions,
             },
         )
