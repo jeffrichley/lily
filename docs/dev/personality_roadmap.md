@@ -328,33 +328,51 @@ flowchart TD
 
 ## Phased Plan (Build Order)
 
-1. Phase 1: Foundation (`P5`)
-- Persona compiler with layered inputs (system identity, user preferences, active mode, session context).
-- Prompt modes (`full`, `minimal`) and bounded bootstrap injection.
-- Personality memory schema v1 with persistence + recovery behavior.
+1. Phase 1: Core Runtime Contract (`P5`)
+- Implement non-command conversation turn pipeline end-to-end.
+- Add `PersonaContext` and `PromptBuilder` interfaces (section-based composition).
+- Keep persona command surface minimal during this phase (no broad expansion yet).
 
-2. Phase 2: Usable Personality (`P5`)
+2. Phase 2: Architecture Decisions + Safety Boundaries (`P5`)
+- Freeze memory ADR:
+  - dual-store (`personality` + `task`) vs unified namespaced store
+  - retrieval contract
+  - retention/deletion semantics
+- Add policy precedence contract:
+  - `safety > user style > persona default > stochastic expression`
+- Add pre-LLM and post-LLM policy checks.
+
+3. Phase 3: Usable Personality Controls (`P5`)
 - Add `/persona list|use|show`.
-- Add `/style` dial with three levels: `focus`, `balanced`, `playful`.
+- Add `/style` dial with `focus|balanced|playful`.
 - Add `/remember`, `/forget`, `/memory show`.
 
-3. Phase 3: Strong Execution (`P5`)
+4. Phase 4: Strong Execution Contracts (`P5`)
 - Enforce typed skill/tool I/O contracts in runtime path.
 - Return deterministic error envelope for validation failures.
 - Add conformance tests for at least 3 skills.
 
-4. Phase 4: Safety + Quality Gates (`P5`)
-- Persona policy checks for manipulative/dependency-seeking patterns.
+5. Phase 5: Quality Gates + Expansion (`P5` then `P4+`)
 - Eval suite:
   - consistency across restarts
   - task success with persona enabled
   - fun/engagement rubric scoring
   - safety redline pass rate
-
-5. Phase 5: Next Elevation (`P4+`)
-- `/reload_persona`, persona export/import.
-- Contextual tone adaptation and richer memory retrieval.
+- Then add `/reload_persona`, persona export/import, contextual tone adaptation.
 - Multi-agent personalities when agent subsystem is ready.
+
+## Architecture Gates (Must Pass Before Next Phase)
+
+- Gate A (before Phase 3 command expansion):
+  - conversation turn path implemented
+  - `PersonaContext` + `PromptBuilder` interfaces stable
+  - memory ADR approved
+  - policy precedence contract approved
+
+- Gate B (before Phase 5 expansion):
+  - typed tool/skill validation in place
+  - deterministic error envelopes verified
+  - baseline eval set (10-20 canonical cases) passing target thresholds
 
 ## Acceptance Criteria For “Up To Snuff”
 
@@ -369,6 +387,18 @@ flowchart TD
 - Should persona changes be session-local by default, with explicit “save globally”?
 - Should playful style be disabled automatically for high-risk domains (medical/legal/financial)?
 - Should personality memory and task memory live in separate stores or one store with typed namespaces?
+
+## Locked Decisions
+
+- Conversation/tool loop limit configuration uses explicit boolean enablement for clarity.
+- Preferred config shape:
+  - `enabled: true|false`
+  - value fields such as `max_rounds`, `timeout_ms`, `max_retries`
+- Default baseline values:
+  - `tool_loop.enabled: false`, `tool_loop.max_rounds: 8`
+  - `timeout.enabled: false`, `timeout.timeout_ms: 30000`
+  - `retries.enabled: true`, `retries.max_retries: 1`
+- Sentinel values (`-1`, `0`) are not the primary user-facing UX pattern.
 
 ## Source Links
 

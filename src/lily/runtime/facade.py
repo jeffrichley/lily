@@ -5,6 +5,13 @@ from __future__ import annotations
 from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
+from lily.runtime.conversation import (
+    ConversationExecutionError,
+    ConversationExecutor,
+    ConversationRequest,
+    ConversationResponse,
+    LangChainConversationExecutor,
+)
 from lily.runtime.executors.llm_orchestration import LlmOrchestrationExecutor
 from lily.runtime.executors.tool_dispatch import AddTool, ToolDispatchExecutor
 from lily.runtime.llm_backend import LangChainBackend
@@ -16,13 +23,21 @@ from lily.session.models import Message, MessageRole, Session
 class RuntimeFacade:
     """Facade for deterministic command and conversational routing."""
 
-    def __init__(self, command_registry: CommandRegistry | None = None) -> None:
-        """Create facade with command registry dependency.
+    def __init__(
+        self,
+        command_registry: CommandRegistry | None = None,
+        conversation_executor: ConversationExecutor | None = None,
+    ) -> None:
+        """Create facade with command and conversation dependencies.
 
         Args:
             command_registry: Optional deterministic command registry.
+            conversation_executor: Optional conversation execution adapter.
         """
         self._command_registry = command_registry or self._build_default_registry()
+        self._conversation_executor = (
+            conversation_executor or LangChainConversationExecutor()
+        )
 
     def handle_input(self, text: str, session: Session) -> CommandResult:
         """Route one user turn to command or conversational path.
@@ -63,12 +78,51 @@ class RuntimeFacade:
             self._record_turn(session, user_text=text, assistant_text=result.message)
             return result
 
-        result = CommandResult.error(
-            "Error: non-command conversational routing is not implemented yet.",
-            code="conversation_unimplemented",
-        )
+        result = self._run_conversation(text=text, session=session)
         self._record_turn(session, user_text=text, assistant_text=result.message)
         return result
+
+    def _run_conversation(self, *, text: str, session: Session) -> CommandResult:
+        """Run non-command conversational turn through conversation executor.
+
+        Args:
+            text: Raw conversation input text.
+            session: Active session context.
+
+        Returns:
+            Deterministic conversation command result envelope.
+        """
+        request = ConversationRequest(
+            session_id=session.session_id,
+            user_text=text,
+            model_name=session.model_settings.model_name,
+            history=tuple(session.conversation_state),
+            limits=session.model_settings.conversation_limits,
+        )
+        try:
+            response = self._conversation_executor.run(request)
+        except ConversationExecutionError as exc:
+            return CommandResult.error(
+                f"Error: {exc}",
+                code=exc.code,
+            )
+        return self._conversation_result(response)
+
+    @staticmethod
+    def _conversation_result(response: ConversationResponse) -> CommandResult:
+        """Convert conversation response to deterministic command envelope.
+
+        Args:
+            response: Normalized conversation response.
+
+        Returns:
+            Deterministic successful command result.
+        """
+        return CommandResult.ok(
+            response.text,
+            code="conversation_reply",
+            data={"route": "conversation"},
+        )
 
     @staticmethod
     def _build_default_registry() -> CommandRegistry:
