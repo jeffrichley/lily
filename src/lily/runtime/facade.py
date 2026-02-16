@@ -7,7 +7,8 @@ from typing import cast
 from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
-from lily.prompting import PersonaContext, PromptMode
+from lily.persona import FilePersonaRepository, PersonaProfile, default_persona_root
+from lily.prompting import PersonaContext, PersonaStyleLevel, PromptMode
 from lily.runtime.conversation import (
     ConversationExecutionError,
     ConversationExecutor,
@@ -36,13 +37,18 @@ class RuntimeFacade:
         self,
         command_registry: CommandRegistry | None = None,
         conversation_executor: ConversationExecutor | None = None,
+        persona_repository: FilePersonaRepository | None = None,
     ) -> None:
         """Create facade with command and conversation dependencies.
 
         Args:
             command_registry: Optional deterministic command registry.
             conversation_executor: Optional conversation execution adapter.
+            persona_repository: Optional persona profile repository.
         """
+        self._persona_repository = persona_repository or FilePersonaRepository(
+            root_dir=default_persona_root()
+        )
         self._command_registry = command_registry or self._build_default_registry()
         self._conversation_executor = (
             conversation_executor or LangChainConversationExecutor()
@@ -101,6 +107,8 @@ class RuntimeFacade:
         Returns:
             Deterministic conversation command result envelope.
         """
+        persona = self._resolve_persona(session.active_agent)
+        style_level = session.active_style or persona.default_style
         request = ConversationRequest(
             session_id=session.session_id,
             user_text=text,
@@ -108,7 +116,10 @@ class RuntimeFacade:
             history=tuple(session.conversation_state),
             limits=session.model_settings.conversation_limits,
             persona_context=PersonaContext(
-                active_persona_id=session.active_agent,
+                active_persona_id=persona.persona_id,
+                style_level=style_level,
+                persona_summary=persona.summary,
+                persona_instructions=persona.instructions,
                 session_hints=(
                     f"conversation_events={len(session.conversation_state)}",
                 ),
@@ -140,8 +151,26 @@ class RuntimeFacade:
             data={"route": "conversation"},
         )
 
-    @staticmethod
-    def _build_default_registry() -> CommandRegistry:
+    def _resolve_persona(self, persona_id: str) -> PersonaProfile:
+        """Resolve active persona profile with deterministic fallback.
+
+        Args:
+            persona_id: Session active persona identifier.
+
+        Returns:
+            Loaded persona profile or safe fallback profile.
+        """
+        profile = self._persona_repository.get(persona_id)
+        if profile is not None:
+            return profile
+        return PersonaProfile(
+            persona_id=persona_id,
+            summary="Fallback persona profile.",
+            default_style=PersonaStyleLevel.BALANCED,
+            instructions="Provide clear, accurate, and concise assistance.",
+        )
+
+    def _build_default_registry(self) -> CommandRegistry:
         """Construct default command registry with hidden LLM backend wiring.
 
         Returns:
@@ -161,7 +190,10 @@ class RuntimeFacade:
             ToolDispatchExecutor(tools=tools),
         )
         invoker = SkillInvoker(executors=executors)
-        return CommandRegistry(skill_invoker=invoker)
+        return CommandRegistry(
+            skill_invoker=invoker,
+            persona_repository=self._persona_repository,
+        )
 
     @staticmethod
     def _record_turn(session: Session, *, user_text: str, assistant_text: str) -> None:

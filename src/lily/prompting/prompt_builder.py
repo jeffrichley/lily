@@ -30,6 +30,8 @@ class PersonaContext(BaseModel):
 
     active_persona_id: str = Field(min_length=1)
     style_level: PersonaStyleLevel = PersonaStyleLevel.BALANCED
+    persona_summary: str = ""
+    persona_instructions: str = ""
     user_preference_summary: str = ""
     session_hints: tuple[str, ...] = ()
     task_hints: tuple[str, ...] = ()
@@ -131,6 +133,36 @@ class SafetySection:
         )
 
 
+class PersonaSection:
+    """Prompt section with active persona directives."""
+
+    def render(self, context: PromptBuildContext, *, max_chars: int) -> str:
+        """Render bounded persona summary/instructions section.
+
+        Args:
+            context: Prompt build context.
+            max_chars: Maximum section chars before truncation.
+
+        Returns:
+            Rendered persona section or empty string.
+        """
+        summary = context.persona.persona_summary.strip()
+        instructions = context.persona.persona_instructions.strip()
+        if not summary and not instructions:
+            return ""
+        blocks: list[str] = ["## Persona"]
+        if summary:
+            blocks.append(f"Summary: {summary}")
+        if instructions:
+            bounded = truncate_with_marker(
+                instructions,
+                max_chars=max_chars,
+                label="persona_instructions",
+            )
+            blocks.append(bounded)
+        return "\n".join(blocks)
+
+
 class SkillsSection:
     """Prompt section listing currently available skill names."""
 
@@ -228,6 +260,7 @@ class PromptBuilder:
         """
         self._sections = sections or (
             IdentitySection(),
+            PersonaSection(),
             SafetySection(),
             SkillsSection(),
             MemorySection(),

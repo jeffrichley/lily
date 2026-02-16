@@ -18,6 +18,8 @@ def _context(*, mode: PromptMode = PromptMode.FULL) -> PromptBuildContext:
         persona=PersonaContext(
             active_persona_id="architect",
             style_level=PersonaStyleLevel.BALANCED,
+            persona_summary="Structured architecture persona.",
+            persona_instructions="Lead with architecture constraints and decisions.",
             user_preference_summary="User likes concise output.",
             session_hints=("channel=repl",),
             task_hints=("phase=2",),
@@ -37,6 +39,7 @@ def test_prompt_builder_full_mode_renders_all_core_sections() -> None:
     prompt = builder.build(_context(mode=PromptMode.FULL))
 
     assert "## Identity" in prompt
+    assert "## Persona" in prompt
     assert "## Safety" in prompt
     assert "## Skills" in prompt
     assert "## Memory" in prompt
@@ -50,6 +53,7 @@ def test_prompt_builder_minimal_mode_skips_skills_and_memory() -> None:
     prompt = builder.build(_context(mode=PromptMode.MINIMAL))
 
     assert "## Identity" in prompt
+    assert "## Persona" in prompt
     assert "## Safety" in prompt
     assert "## Runtime" in prompt
     assert "## Skills" not in prompt

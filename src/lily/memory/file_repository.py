@@ -148,6 +148,7 @@ class _FileMemoryStore:
         records = self._load_records()
         needle = query.query.strip().lower()
         namespace = query.namespace.strip() if query.namespace is not None else None
+        wildcard = needle == "*"
         matches = []
         for record in records:
             if namespace is not None and record.namespace != namespace:
@@ -157,7 +158,7 @@ class _FileMemoryStore:
                 and record.confidence < query.min_confidence
             ):
                 continue
-            if needle not in record.content.lower():
+            if not wildcard and needle not in record.content.lower():
                 continue
             matches.append(record)
         ordered = sorted(matches, key=lambda record: record.updated_at, reverse=True)

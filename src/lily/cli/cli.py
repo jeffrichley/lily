@@ -109,7 +109,17 @@ def _build_session(
         SessionFactoryConfig(
             bundled_dir=bundled_dir,
             workspace_dir=workspace_dir,
-            reserved_commands={"skills", "skill", "help", "reload_skills"},
+            reserved_commands={
+                "skills",
+                "skill",
+                "help",
+                "reload_skills",
+                "persona",
+                "style",
+                "remember",
+                "forget",
+                "memory",
+            },
         )
     )
     try:

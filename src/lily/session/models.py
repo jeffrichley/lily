@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from lily.prompting import PersonaStyleLevel
 from lily.skills.types import SkillSnapshot
 
 
@@ -129,6 +130,7 @@ class Session(BaseModel):
 
     session_id: str = Field(default_factory=lambda: str(uuid4()))
     active_agent: str = "default"
+    active_style: PersonaStyleLevel | None = None
     skill_snapshot: SkillSnapshot
     model_settings: ModelConfig = Field(alias="model_config")
     conversation_state: list[Message] = Field(default_factory=list)

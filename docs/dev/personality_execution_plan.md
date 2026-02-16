@@ -133,14 +133,14 @@ Phase 2 current-state note:
 
 ## Phase 6: Persona Command Surface (`P5`)
 
-- [ ] `/persona list`
-- [ ] `/persona use <name>`
-- [ ] `/persona show`
-- [ ] `/style focus|balanced|playful`
-- [ ] `/remember`
-- [ ] `/forget`
-- [ ] `/memory show`
-- [ ] Command help/docs for all above
+- [x] `/persona list`
+- [x] `/persona use <name>`
+- [x] `/persona show`
+- [x] `/style focus|balanced|playful`
+- [x] `/remember`
+- [x] `/forget`
+- [x] `/memory show`
+- [x] Command help/docs for all above
 
 ## Phase 7: Quality + CI Gates (`P5`)
 
@@ -172,6 +172,7 @@ Phase 2 current-state note:
 - 2026-02-16: Completed Phase 4 policy boundaries (pre/post policy checks, precedence enforcement, tool-call guardrails, conversation/memory policy-denied envelopes, and redline fixtures).
 - 2026-02-16: Completed Phase 5 typed contracts (`command_tool` input/output schemas, deterministic validation envelopes, LangChain structured-response extraction, and conformance tests for add/subtract/multiply).
 - 2026-02-16: Completed Gate B baseline quality enforcement with 10-20 canonical eval coverage and pass-rate threshold tests.
+- 2026-02-16: Completed Phase 6 persona command surface (`/persona`, `/style`, `/remember`, `/forget`, `/memory show`) with bundled persona profiles (`lily`, `chad`, `barbie`) and docs in `docs/dev/persona_commands.md`.
 
 ## LangChain v1 Leverage (Out-of-the-Box)
 

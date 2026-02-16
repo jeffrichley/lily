@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from lily.persona import FilePersonaRepository
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
 from lily.session.models import ModelConfig, Session
@@ -56,6 +57,29 @@ def _make_skill(
         invocation_mode=mode,
         command=command,
         command_tool=command_tool,
+    )
+
+
+def _write_persona(root: Path, name: str, summary: str, default_style: str) -> None:
+    """Write one persona markdown fixture.
+
+    Args:
+        root: Persona directory root.
+        name: Persona identifier and filename stem.
+        summary: Persona summary.
+        default_style: Persona default style value.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    (root / f"{name}.md").write_text(
+        (
+            "---\n"
+            f"id: {name}\n"
+            f"summary: {summary}\n"
+            f"default_style: {default_style}\n"
+            "---\n"
+            f"You are {name}.\n"
+        ),
+        encoding="utf-8",
     )
 
 
@@ -328,3 +352,86 @@ def test_runtime_records_turns_in_conversation_state() -> None:
     assert session.conversation_state[0].role.value == "user"
     assert session.conversation_state[0].content == "/skills"
     assert session.conversation_state[1].role.value == "assistant"
+
+
+def test_persona_list_use_show_and_style_commands(tmp_path: Path) -> None:
+    """Persona and style commands should be deterministic and session-scoped."""
+    personas_dir = tmp_path / "personas"
+    _write_persona(
+        personas_dir,
+        "lily",
+        "Professional executive assistant",
+        "focus",
+    )
+    _write_persona(personas_dir, "chad", "Beach bro", "playful")
+    _write_persona(personas_dir, "barbie", "Valley girl", "playful")
+    runtime = RuntimeFacade(
+        persona_repository=FilePersonaRepository(root_dir=personas_dir)
+    )
+    session = _make_session(skills=())
+
+    listed = runtime.handle_input("/persona list", session)
+    assert listed.status.value == "ok"
+    assert "* default" not in listed.message
+    assert "lily - Professional executive assistant" in listed.message
+    assert "chad - Beach bro" in listed.message
+    assert "barbie - Valley girl" in listed.message
+
+    used = runtime.handle_input("/persona use chad", session)
+    assert used.status.value == "ok"
+    assert session.active_agent == "chad"
+    assert session.active_style is None
+
+    shown = runtime.handle_input("/persona show", session)
+    assert shown.status.value == "ok"
+    assert "# Persona: chad" in shown.message
+    assert "- `default_style`: playful" in shown.message
+    assert "- `effective_style`: playful" in shown.message
+
+    styled = runtime.handle_input("/style focus", session)
+    assert styled.status.value == "ok"
+    assert session.active_style is not None
+    assert session.active_style.value == "focus"
+
+    shown_after_style = runtime.handle_input("/persona show", session)
+    assert "- `effective_style`: focus" in shown_after_style.message
+
+
+def test_memory_commands_roundtrip(tmp_path: Path) -> None:
+    """Remember/show/forget should roundtrip through personality memory store."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    personas_dir = tmp_path / "personas"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    _write_persona(personas_dir, "lily", "Professional executive assistant", "focus")
+
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"remember", "forget", "memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade(
+        persona_repository=FilePersonaRepository(root_dir=personas_dir)
+    )
+
+    remember = runtime.handle_input("/remember favorite number is 42", session)
+    assert remember.status.value == "ok"
+    assert remember.code == "memory_saved"
+    memory_id = remember.data["id"] if remember.data is not None else ""
+    assert memory_id.startswith("mem_")
+
+    shown = runtime.handle_input("/memory show", session)
+    assert shown.status.value == "ok"
+    assert "favorite number is 42" in shown.message
+
+    forgot = runtime.handle_input(f"/forget {memory_id}", session)
+    assert forgot.status.value == "ok"
+    assert forgot.code == "memory_deleted"
+
+    shown_after_forget = runtime.handle_input("/memory show", session)
+    assert shown_after_forget.status.value == "ok"
+    assert shown_after_forget.code == "memory_empty"
