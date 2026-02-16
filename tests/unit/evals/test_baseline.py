@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lily.evals.baseline import (
+from tests.unit.evals._baseline_harness import (
     BASELINE_MIN_CASES,
     BASELINE_MIN_PASS_RATE,
     run_baseline_evals,
