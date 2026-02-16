@@ -18,6 +18,7 @@ from langchain.agents.middleware import (
     dynamic_prompt,
 )
 from langchain_core.messages import ToolMessage
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
 from langgraph.runtime import Runtime
@@ -129,7 +130,7 @@ class _LangChainAgentRunner:
 
     def __init__(
         self,
-        checkpointer: InMemorySaver | None = None,
+        checkpointer: BaseCheckpointSaver | None = None,
         *,
         prompt_builder: PromptBuilder | None = None,
     ) -> None:
@@ -393,15 +394,17 @@ class LangChainConversationExecutor:
         self,
         runner: AgentRunner | None = None,
         *,
+        checkpointer: BaseCheckpointSaver | None = None,
         normalize_text: Callable[[str], str] | None = None,
     ) -> None:
         """Create LangChain conversation executor.
 
         Args:
             runner: Optional runner override for tests.
+            checkpointer: Optional checkpointer override for default runner wiring.
             normalize_text: Optional text normalization override for tests.
         """
-        self._runner = runner or _LangChainAgentRunner()
+        self._runner = runner or _LangChainAgentRunner(checkpointer=checkpointer)
         self._normalize_text = normalize_text or (lambda text: text.strip())
 
     def run(self, request: ConversationRequest) -> ConversationResponse:

@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import cast
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
+
 from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
@@ -49,6 +51,7 @@ class RuntimeFacade:
         command_registry: CommandRegistry | None = None,
         conversation_executor: ConversationExecutor | None = None,
         persona_repository: FilePersonaRepository | None = None,
+        conversation_checkpointer: BaseCheckpointSaver | None = None,
     ) -> None:
         """Create facade with command and conversation dependencies.
 
@@ -56,13 +59,16 @@ class RuntimeFacade:
             command_registry: Optional deterministic command registry.
             conversation_executor: Optional conversation execution adapter.
             persona_repository: Optional persona profile repository.
+            conversation_checkpointer: Optional checkpointer for default conversation
+                executor wiring.
         """
         self._persona_repository = persona_repository or FilePersonaRepository(
             root_dir=default_persona_root()
         )
         self._command_registry = command_registry or self._build_default_registry()
         self._conversation_executor = (
-            conversation_executor or LangChainConversationExecutor()
+            conversation_executor
+            or LangChainConversationExecutor(checkpointer=conversation_checkpointer)
         )
 
     def handle_input(self, text: str, session: Session) -> CommandResult:

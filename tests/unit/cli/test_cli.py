@@ -73,7 +73,10 @@ def test_run_single_shot_renders_success(
             del session
             return CommandResult.ok("HELLO")
 
-    monkeypatch.setattr("lily.cli.cli._build_runtime", _StubRuntime)
+    monkeypatch.setattr(
+        "lily.cli.cli._build_runtime_for_workspace",
+        lambda **_: _StubRuntime(),
+    )
 
     result = _RUNNER.invoke(
         app,
@@ -107,7 +110,10 @@ def test_run_single_shot_renders_error_and_exit_code(
             del session
             return CommandResult.error("Error: boom")
 
-    monkeypatch.setattr("lily.cli.cli._build_runtime", _StubRuntime)
+    monkeypatch.setattr(
+        "lily.cli.cli._build_runtime_for_workspace",
+        lambda **_: _StubRuntime(),
+    )
 
     result = _RUNNER.invoke(
         app,
@@ -368,3 +374,46 @@ def test_repl_recovers_corrupt_session_file(tmp_path: Path) -> None:
     assert backups
     payload = json.loads(session_file.read_text(encoding="utf-8"))
     assert payload["schema_version"] == 1
+
+
+def test_run_creates_default_sqlite_checkpointer_file(tmp_path: Path) -> None:
+    """`lily run` should initialize default sqlite checkpointer file in local mode."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / ".lily" / "skills"
+    session_file = tmp_path / ".lily" / "session.json"
+    config_file = tmp_path / ".lily" / "config.json"
+    checkpointer_file = tmp_path / ".lily" / "checkpoints" / "checkpointer.sqlite"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir(parents=True)
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(
+        (
+            "{"
+            '"checkpointer":{'
+            '"backend":"sqlite",'
+            f'"sqlite_path":"{checkpointer_file.as_posix()}"'
+            "}"
+            "}"
+        ),
+        encoding="utf-8",
+    )
+    _write_echo_skill(bundled_dir)
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "/skills",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+            "--session-file",
+            str(session_file),
+            "--config-file",
+            str(config_file),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert checkpointer_file.exists()

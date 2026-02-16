@@ -1,0 +1,63 @@
+"""Global Lily config models and loading helpers."""
+
+from __future__ import annotations
+
+import json
+from enum import StrEnum
+from pathlib import Path
+
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+
+class CheckpointerBackend(StrEnum):
+    """Supported checkpointer backend identifiers."""
+
+    SQLITE = "sqlite"
+    MEMORY = "memory"
+    POSTGRES = "postgres"
+
+
+class CheckpointerSettings(BaseModel):
+    """Global checkpointer configuration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    backend: CheckpointerBackend = CheckpointerBackend.SQLITE
+    sqlite_path: str = ".lily/checkpoints/checkpointer.sqlite"
+    postgres_dsn: str | None = None
+
+
+class LilyGlobalConfig(BaseModel):
+    """Root global Lily configuration model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    checkpointer: CheckpointerSettings = CheckpointerSettings()
+
+
+class GlobalConfigError(RuntimeError):
+    """Raised when global config cannot be decoded or validated."""
+
+
+def load_global_config(path: Path) -> LilyGlobalConfig:
+    """Load global Lily config from disk, defaulting when missing.
+
+    Args:
+        path: Config file path.
+
+    Returns:
+        Parsed config payload, or defaults when file does not exist.
+
+    Raises:
+        GlobalConfigError: If payload decode or validation fails.
+    """
+    if not path.exists():
+        return LilyGlobalConfig()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise GlobalConfigError(f"Invalid global config JSON: {exc}") from exc
+    try:
+        return LilyGlobalConfig.model_validate(payload)
+    except ValidationError as exc:
+        raise GlobalConfigError(f"Invalid global config payload: {exc}") from exc

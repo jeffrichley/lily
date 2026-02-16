@@ -38,6 +38,7 @@ Priority source of truth: `docs/dev/roadmap.md`.
 
 - [ ] Define explicit persistence policy (what survives restart vs what is ephemeral).
 - [ ] Define migration/versioning policy for persisted session schema.
+- [ ] Design lifecycle storage tiers for memory (for example hot/warm/cold/archive) with explicit restore UX and cost policy.
 
 ## Commands And UX
 
@@ -77,6 +78,8 @@ Priority source of truth: `docs/dev/roadmap.md`.
 
 ## Developer Experience
 
+- [ ] Clean up the CLI and repackage it for improved structure and maintainability.
+- [ ] Refactor long conditional dispatch chains (`if`/`elif` by mode/backend/type) into strategy registries with explicit handler maps.
 - [ ] Add a single `slice_001_smoke.py` script for manual end-to-end validation.
 - [ ] Add a minimal `make/just` target for running the slice demo deterministically.
 - [ ] Add architecture decision record (ADR) summarizing command-vs-LLM boundary.

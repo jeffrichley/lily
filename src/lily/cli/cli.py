@@ -17,6 +17,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from lily.commands.types import CommandResult, CommandStatus
+from lily.config import GlobalConfigError, LilyGlobalConfig, load_global_config
+from lily.runtime.checkpointing import CheckpointerBuildError, build_checkpointer
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
 from lily.session.models import ModelConfig, Session
@@ -104,6 +106,19 @@ def _default_session_file(workspace_dir: Path) -> Path:
     return workspace_dir.parent / "session.json"
 
 
+def _default_global_config_file(workspace_dir: Path) -> Path:
+    """Return default global config path for current workspace root.
+
+    Args:
+        workspace_dir: Workspace skills directory path.
+
+    Returns:
+        Global config file path.
+    """
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    return workspace_dir.parent / "config.json"
+
+
 def _build_session(
     *,
     bundled_dir: Path,
@@ -179,13 +194,33 @@ def _persist_session(session: Session, session_file: Path) -> None:
         )
 
 
-def _build_runtime() -> RuntimeFacade:
-    """Build default runtime facade.
+def _build_runtime_for_workspace(
+    *,
+    workspace_dir: Path,
+    config_file: Path | None,
+) -> RuntimeFacade:
+    """Build runtime facade with configured checkpointer backend.
+
+    Args:
+        workspace_dir: Workspace skills directory path.
+        config_file: Optional global config override path.
 
     Returns:
-        Runtime facade with default wiring.
+        Runtime facade wired with configured checkpointer.
     """
-    return RuntimeFacade()
+    effective_config_file = config_file or _default_global_config_file(workspace_dir)
+    config: LilyGlobalConfig
+    try:
+        config = load_global_config(effective_config_file)
+    except GlobalConfigError as exc:
+        _CONSOLE.print(
+            f"[yellow]Global config at {effective_config_file} is invalid; "
+            "falling back to defaults.[/yellow]"
+        )
+        _CONSOLE.print(f"[yellow]Reason: {exc}[/yellow]")
+        config = LilyGlobalConfig()
+    result = build_checkpointer(config.checkpointer)
+    return RuntimeFacade(conversation_checkpointer=result.saver)
 
 
 def _render_result(result: CommandResult) -> None:
@@ -473,13 +508,14 @@ def _render_agent_show(result: CommandResult) -> bool:
     return True
 
 
-def _execute_once(
+def _execute_once(  # noqa: PLR0913
     *,
     text: str,
     bundled_dir: Path,
     workspace_dir: Path,
     model_name: str,
     session_file: Path,
+    config_file: Path | None,
 ) -> int:
     """Execute one input line through runtime facade.
 
@@ -489,6 +525,7 @@ def _execute_once(
         workspace_dir: Workspace skills root.
         model_name: Model name for session construction.
         session_file: Session persistence file path.
+        config_file: Optional global config path.
 
     Returns:
         Process exit code.
@@ -499,7 +536,14 @@ def _execute_once(
         model_name=model_name,
         session_file=session_file,
     )
-    runtime = _build_runtime()
+    try:
+        runtime = _build_runtime_for_workspace(
+            workspace_dir=workspace_dir,
+            config_file=config_file,
+        )
+    except CheckpointerBuildError as exc:
+        _CONSOLE.print(f"[bold red]Failed to initialize checkpointer: {exc}[/bold red]")
+        return 1
     result = runtime.handle_input(text, session)
     _persist_session(session, session_file)
     _render_result(result)
@@ -507,7 +551,7 @@ def _execute_once(
 
 
 @app.command("run")
-def run_command(
+def run_command(  # noqa: PLR0913
     text: Annotated[str, typer.Argument(help="Single input line to execute.")],
     bundled_dir: Annotated[
         Path | None,
@@ -529,6 +573,14 @@ def run_command(
             help="Path to persisted session JSON file.",
         ),
     ] = None,
+    config_file: Annotated[
+        Path | None,
+        typer.Option(
+            file_okay=True,
+            dir_okay=False,
+            help="Path to global Lily config JSON file.",
+        ),
+    ] = None,
 ) -> None:
     """Execute one input line and print deterministic result.
 
@@ -538,6 +590,7 @@ def run_command(
         workspace_dir: Optional workspace skills root override.
         model_name: Model identifier for session execution.
         session_file: Optional persisted session file path override.
+        config_file: Optional global Lily config file path override.
 
     Raises:
         Exit: Raised with command status code for shell integration.
@@ -554,6 +607,7 @@ def run_command(
         workspace_dir=effective_workspace_dir,
         model_name=model_name,
         session_file=effective_session_file,
+        config_file=config_file,
     )
     raise typer.Exit(code=exit_code)
 
@@ -580,6 +634,14 @@ def repl_command(
             help="Path to persisted session JSON file.",
         ),
     ] = None,
+    config_file: Annotated[
+        Path | None,
+        typer.Option(
+            file_okay=True,
+            dir_okay=False,
+            help="Path to global Lily config JSON file.",
+        ),
+    ] = None,
 ) -> None:
     """Run interactive REPL for slash-command testing.
 
@@ -588,6 +650,10 @@ def repl_command(
         workspace_dir: Optional workspace skills root override.
         model_name: Model identifier for session execution.
         session_file: Optional persisted session file path override.
+        config_file: Optional global Lily config file path override.
+
+    Raises:
+        Exit: Raised when configured checkpointer cannot be initialized.
     """
     _configure_logging()
     _CONSOLE.print(
@@ -604,7 +670,14 @@ def repl_command(
         model_name=model_name,
         session_file=effective_session_file,
     )
-    runtime = _build_runtime()
+    try:
+        runtime = _build_runtime_for_workspace(
+            workspace_dir=effective_workspace_dir,
+            config_file=config_file,
+        )
+    except CheckpointerBuildError as exc:
+        _CONSOLE.print(f"[bold red]Failed to initialize checkpointer: {exc}[/bold red]")
+        raise typer.Exit(code=1) from exc
 
     while True:
         try:

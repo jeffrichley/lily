@@ -13,6 +13,7 @@ dependencies = [
     "langchain>=1.0.0",
     "langchain-openai>=1.1.9",
     "langchain-ollama>=1.0.1",
+    "langgraph-checkpoint-sqlite>=3.0.3",
 ]
 
 [project.scripts]
