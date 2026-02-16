@@ -82,21 +82,21 @@ Phase 2 current-state note:
 
 ## Phase 3: Memory Repositories (`P5`)
 
-- [ ] Implement repository interfaces
-  - [ ] `PersonalityMemoryRepository`
-  - [ ] `TaskMemoryRepository`
-- [ ] Implement file-backed adapters (v1)
-- [ ] Enforce store separation
-  - [ ] No implicit cross-store query in default path
-  - [ ] Namespace isolation for task memory
-- [ ] Implement deterministic memory error codes
-  - [ ] `memory_invalid_input`
-  - [ ] `memory_not_found`
+- [x] Implement repository interfaces
+  - [x] `PersonalityMemoryRepository`
+  - [x] `TaskMemoryRepository`
+- [x] Implement file-backed adapters (v1)
+- [x] Enforce store separation
+  - [x] No implicit cross-store query in default path
+  - [x] Namespace isolation for task memory
+- [x] Implement deterministic memory error codes
+  - [x] `memory_invalid_input`
+  - [x] `memory_not_found`
   - [ ] `memory_policy_denied`
-  - [ ] `memory_store_unavailable`
-  - [ ] `memory_namespace_required`
-  - [ ] `memory_schema_mismatch`
-- [ ] Mark ADR-001 as `Accepted` once implementation contract matches
+  - [x] `memory_store_unavailable`
+  - [x] `memory_namespace_required`
+  - [x] `memory_schema_mismatch`
+- [x] Mark ADR-001 as `Accepted` once implementation contract matches
 
 ## Phase 4: Policy Boundaries (`P5`)
 
@@ -162,6 +162,7 @@ Phase 2 current-state note:
 - 2026-02-16: Implemented tool-loop boundary enforcement with deterministic timeout/retry/loop-limit handling and tests.
 - 2026-02-16: Completed Phase 2 foundations (`PersonaContext`, sectioned `PromptBuilder`, prompt modes, LangChain `context_schema` + middleware hooks, deterministic bounded/truncated injection).
 - 2026-02-16: Verified rendered prompt output manually; documented current baseline section content vs planned enrichments.
+- 2026-02-16: Completed Phase 3 memory repositories (split interfaces + file adapters, namespace-isolated task queries, deterministic memory error model, and tests).
 
 ## LangChain v1 Leverage (Out-of-the-Box)
 
