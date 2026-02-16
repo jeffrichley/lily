@@ -123,8 +123,13 @@ Phase 2 current-state note:
 
 - [x] Typed tool/skill validation enabled end-to-end
 - [x] Deterministic error envelopes verified by tests
-- [ ] Baseline eval set created (10-20 canonical cases)
-- [ ] Baseline thresholds documented and passing
+- [x] Baseline eval set created (10-20 canonical cases)
+- [x] Baseline thresholds documented and passing
+  - Thresholds:
+  - `minimum_cases >= 10`
+  - `maximum_cases <= 20`
+  - `minimum_pass_rate >= 0.95`
+  - Enforced by `tests/unit/evals/test_baseline.py`
 
 ## Phase 6: Persona Command Surface (`P5`)
 
@@ -166,6 +171,7 @@ Phase 2 current-state note:
 - 2026-02-16: Completed Phase 3 memory repositories (split interfaces + file adapters, namespace-isolated task queries, deterministic memory error model, and tests).
 - 2026-02-16: Completed Phase 4 policy boundaries (pre/post policy checks, precedence enforcement, tool-call guardrails, conversation/memory policy-denied envelopes, and redline fixtures).
 - 2026-02-16: Completed Phase 5 typed contracts (`command_tool` input/output schemas, deterministic validation envelopes, LangChain structured-response extraction, and conformance tests for add/subtract/multiply).
+- 2026-02-16: Completed Gate B baseline quality enforcement with 10-20 canonical eval coverage and pass-rate threshold tests.
 
 ## LangChain v1 Leverage (Out-of-the-Box)
 
