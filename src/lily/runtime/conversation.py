@@ -9,17 +9,28 @@ from typing import Any, Protocol, cast
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
+    AgentMiddleware,
     AgentState,
     ModelRequest,
+    ToolCallRequest,
     after_model,
     before_model,
     dynamic_prompt,
 )
+from langchain_core.messages import ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
 from langgraph.runtime import Runtime
+from langgraph.types import Command
 from pydantic import BaseModel, ConfigDict, Field
 
+from lily.policy import (
+    PRECEDENCE_CONTRACT,
+    evaluate_post_generation,
+    evaluate_pre_generation,
+    force_safe_style,
+    resolve_effective_style,
+)
 from lily.prompting import PersonaContext, PromptBuildContext, PromptBuilder, PromptMode
 from lily.session.models import ConversationLimitsConfig, Message
 
@@ -170,70 +181,159 @@ class _LangChainAgentRunner:
         Returns:
             Ordered middleware tuple.
         """
-        prompt_builder = self._prompt_builder
+        return (
+            _build_dynamic_prompt_middleware(self._prompt_builder),
+            _build_before_model_middleware(),
+            _build_after_model_middleware(),
+            ToolGuardrailMiddleware(),
+        )
 
-        @dynamic_prompt
-        def lily_dynamic_prompt(
-            request: ModelRequest[ConversationRuntimeContext],
-        ) -> str:
-            """Build dynamic prompt from runtime persona context.
 
-            Args:
-                request: Model request carrying runtime context.
+class ToolGuardrailMiddleware(
+    AgentMiddleware[AgentState[object], ConversationRuntimeContext, object]
+):
+    """Middleware enforcing deterministic tool-call guardrails."""
 
-            Returns:
-                Deterministic system prompt text.
-            """
-            runtime_context = request.runtime.context
-            build_context = PromptBuildContext(
-                persona=runtime_context.persona_context,
-                mode=runtime_context.prompt_mode,
-                session_id=runtime_context.session_id,
-                model_name=runtime_context.model_name,
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command[object]],
+    ) -> ToolMessage | Command[object]:
+        """Validate tool call input before executing tool handler.
+
+        Args:
+            request: Tool call request payload.
+            handler: Downstream tool handler.
+
+        Returns:
+            Tool execution result.
+
+        Raises:
+            ConversationExecutionError: If tool call is denied by policy.
+        """
+        args_value: object = None
+        if isinstance(request.tool_call, dict):
+            args_value = request.tool_call.get("args")
+        args_text = str(args_value) if args_value is not None else ""
+        decision = evaluate_pre_generation(args_text)
+        if not decision.allowed:
+            raise ConversationExecutionError(
+                "Tool call denied by policy.",
+                code="conversation_policy_denied",
             )
-            return prompt_builder.build(build_context)
+        return handler(request)
 
-        @before_model
-        def lily_before_model(
-            state: AgentState[object],
-            runtime: Runtime[ConversationRuntimeContext],
-        ) -> None:
-            """Emit trace hook before model execution.
 
-            Args:
-                state: Current agent state payload.
-                runtime: LangGraph runtime context.
-            """
-            del state
-            context = runtime.context
-            _LOGGER.debug(
-                "conversation.before_model session=%s persona=%s mode=%s",
-                context.session_id,
-                context.persona_context.active_persona_id,
-                context.prompt_mode.value,
-            )
+def _build_dynamic_prompt_middleware(prompt_builder: PromptBuilder) -> object:
+    """Create dynamic prompt middleware for persona-aware prompt rendering.
 
-        @after_model
-        def lily_after_model(
-            state: AgentState[object],
-            runtime: Runtime[ConversationRuntimeContext],
-        ) -> None:
-            """Emit trace hook after model execution.
+    Args:
+        prompt_builder: Prompt builder used for deterministic prompt rendering.
 
-            Args:
-                state: Current agent state payload.
-                runtime: LangGraph runtime context.
-            """
-            del state
-            context = runtime.context
-            _LOGGER.debug(
-                "conversation.after_model session=%s persona=%s mode=%s",
-                context.session_id,
-                context.persona_context.active_persona_id,
-                context.prompt_mode.value,
-            )
+    Returns:
+        LangChain dynamic prompt middleware.
+    """
 
-        return (lily_dynamic_prompt, lily_before_model, lily_after_model)
+    @dynamic_prompt
+    def lily_dynamic_prompt(request: ModelRequest[ConversationRuntimeContext]) -> str:
+        """Build dynamic prompt from runtime persona context.
+
+        Args:
+            request: Model request carrying runtime context.
+
+        Returns:
+            Deterministic system prompt text.
+        """
+        runtime_context = request.runtime.context
+        build_context = PromptBuildContext(
+            persona=runtime_context.persona_context,
+            mode=runtime_context.prompt_mode,
+            session_id=runtime_context.session_id,
+            model_name=runtime_context.model_name,
+        )
+        return prompt_builder.build(build_context)
+
+    return lily_dynamic_prompt
+
+
+def _build_before_model_middleware() -> object:
+    """Create pre-model policy-check middleware.
+
+    Returns:
+        LangChain before-model middleware.
+    """
+
+    @before_model
+    def lily_before_model(
+        state: AgentState[object],
+        runtime: Runtime[ConversationRuntimeContext],
+    ) -> None:
+        """Emit trace hook and enforce pre-generation policy checks.
+
+        Args:
+            state: Current agent state payload.
+            runtime: LangGraph runtime context.
+
+        Raises:
+            ConversationExecutionError: If pre-generation policy denies input.
+        """
+        context = runtime.context
+        _LOGGER.debug(
+            "conversation.before_model session=%s persona=%s mode=%s",
+            context.session_id,
+            context.persona_context.active_persona_id,
+            context.prompt_mode.value,
+        )
+        latest_user = _latest_user_text(state)
+        if latest_user:
+            decision = evaluate_pre_generation(latest_user)
+            if not decision.allowed:
+                raise ConversationExecutionError(
+                    decision.reason,
+                    code=decision.code or "conversation_policy_denied",
+                )
+
+    return lily_before_model
+
+
+def _build_after_model_middleware() -> object:
+    """Create post-model policy-check middleware.
+
+    Returns:
+        LangChain after-model middleware.
+    """
+
+    @after_model
+    def lily_after_model(
+        state: AgentState[object],
+        runtime: Runtime[ConversationRuntimeContext],
+    ) -> None:
+        """Emit trace hook and enforce post-generation policy checks.
+
+        Args:
+            state: Current agent state payload.
+            runtime: LangGraph runtime context.
+
+        Raises:
+            ConversationExecutionError: If post-generation policy denies output.
+        """
+        context = runtime.context
+        _LOGGER.debug(
+            "conversation.after_model session=%s persona=%s mode=%s",
+            context.session_id,
+            context.persona_context.active_persona_id,
+            context.prompt_mode.value,
+        )
+        latest_assistant = _latest_assistant_text(state)
+        if latest_assistant:
+            decision = evaluate_post_generation(latest_assistant)
+            if not decision.allowed:
+                raise ConversationExecutionError(
+                    decision.reason,
+                    code=decision.code or "conversation_policy_denied",
+                )
+
+    return lily_after_model
 
 
 def _build_messages(request: ConversationRequest) -> list[dict[str, str]]:
@@ -321,12 +421,19 @@ class LangChainConversationExecutor:
                 "session_id": request.session_id.strip(),
                 "user_text": request.user_text.strip(),
                 "model_name": request.model_name.strip(),
+                "persona_context": _apply_precedence(request),
             }
         )
         if not normalized.user_text:
             raise ConversationExecutionError(
                 "Conversation input is empty.",
                 code="conversation_invalid_input",
+            )
+        pre_decision = evaluate_pre_generation(normalized.user_text)
+        if not pre_decision.allowed:
+            raise ConversationExecutionError(
+                pre_decision.reason,
+                code=pre_decision.code or "conversation_policy_denied",
             )
         max_attempts = self._resolve_max_attempts(normalized)
         for attempt in range(1, max_attempts + 1):
@@ -337,6 +444,12 @@ class LangChainConversationExecutor:
                     raise ConversationExecutionError(
                         "Conversation backend returned empty output.",
                         code="conversation_invalid_response",
+                    )
+                post_decision = evaluate_post_generation(text)
+                if not post_decision.allowed:
+                    raise ConversationExecutionError(
+                        post_decision.reason,
+                        code=post_decision.code or "conversation_policy_denied",
                     )
                 return ConversationResponse(text=text)
             except ConversationExecutionError as exc:
@@ -450,7 +563,10 @@ class LangChainConversationExecutor:
         """
         if attempt >= max_attempts:
             return False
-        return exc.code in {"conversation_backend_unavailable", "conversation_timeout"}
+        return exc.code in {
+            "conversation_backend_unavailable",
+            "conversation_timeout",
+        }
 
     def _extract_text(self, payload: object) -> str:
         """Extract assistant text from LangChain invocation payload.
@@ -504,3 +620,60 @@ class LangChainConversationExecutor:
             if isinstance(item, dict)
         ]
         return "\n".join(chunk for chunk in chunks if chunk)
+
+
+def _apply_precedence(request: ConversationRequest) -> PersonaContext:
+    """Apply precedence contract to derive effective persona style.
+
+    Args:
+        request: Normalized conversation request.
+
+    Returns:
+        Persona context with effective style for this turn.
+    """
+    user_style = request.persona_context.style_level
+    effective_style = resolve_effective_style(user_style=user_style)
+    if not evaluate_pre_generation(request.user_text).allowed:
+        effective_style = force_safe_style()
+    _LOGGER.debug(
+        "conversation.precedence contract=%s resolved_style=%s",
+        PRECEDENCE_CONTRACT,
+        effective_style.value,
+    )
+    return request.persona_context.model_copy(update={"style_level": effective_style})
+
+
+def _latest_user_text(state: AgentState[object]) -> str:
+    """Extract latest user message text from agent state.
+
+    Args:
+        state: Current agent state payload.
+
+    Returns:
+        Latest user message text, or empty string when unavailable.
+    """
+    messages = state.get("messages", [])
+    for message in reversed(messages):
+        role = getattr(message, "type", "")
+        content = getattr(message, "content", "")
+        if role == "human" and isinstance(content, str):
+            return content
+    return ""
+
+
+def _latest_assistant_text(state: AgentState[object]) -> str:
+    """Extract latest assistant message text from agent state.
+
+    Args:
+        state: Current agent state payload.
+
+    Returns:
+        Latest assistant message text, or empty string when unavailable.
+    """
+    messages = state.get("messages", [])
+    for message in reversed(messages):
+        role = getattr(message, "type", "")
+        content = getattr(message, "content", "")
+        if role == "ai" and isinstance(content, str):
+            return content
+    return ""

@@ -106,3 +106,15 @@ def test_invalid_store_payload_returns_schema_mismatch(tmp_path: Path) -> None:
         assert exc.code == MemoryErrorCode.SCHEMA_MISMATCH
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected MemoryError")
+
+
+def test_memory_policy_denied_blocks_sensitive_writes(tmp_path: Path) -> None:
+    """Memory writes should fail deterministically for sensitive content."""
+    repo = _personality_repo(tmp_path)
+
+    try:
+        repo.remember(MemoryWriteRequest(namespace="global", content="api_key=sk-123"))
+    except MemoryError as exc:
+        assert exc.code == MemoryErrorCode.POLICY_DENIED
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("Expected MemoryError")

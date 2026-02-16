@@ -18,8 +18,8 @@ Related:
 - [x] `PersonaContext` interface implemented and wired
 - [x] `PromptBuilder` interface implemented and wired
 - [x] ADR-001 memory model status updated to `Accepted`
-- [ ] Policy precedence contract documented in code/docs:
-  - [ ] `safety > user style > persona default > stochastic expression`
+- [x] Policy precedence contract documented in code/docs:
+  - [x] `safety > user style > persona default > stochastic expression`
 
 ## Phase 1: Core Conversation Runtime (`P5`)
 
@@ -92,7 +92,6 @@ Phase 2 current-state note:
 - [x] Implement deterministic memory error codes
   - [x] `memory_invalid_input`
   - [x] `memory_not_found`
-  - [ ] `memory_policy_denied`
   - [x] `memory_store_unavailable`
   - [x] `memory_namespace_required`
   - [x] `memory_schema_mismatch`
@@ -100,15 +99,17 @@ Phase 2 current-state note:
 
 ## Phase 4: Policy Boundaries (`P5`)
 
-- [ ] Add pre-LLM policy check stage
-- [ ] Add post-LLM policy check stage
-- [ ] Enforce precedence contract in runtime path
-- [ ] Implement policy boundaries with LangChain middleware hooks
-  - [ ] `before_model` for pre-generation policy checks
-  - [ ] `after_model` for post-generation policy checks
-  - [ ] `wrap_tool_call` for tool-call guardrails
-- [ ] Add deterministic policy-denied envelope and tests
-- [ ] Add policy test fixtures for redline scenarios
+- [x] Add pre-LLM policy check stage
+- [x] Add post-LLM policy check stage
+- [x] Enforce precedence contract in runtime path
+- [x] Implement policy boundaries with LangChain middleware hooks
+  - [x] `before_model` for pre-generation policy checks
+  - [x] `after_model` for post-generation policy checks
+  - [x] `wrap_tool_call` for tool-call guardrails
+- [x] Add deterministic policy-denied envelope and tests
+- [x] Add deterministic memory policy-denied handling and tests
+  - [x] Emit `memory_policy_denied` on blocked memory writes
+- [x] Add policy test fixtures for redline scenarios
 
 ## Phase 5: Typed Skill/Tool Contracts (`P5`)
 
@@ -163,6 +164,7 @@ Phase 2 current-state note:
 - 2026-02-16: Completed Phase 2 foundations (`PersonaContext`, sectioned `PromptBuilder`, prompt modes, LangChain `context_schema` + middleware hooks, deterministic bounded/truncated injection).
 - 2026-02-16: Verified rendered prompt output manually; documented current baseline section content vs planned enrichments.
 - 2026-02-16: Completed Phase 3 memory repositories (split interfaces + file adapters, namespace-isolated task queries, deterministic memory error model, and tests).
+- 2026-02-16: Completed Phase 4 policy boundaries (pre/post policy checks, precedence enforcement, tool-call guardrails, conversation/memory policy-denied envelopes, and redline fixtures).
 
 ## LangChain v1 Leverage (Out-of-the-Box)
 

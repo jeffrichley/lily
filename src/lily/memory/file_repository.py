@@ -18,6 +18,7 @@ from lily.memory.models import (
     MemoryWriteRequest,
 )
 from lily.memory.repository import PersonalityMemoryRepository, TaskMemoryRepository
+from lily.policy import evaluate_memory_write
 
 _PERSONALITY_FILE = "personality_memory.json"
 _TASK_FILE = "task_memory.json"
@@ -58,6 +59,12 @@ class _FileMemoryStore:
             raise MemoryError(
                 MemoryErrorCode.INVALID_INPUT,
                 "Invalid memory write input.",
+            )
+        decision = evaluate_memory_write(normalized_content)
+        if not decision.allowed:
+            raise MemoryError(
+                MemoryErrorCode.POLICY_DENIED,
+                decision.reason,
             )
         records = self._load_records()
         fingerprint = _fingerprint(normalized_namespace, normalized_content)
