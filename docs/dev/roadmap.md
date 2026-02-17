@@ -4,6 +4,7 @@ Purpose: define what we build, in what order, and why.
 
 This roadmap is the source of truth for prioritization.
 If something is not on this list (or not promoted on this list), we do not build it yet.
+Debt tracking lives in `docs/dev/debt_tracker.md`.
 
 ## Priority Scale
 
