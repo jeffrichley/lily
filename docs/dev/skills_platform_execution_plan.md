@@ -306,6 +306,93 @@ Scope contract:
 
 ---
 
+## Gate S3: Phase 4 Alignment (Must Pass Before Typed-Contract Rollout)
+
+`User-visible features`
+- None (alignment gate only).
+
+`Internal engineering tasks`
+- [x] Confirm Phase 4 locked scope from spec:
+  - [x] complete typed I/O contracts across all supported skill execution paths
+  - [x] add contract conformance suite and deterministic envelope regression tests
+  - [x] wire conformance checks into CI gate path
+- [x] Confirm low-friction authoring contract (required):
+  - [x] tiny tool additions remain a small edit path (tool implementation + registry + SKILL declaration)
+  - [x] no manual hand-editing of generated contract snapshots in normal flow
+  - [x] no extra policy/security ceremony beyond existing Phase 3 controls
+- [x] Confirm LangChain interoperability scope:
+  - [x] add `LangChain -> Lily` wrapper adapter
+  - [x] add `Lily -> LangChain` wrapper adapter
+  - [x] preserve deterministic Lily error/result envelope contract
+- [x] Confirm explicit Phase 4 exclusions:
+  - [x] no supervisor/subagent orchestration rollout (separate feature)
+  - [x] no TUI approval UX changes (separate feature)
+  - [x] no expansion of security policy model beyond Phase 3
+
+`Acceptance criteria`
+- [x] S3 checklist completed and referenced in implementation PR.
+- [x] Phase 4 scope explicitly preserves low-friction tool authoring path.
+
+`Non-goals`
+- no agent orchestration feature work.
+- no plugin marketplace/distribution changes.
+
+`Required tests and gates`
+- [x] `just docs-check` green before and after Phase 4 plan edits.
+
+---
+
+## Phase 4: Typed Contract Completion + LangChain Wrappers (`P5`)
+
+`User-visible features`
+- [x] Tool/skill failures stay deterministic while contract validation coverage expands.
+- [x] Small tool changes and small tool additions keep a lightweight workflow.
+- [x] LangChain-compatible tool wrappers are available for interoperability.
+
+`Internal engineering tasks`
+- [x] Typed contract completion:
+  - [x] ensure all supported execution paths use typed input/output envelopes
+  - [x] normalize remaining non-typed result/error paths into stable envelopes
+  - [x] document contract versioning and compatibility expectations
+- [x] Conformance + regression:
+  - [x] add contract conformance suite for provider/tool execution boundaries
+  - [x] add deterministic snapshot tests for stable codes/messages/data shape
+  - [x] gate CI on conformance + regression suites
+- [x] Low-friction authoring path:
+  - [x] add optional `BaseToolContract` class with default method behaviors (`parse_payload`, `execute_typed`, `render_output`)
+  - [x] keep direct `ToolContract` implementation supported (base class is optional, not mandatory)
+  - [x] require tiny tools to override only behavior they actually need
+  - [x] add minimal scaffolding command/template for new tiny tools
+  - [x] add one-command contract snapshot generation/update flow
+  - [x] document tiny-change workflow (`change code -> run fast gate -> done`)
+- [x] LangChain interoperability adapters:
+  - [x] implement `LangChain -> Lily` adapter (schema + invoke mapping)
+  - [x] implement `Lily -> LangChain` adapter (StructuredTool mapping)
+  - [x] map wrapper failures to deterministic Lily error envelopes
+  - [x] add focused tests for args_schema and result-shape compatibility
+
+`Acceptance criteria`
+- [x] Conformance suite covers all currently supported skill execution paths.
+- [x] CI includes contract conformance gate and fails deterministically on drift.
+- [x] Tiny tool add/change workflow is documented and test-validated as lightweight.
+- [x] Optional `BaseToolContract` path is available and verified to reduce boilerplate for simple tools.
+- [x] LangChain wrapper adapters can round-trip representative tools without contract ambiguity.
+
+`Non-goals`
+- no new security trust tiers beyond Phase 3.
+- no broad refactor of runtime architecture unrelated to typed contract boundaries.
+
+`Required tests and gates`
+- [x] unit tests for remaining typed contract boundary coverage.
+- [x] conformance suite for provider/tool contract parity.
+- [x] unit tests for optional `BaseToolContract` defaults and override behavior.
+- [x] regression snapshot tests for deterministic envelopes.
+- [x] adapter tests for `LangChain -> Lily` and `Lily -> LangChain`.
+- [x] `just quality-check`.
+- [x] `just docs-check`.
+
+---
+
 ## Status Log
 
 - 2026-02-17: Plan created. User selected Phase 1-only implementation start with rule-based security governance, SQLite security backend, and terminal-first HITL deferred to later phase.
@@ -315,3 +402,6 @@ Scope contract:
 - 2026-02-17: Gate S1 and Phase 2 completed. Added provider registry (`builtin` + MCP adapter contract), provider-scoped deterministic errors, provider-aware tool dispatch/runtime metadata, capability checks supporting provider-qualified declarations, and mocked MCP routing/failure tests; `just quality-check` and `just docs-check` passed.
 - 2026-02-17: Phase 3 detailed plan added (Gate S2 + containerized plugin runtime/HITL/security-hash/SQLite persistence scope, acceptance criteria, non-goals, and tests/gates).
 - 2026-02-17: Gate S2 and Phase 3 completed. Added plugin provider contract validation, Docker SDK container runtime, hard-deny preflight scanner, canonical security hashing, terminal HITL approvals (`run_once`/`always_allow`/`deny`), SQLite-backed approval/provenance persistence at `.lily/db/security.sqlite`, and security alert code/render coverage; `just quality-check` and `just docs-check` passed.
+- 2026-02-17: Phase 4 execution plan expanded with Gate S3 + detailed implementation scope for end-to-end typed contract completion, low-friction tool authoring workflow, and LangChain wrapper interoperability.
+- 2026-02-17: Gate S3 completed. Phase 4 scope, low-friction authoring requirements (including optional `BaseToolContract`), LangChain wrapper scope, exclusions, and gate criteria were frozen before implementation; `just docs-check` passed.
+- 2026-02-17: Phase 4 completed. Added optional `BaseToolContract`, LangChain wrapper adapters (`LangChain -> Lily`, `Lily -> LangChain`) with deterministic wrapper error mapping, contract conformance test lane, deterministic envelope snapshot generation/check flow, and lightweight tool authoring workflow docs; `just contract-conformance`, `just quality-check`, and `just docs-check` passed.
