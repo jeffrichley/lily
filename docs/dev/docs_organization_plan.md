@@ -66,8 +66,9 @@ Phase 3 gate note:
 
 `Required tests and gates`
 - [x] CI catches intentionally stale active doc fixture.
-- [ ] Zero false positives on current docs tree.
+- [x] Zero false positives on current docs tree.
 
 Phase 4 gate note:
 - Frontmatter was auto-added across all docs with placeholders where missing.
-- CI now fails until placeholder values are replaced with concrete `owner` and `last_updated` values.
+- Placeholder values were replaced with concrete `owner` and `last_updated` values.
+- `just quality-check` now passes with docs validation enabled.
