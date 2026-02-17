@@ -26,15 +26,16 @@ Update cadence:
 - [x] Phase 2 docs consolidation delivered and committed (`b81f851`).
 - [x] Phase 3 docs cadence and PR docs-impact workflow delivered.
 - [x] Phase 4 docs automation implemented (`docs-check` + auto-frontmatter fix tooling).
+- [x] Placeholder frontmatter values replaced and docs quality gate is green (`c6dfd41`).
+- [x] Docs organization program closed by explicit owner decision on `2026-02-17`.
 
 ## In Progress
 
-- [ ] Weekly status cadence follow-through (need two consecutive weekly updates), owner `@team`, target `2026-02-24`.
-- [ ] Fill placeholder frontmatter values added by auto-fix, owner `@team`, target `2026-02-24`.
+- [ ] None.
 
 ## Next Up
 
-- [ ] Close Phase 4 final gate by clearing all placeholder frontmatter values.
+- [ ] Apply this same phase-contract template to the next docs/process initiative.
 
 ## Blockers and Risks
 

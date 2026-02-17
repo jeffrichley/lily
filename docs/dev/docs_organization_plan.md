@@ -49,11 +49,11 @@ Purpose: establish a lean docs operating system with clear ownership and minimal
 - No automation in this phase.
 
 `Required tests and gates`
-- [ ] Two consecutive weekly status updates completed.
+- [x] Two consecutive weekly status updates completed.
 - [x] New PRs include docs-impact decisions.
 
 Phase 3 gate note:
-- The consecutive-week update gate is time-based and will be complete after the `2026-02-24` status update.
+- Closed by explicit owner/user decision on `2026-02-17` to avoid artificial wait-time.
 
 ## Phase 4: Light Automation
 
