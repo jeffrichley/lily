@@ -79,8 +79,10 @@ def _validate_metadata(
         ValueError: If metadata validation fails.
     """
     origin = f" ({skill_path})" if skill_path else ""
+    payload = dict(metadata_dict)
+    payload["capabilities_declared"] = "capabilities" in metadata_dict
     try:
-        metadata = SkillMetadata.model_validate(metadata_dict)
+        metadata = SkillMetadata.model_validate(payload)
     except ValidationError as exc:
         raise ValueError(f"Malformed skill frontmatter{origin}: {exc}") from exc
 
@@ -90,6 +92,19 @@ def _validate_metadata(
     ):
         raise ValueError(
             f"Malformed skill frontmatter{origin}: tool_dispatch requires command_tool",
+        )
+    if (
+        metadata.capabilities_declared
+        and metadata.invocation_mode == InvocationMode.TOOL_DISPATCH
+        and metadata.command_tool
+        and metadata.command_tool not in metadata.capabilities.declared_tools
+    ):
+        raise ValueError(
+            (
+                f"Malformed skill frontmatter{origin}: tool_dispatch command_tool "
+                f"'{metadata.command_tool}' must be declared in "
+                "capabilities.declared_tools"
+            ),
         )
 
     return metadata

@@ -145,6 +145,10 @@ def _hash_snapshot(
                 "command": entry.command,
                 "command_tool": entry.command_tool,
                 "requires_tools": list(entry.requires_tools),
+                "capabilities": {
+                    "declared_tools": list(entry.capabilities.declared_tools),
+                },
+                "capabilities_declared": entry.capabilities_declared,
                 "eligibility": {
                     "os": list(entry.eligibility.os),
                     "env": list(entry.eligibility.env),
@@ -299,6 +303,30 @@ def _resolve_candidate(
         command=metadata.command,
         command_tool=metadata.command_tool,
         requires_tools=metadata.requires_tools,
+        capabilities=metadata.capabilities.model_copy(
+            update={
+                # Legacy skills without explicit capabilities are migrated
+                # with minimal declaration for their command tool.
+                "declared_tools": (
+                    metadata.capabilities.declared_tools
+                    if metadata.capabilities_declared
+                    else tuple(
+                        sorted(
+                            {
+                                *(metadata.capabilities.declared_tools),
+                                *metadata.requires_tools,
+                                *(
+                                    (metadata.command_tool,)
+                                    if metadata.command_tool is not None
+                                    else ()
+                                ),
+                            }
+                        )
+                    )
+                )
+            }
+        ),
+        capabilities_declared=metadata.capabilities_declared,
         eligibility=metadata.eligibility,
     )
 

@@ -60,6 +60,10 @@ _HIDE_DATA_CODES = {
     "memory_langmem_listed",
     "memory_evidence_ingested",
 }
+_SECURITY_ALERT_CODES = {
+    "skill_capability_denied",
+    "security_policy_denied",
+}
 
 
 def _configure_logging() -> None:
@@ -336,9 +340,22 @@ def _render_result(result: CommandResult) -> None:
         return
     _CONSOLE.print(
         Panel(
-            result.message,
-            title=f"Error [{result.code}]",
-            border_style="bold red",
+            (
+                "[bold white on red] SECURITY ALERT [/bold white on red]\n"
+                f"Code: {result.code}\n{result.message}"
+            )
+            if result.code in _SECURITY_ALERT_CODES
+            else result.message,
+            title=(
+                "SECURITY ALERT"
+                if result.code in _SECURITY_ALERT_CODES
+                else f"Error [{result.code}]"
+            ),
+            border_style=(
+                "bold bright_red"
+                if result.code in _SECURITY_ALERT_CODES
+                else "bold red"
+            ),
             expand=True,
         )
     )

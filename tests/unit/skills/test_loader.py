@@ -110,3 +110,73 @@ eligibility:
         for diag in snapshot.diagnostics
     )
     assert any(diag.code == "precedence_conflict" for diag in snapshot.diagnostics)
+
+
+def test_loader_rejects_underdeclared_tool_capability(tmp_path: Path) -> None:
+    """tool_dispatch skill should fail when command tool is undeclared."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+
+    _write_skill(
+        bundled_dir,
+        "add",
+        """---
+summary: add
+invocation_mode: tool_dispatch
+command_tool: add
+capabilities:
+  declared_tools: [subtract]
+---
+# Add
+""",
+    )
+
+    snapshot = build_skill_snapshot(
+        SkillSnapshotRequest(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            platform="linux",
+            env={},
+        )
+    )
+
+    assert [entry.name for entry in snapshot.skills] == []
+    assert any(
+        diag.code == "malformed_frontmatter" and diag.skill_name == "add"
+        for diag in snapshot.diagnostics
+    )
+
+
+def test_loader_migrates_legacy_tool_dispatch_capabilities(tmp_path: Path) -> None:
+    """Legacy tool_dispatch metadata should auto-populate minimal capabilities."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+
+    _write_skill(
+        bundled_dir,
+        "add",
+        """---
+summary: add
+invocation_mode: tool_dispatch
+command_tool: add
+---
+# Add
+""",
+    )
+
+    snapshot = build_skill_snapshot(
+        SkillSnapshotRequest(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            platform="linux",
+            env={},
+        )
+    )
+
+    assert [entry.name for entry in snapshot.skills] == ["add"]
+    assert snapshot.skills[0].capabilities.declared_tools == ("add",)
+    assert snapshot.skills[0].capabilities_declared is False

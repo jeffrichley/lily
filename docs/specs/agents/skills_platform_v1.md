@@ -31,6 +31,8 @@ This feature establishes a secure, deterministic, extensible skills substrate.
 6. Write operations are denied by default and require HITL checkpoint.
 7. Durable backend for approval/provenance is SQLite.
 8. TUI approval UX is deferred; terminal prompt is in scope.
+9. Security-critical decisions are deterministic/rule-based; no LLM policy adjudication in V1 security path.
+10. V1 security DB path is `.lily/db/security.sqlite`.
 
 ## 3. Architecture Contract
 
@@ -90,6 +92,7 @@ Any hash change invalidates prior approval grants.
 Persist in SQLite:
 - approval grants (`run_once`, `always_allow`) keyed by `(agent, skill, hash)`.
 - provenance receipts (hashes, limits, outcome, capped logs metadata).
+- V1 storage location: `.lily/db/security.sqlite`.
 
 ## 4. Migration Plan (Fixed Scope)
 
@@ -97,6 +100,7 @@ Persist in SQLite:
 
 User-visible features:
 - `/skills` diagnostics show capability validation failures.
+- denied or suspicious skill execution paths render high-visibility Rich security alerts in terminal UX.
 
 Internal engineering tasks:
 - extend frontmatter/types for capability contract.
@@ -115,6 +119,7 @@ Non-goals:
 Required tests and gates:
 - skill frontmatter/type validation tests.
 - capability enforcement unit tests.
+- CLI render tests for security-alert presentation on capability-denied/hinky paths.
 - `just quality-check` and `just docs-check`.
 
 ## Phase 2: Provider Registry (Builtin + MCP)

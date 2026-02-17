@@ -33,6 +33,14 @@ class SkillEligibilitySpec(BaseModel):
     binaries: tuple[str, ...] = ()
 
 
+class SkillCapabilitySpec(BaseModel):
+    """Capability declarations enforced during skill invocation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    declared_tools: tuple[str, ...] = ()
+
+
 class SkillMetadata(BaseModel):
     """Parsed metadata derived from SKILL.md frontmatter."""
 
@@ -43,6 +51,8 @@ class SkillMetadata(BaseModel):
     command: str | None = None
     command_tool: str | None = None
     requires_tools: tuple[str, ...] = ()
+    capabilities: SkillCapabilitySpec = Field(default_factory=SkillCapabilitySpec)
+    capabilities_declared: bool = False
     eligibility: SkillEligibilitySpec = Field(default_factory=SkillEligibilitySpec)
 
 
@@ -82,6 +92,8 @@ class SkillEntry(BaseModel):
     command: str | None = None
     command_tool: str | None = None
     requires_tools: tuple[str, ...] = ()
+    capabilities: SkillCapabilitySpec = Field(default_factory=SkillCapabilitySpec)
+    capabilities_declared: bool = False
     eligibility: SkillEligibilitySpec = Field(default_factory=SkillEligibilitySpec)
 
 

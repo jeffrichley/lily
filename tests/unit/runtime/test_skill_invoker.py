@@ -10,7 +10,13 @@ from lily.runtime.executors.llm_orchestration import LlmOrchestrationExecutor
 from lily.runtime.llm_backend.base import LlmRunRequest, LlmRunResponse
 from lily.runtime.skill_invoker import SkillInvoker
 from lily.session.models import ModelConfig, Session
-from lily.skills.types import InvocationMode, SkillEntry, SkillSnapshot, SkillSource
+from lily.skills.types import (
+    InvocationMode,
+    SkillCapabilitySpec,
+    SkillEntry,
+    SkillSnapshot,
+    SkillSource,
+)
 
 
 class _StubLlmBackend:
@@ -112,3 +118,23 @@ def test_invoker_dispatches_to_tool_executor() -> None:
 
     assert result.status.value == "ok"
     assert result.message == "tool:dispatch_me:payload"
+
+
+def test_invoker_denies_undeclared_tool_capability() -> None:
+    """Invoker should deny tool_dispatch entry missing declared tool capability."""
+    executors: tuple[SkillExecutor, ...] = (_EchoToolDispatchExecutor(),)
+    invoker = SkillInvoker(executors=executors)
+    session = _make_session()
+    entry = _make_entry("dispatch_me", InvocationMode.TOOL_DISPATCH).model_copy(
+        update={
+            "command_tool": "add",
+            "capabilities": SkillCapabilitySpec(declared_tools=("subtract",)),
+            "capabilities_declared": True,
+        }
+    )
+
+    result = invoker.invoke(entry, session, "payload")
+
+    assert result.status.value == "error"
+    assert result.code == "skill_capability_denied"
+    assert "undeclared tool 'add'" in result.message

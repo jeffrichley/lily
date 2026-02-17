@@ -55,6 +55,15 @@ Priority scale:
 
 ### P3
 
+- [ ] Consolidate runtime SQLite locations under `.lily/db/`
+  - Owner: `@team`
+  - Target: `TBD`
+  - Current state: SQLite artifacts are split across directories (for example `.lily/checkpoints/checkpointer.sqlite` and planned `.lily/db/security.sqlite`).
+  - Exit criteria:
+    - canonical runtime DB directory is defined as `.lily/db/`
+    - existing SQLite paths (checkpointer and related runtime DBs) are migrated or compatibility-mapped
+    - docs/config defaults are updated and tested for migration safety
+
 - [ ] Add multi-process persistence safety strategy
   - Owner: `@team`
   - Target: `TBD`
