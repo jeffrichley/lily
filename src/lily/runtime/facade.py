@@ -12,11 +12,19 @@ from lily.commands.handlers._memory_support import (
     build_personality_repository,
     build_task_namespace,
     build_task_repository,
+    resolve_store_file,
 )
 from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
-from lily.memory import ConsolidationBackend, PromptMemoryRetrievalService
+from lily.memory import (
+    ConsolidationBackend,
+    ConsolidationRequest,
+    LangMemManagerConsolidationEngine,
+    LangMemToolingAdapter,
+    PromptMemoryRetrievalService,
+    RuleBasedConsolidationEngine,
+)
 from lily.persona import FilePersonaRepository, PersonaProfile, default_persona_root
 from lily.prompting import PersonaContext, PersonaStyleLevel, PromptMode
 from lily.runtime.conversation import (
@@ -64,6 +72,7 @@ class RuntimeFacade:
         consolidation_enabled: bool = False,
         consolidation_backend: ConsolidationBackend = ConsolidationBackend.RULE_BASED,
         consolidation_llm_assisted_enabled: bool = False,
+        consolidation_auto_run_every_n_turns: int = 0,
     ) -> None:
         """Create facade with command and conversation dependencies.
 
@@ -78,7 +87,14 @@ class RuntimeFacade:
             consolidation_enabled: Whether consolidation pipeline is enabled.
             consolidation_backend: Consolidation backend selection.
             consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
+            consolidation_auto_run_every_n_turns: Scheduled consolidation interval.
         """
+        self._consolidation_enabled = consolidation_enabled
+        self._consolidation_backend = consolidation_backend
+        self._consolidation_llm_assisted_enabled = consolidation_llm_assisted_enabled
+        self._consolidation_auto_run_every_n_turns = (
+            consolidation_auto_run_every_n_turns
+        )
         self._persona_repository = persona_repository or FilePersonaRepository(
             root_dir=default_persona_root()
         )
@@ -135,6 +151,7 @@ class RuntimeFacade:
 
         result = self._run_conversation(text=text, session=session)
         self._record_turn(session, user_text=text, assistant_text=result.message)
+        self._maybe_run_scheduled_consolidation(session)
         return result
 
     def _run_conversation(self, *, text: str, session: Session) -> CommandResult:
@@ -293,6 +310,73 @@ class RuntimeFacade:
             consolidation_backend=consolidation_backend,
             consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
         )
+
+    def _maybe_run_scheduled_consolidation(self, session: Session) -> None:
+        """Run periodic consolidation when scheduled interval is met.
+
+        Args:
+            session: Active session.
+        """
+        if not self._should_run_scheduled_consolidation(session):
+            return
+        self._run_scheduled_consolidation(session)
+
+    def _should_run_scheduled_consolidation(self, session: Session) -> bool:
+        """Check whether scheduled consolidation should run for this turn.
+
+        Args:
+            session: Active session.
+
+        Returns:
+            Whether scheduled consolidation should run now.
+        """
+        if not self._consolidation_enabled:
+            return False
+        interval = self._consolidation_auto_run_every_n_turns
+        if interval < 1:
+            return False
+        user_turns = sum(
+            1 for event in session.conversation_state if event.role == MessageRole.USER
+        )
+        return user_turns > 0 and user_turns % interval == 0
+
+    def _run_scheduled_consolidation(self, session: Session) -> None:
+        """Run scheduled consolidation once for current session state.
+
+        Args:
+            session: Active session.
+        """
+        request = ConsolidationRequest(
+            session_id=session.session_id,
+            history=tuple(session.conversation_state),
+            personality_namespace=build_personality_namespace(
+                session=session,
+                domain="user_profile",
+            ),
+            enabled=True,
+            backend=self._consolidation_backend,
+            llm_assisted_enabled=self._consolidation_llm_assisted_enabled,
+            dry_run=False,
+        )
+        try:
+            if self._consolidation_backend == ConsolidationBackend.RULE_BASED:
+                personality_repository = build_personality_repository(session)
+                task_repository = build_task_repository(session)
+                if personality_repository is None:
+                    return
+                RuleBasedConsolidationEngine(
+                    personality_repository=personality_repository,
+                    task_repository=task_repository,
+                ).run(request)
+                return
+            store_file = resolve_store_file(session)
+            if store_file is None:
+                return
+            LangMemManagerConsolidationEngine(
+                tooling_adapter=LangMemToolingAdapter(store_file=store_file)
+            ).run(request)
+        except Exception:  # pragma: no cover - best effort scheduling
+            return
 
     @staticmethod
     def _record_turn(session: Session, *, user_text: str, assistant_text: str) -> None:

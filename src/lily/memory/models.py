@@ -104,3 +104,6 @@ class MemoryQuery(BaseModel):
     namespace: str | None = None
     limit: int = Field(default=5, ge=1, le=20)
     min_confidence: float | None = None
+    include_archived: bool = False
+    include_expired: bool = False
+    include_conflicted: bool = False

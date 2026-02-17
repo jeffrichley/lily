@@ -226,7 +226,7 @@ Goal: reduce custom write/search glue by integrating LangMem tools in controlled
 Goal: add post-run memory consolidation and profile merging.
 
 `User-visible features`
-- [ ] More coherent long-term profile/task memory over time (when enabled).
+- [x] More coherent long-term profile/task memory over time (when enabled).
 
 `Internal engineering tasks`
 - [x] Define consolidation input/output schema.
@@ -236,27 +236,27 @@ Goal: add post-run memory consolidation and profile merging.
 - [x] Add per-backend opt-in controls (`consolidation.enabled`, `consolidation.llm_assisted_enabled`).
 - [x] Add optional LLM-assisted extraction path (guarded, disabled by default).
 - [ ] Implement lifecycle/retention policy from spec:
-  - [ ] `persona_core`: high stability, no expiry by default
-  - [ ] `working_rules`: high stability, no expiry by default
-  - [ ] `user_profile`: periodic reverification with `last_verified`
-  - [ ] `task_memory`: optional namespace expiry/archive metadata
-  - [ ] lifecycle state is metadata-only (no automatic hard deletion)
+  - [x] `persona_core`: high stability, no expiry by default
+  - [x] `working_rules`: high stability, no expiry by default
+  - [x] `user_profile`: periodic reverification with `last_verified`
+  - [x] `task_memory`: optional namespace expiry/archive metadata
+  - [x] lifecycle state is metadata-only (no automatic hard deletion)
 - [ ] Add merge/conflict policy:
-  - [ ] provenance preserved
-  - [ ] confidence updates controlled
-  - [ ] stale/conflicting memory handling
+  - [x] provenance preserved
+  - [x] confidence updates controlled
+  - [x] stale/conflicting memory handling
 - [ ] Add scheduled/triggered execution path.
   - [x] Triggered command path (`/memory long consolidate [--dry-run]`).
-  - [ ] Scheduled/background runner.
+  - [x] Scheduled/background runner.
 
 `Acceptance criteria`
 - [x] Consolidation produces stable, auditable profile updates.
-- [ ] No uncontrolled writes without explicit configuration.
+- [x] No uncontrolled writes without explicit configuration.
 - [x] Rule-based and LangMem-manager backends can each be enabled/disabled by config.
 - [x] Backend selection is deterministic and explicit in runtime metadata/logging.
-- [ ] Expired/archived task memory is excluded from default retrieval unless explicitly requested.
-- [ ] `last_verified` is updated only on explicit confirmation events.
-- [ ] Lifecycle processing performs no automatic hard deletion.
+- [x] Expired/archived task memory is excluded from default retrieval unless explicitly requested.
+- [x] `last_verified` is updated only on explicit confirmation events.
+- [x] Lifecycle processing performs no automatic hard deletion.
 
 `Non-goals`
 - No fully autonomous always-on consolidation by default.
@@ -265,11 +265,11 @@ Goal: add post-run memory consolidation and profile merging.
 
 `Required tests and gates`
 - [x] Consolidation determinism tests.
-- [ ] Provenance/conflict resolution tests.
-- [ ] Configuration guard tests (disabled means no writes).
+- [x] Provenance/conflict resolution tests.
+- [x] Configuration guard tests (disabled means no writes).
 - [x] Backend selection tests (`rule_based` vs `langmem_manager`).
 - [x] Per-backend opt-in/out behavior tests.
-- [ ] Lifecycle policy tests (expiry/archive/reverification behavior, no-delete guarantee).
+- [x] Lifecycle policy tests (expiry/archive/reverification behavior, no-delete guarantee).
 
 ---
 
@@ -401,3 +401,4 @@ Goal: replace custom rule-based history compaction with LangGraph-native state/c
 - 2026-02-17: Phase 3 completed. Added repository-backed retrieval service, deterministic ranking and memory-summary prompt injection, and deterministic context compaction with long-transcript tests.
 - 2026-02-17: Phase 4 completed. Added controlled LangMem manage/search tool routes, global opt-in tooling flags (`enabled`, `auto_apply`), deterministic envelope adapters for tool outputs, and policy/flag regression tests.
 - 2026-02-17: Phase 5 started. Added dual-backend consolidation pipeline (`rule_based` + `langmem_manager`), opt-in backend/config toggles, triggered command path (`/memory long consolidate [--dry-run]`), and deterministic backend selection/behavior tests.
+- 2026-02-17: Phase 5 completed. Added lifecycle visibility controls (`include_archived|include_expired|include_conflicted`), `/memory long verify` reverification path, conflict-group reconciliation behavior, scheduled auto-consolidation (`auto_run_every_n_turns`), and corresponding command/repository/consolidation test coverage.

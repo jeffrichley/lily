@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from _pytest.monkeypatch import MonkeyPatch
@@ -130,3 +131,68 @@ def test_store_query_and_forget_paginate_across_large_namespace_set(
     after = repo.query(MemoryQuery(query="Fact", limit=20))
     assert len(after) == 6
     assert all(record.id != target_id for record in after)
+
+
+def test_store_query_excludes_archived_conflicted_and_expired_by_default(
+    tmp_path: Path,
+) -> None:
+    """Store query should hide archived/conflicted/expired by default."""
+    repo = StoreBackedPersonalityMemoryRepository(
+        store_file=tmp_path / "memory" / "store.sqlite"
+    )
+    now = datetime.now(UTC)
+    repo.remember(
+        MemoryWriteRequest(
+            namespace="user_profile/workspace:workspace/persona:lily",
+            content="active preference",
+            status="verified",
+        )
+    )
+    repo.remember(
+        MemoryWriteRequest(
+            namespace="user_profile/workspace:workspace/persona:lily",
+            content="archived preference",
+            status="archived",
+        )
+    )
+    repo.remember(
+        MemoryWriteRequest(
+            namespace="user_profile/workspace:workspace/persona:lily",
+            content="conflicted preference",
+            status="conflicted",
+        )
+    )
+    repo.remember(
+        MemoryWriteRequest(
+            namespace="user_profile/workspace:workspace/persona:lily",
+            content="expired preference",
+            status="verified",
+            expires_at=now - timedelta(days=1),
+        )
+    )
+
+    visible = repo.query(
+        MemoryQuery(
+            query="*",
+            namespace="user_profile/workspace:workspace/persona:lily",
+            limit=20,
+        )
+    )
+    all_rows = repo.query(
+        MemoryQuery(
+            query="*",
+            namespace="user_profile/workspace:workspace/persona:lily",
+            limit=20,
+            include_archived=True,
+            include_conflicted=True,
+            include_expired=True,
+        )
+    )
+
+    assert {row.content for row in visible} == {"active preference"}
+    assert {
+        "active preference",
+        "archived preference",
+        "conflicted preference",
+        "expired preference",
+    } <= {row.content for row in all_rows}

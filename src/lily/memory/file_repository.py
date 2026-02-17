@@ -17,6 +17,12 @@ from lily.memory.models import (
     MemoryStore,
     MemoryWriteRequest,
 )
+from lily.memory.query_filters import (
+    confidence_matches,
+    content_matches,
+    namespace_matches,
+    status_visible,
+)
 from lily.memory.record_factory import create_memory_record, memory_update_fields
 from lily.memory.repository import PersonalityMemoryRepository, TaskMemoryRepository
 from lily.policy import evaluate_memory_write
@@ -125,21 +131,16 @@ class _FileMemoryStore:
             Ordered matching memory records.
         """
         records = self._load_records()
-        needle = query.query.strip().lower()
         namespace = query.namespace.strip() if query.namespace is not None else None
-        wildcard = needle == "*"
-        matches = []
-        for record in records:
-            if namespace is not None and record.namespace != namespace:
-                continue
-            if (
-                query.min_confidence is not None
-                and record.confidence < query.min_confidence
-            ):
-                continue
-            if not wildcard and needle not in record.content.lower():
-                continue
-            matches.append(record)
+        matches = [
+            record
+            for record in records
+            if _record_visible(
+                query=query,
+                record=record,
+                namespace=namespace,
+            )
+        ]
         ordered = sorted(matches, key=lambda record: record.updated_at, reverse=True)
         return tuple(ordered[: query.limit])
 
@@ -310,3 +311,29 @@ def _fingerprint(namespace: str, content: str) -> str:
     """
     value = f"{namespace.strip().lower()}::{content.strip().lower()}".encode()
     return sha256(value).hexdigest()
+
+
+def _record_visible(
+    *,
+    query: MemoryQuery,
+    record: MemoryRecord,
+    namespace: str | None,
+) -> bool:
+    """Check whether one record passes deterministic visibility filters.
+
+    Args:
+        query: Memory query payload.
+        record: Candidate memory record.
+        namespace: Optional required namespace filter.
+
+    Returns:
+        ``True`` when record is visible and matches query.
+    """
+    return all(
+        (
+            namespace_matches(namespace=namespace, record=record),
+            confidence_matches(query=query, record=record),
+            status_visible(query=query, record=record),
+            content_matches(query=query, record=record),
+        )
+    )

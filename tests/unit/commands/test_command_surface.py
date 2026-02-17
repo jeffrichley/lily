@@ -881,3 +881,113 @@ def test_memory_long_consolidate_langmem_manager_backend(tmp_path: Path) -> None
     assert shown.status.value == "ok"
     assert shown.code == "memory_langmem_listed"
     assert "name is Jeff" in shown.message
+
+
+def test_memory_long_verify_updates_last_verified(tmp_path: Path) -> None:
+    """`/memory long verify` should set verified status and last_verified timestamp."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"remember", "memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade()
+
+    remembered = runtime.handle_input("/remember my favorite editor is vim", session)
+    assert remembered.status.value == "ok"
+    memory_id = str((remembered.data or {}).get("id", ""))
+
+    verified = runtime.handle_input(f"/memory long verify {memory_id}", session)
+    listed = runtime.handle_input(
+        "/memory long show --domain user_profile --include-conflicted favorite",
+        session,
+    )
+
+    assert verified.status.value == "ok"
+    assert verified.code == "memory_verified"
+    assert listed.status.value == "ok"
+    assert listed.data is not None
+    records = listed.data.get("records")
+    assert isinstance(records, list)
+    target = next((item for item in records if item.get("id") == memory_id), None)
+    assert isinstance(target, dict)
+    assert target.get("status") == "verified"
+    assert target.get("last_verified")
+
+
+def test_memory_long_show_excludes_conflicted_unless_requested(tmp_path: Path) -> None:
+    """Conflicted records should be hidden by default and visible when requested."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade(consolidation_enabled=True)
+    session.conversation_state.append(
+        Message(role=MessageRole.USER, content="My favorite color is green")
+    )
+    _ = runtime.handle_input("/memory long consolidate", session)
+    session.conversation_state.append(
+        Message(role=MessageRole.USER, content="My favorite color is blue")
+    )
+    _ = runtime.handle_input("/memory long consolidate", session)
+
+    hidden = runtime.handle_input(
+        "/memory long show --domain user_profile green",
+        session,
+    )
+    visible = runtime.handle_input(
+        "/memory long show --domain user_profile --include-conflicted green",
+        session,
+    )
+
+    assert hidden.status.value == "ok"
+    assert hidden.code == "memory_empty"
+    assert visible.status.value == "ok"
+    assert "favorite color is green" in visible.message
+
+
+def test_scheduled_auto_consolidation_runs_on_interval(tmp_path: Path) -> None:
+    """Scheduled auto consolidation should run on configured conversation interval."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    session.conversation_state.append(
+        Message(role=MessageRole.USER, content="My favorite movie is Inception")
+    )
+    runtime = RuntimeFacade(
+        conversation_executor=_ConversationCaptureExecutor(),
+        consolidation_enabled=True,
+        consolidation_auto_run_every_n_turns=1,
+    )
+
+    _ = runtime.handle_input("hello there", session)
+    shown = runtime.handle_input(
+        "/memory long show --domain user_profile movie",
+        session,
+    )
+
+    assert shown.status.value == "ok"
+    assert "favorite movie is Inception" in shown.message

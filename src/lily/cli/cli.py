@@ -232,6 +232,7 @@ def _build_runtime_for_workspace(
             config.consolidation.backend.value
         ),
         consolidation_llm_assisted_enabled=config.consolidation.llm_assisted_enabled,
+        consolidation_auto_run_every_n_turns=config.consolidation.auto_run_every_n_turns,
     )
 
 

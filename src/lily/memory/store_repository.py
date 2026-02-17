@@ -21,6 +21,12 @@ from lily.memory.models import (
     MemoryStore,
     MemoryWriteRequest,
 )
+from lily.memory.query_filters import (
+    confidence_matches,
+    content_matches,
+    namespace_matches,
+    status_visible,
+)
 from lily.memory.record_factory import create_memory_record, memory_update_fields
 from lily.memory.repository import PersonalityMemoryRepository, TaskMemoryRepository
 from lily.policy import evaluate_memory_write
@@ -368,14 +374,14 @@ def _record_matches(
     Returns:
         Whether record matches query filter criteria.
     """
-    if namespace is not None and record.namespace != namespace:
-        return False
-    if query.min_confidence is not None and record.confidence < query.min_confidence:
-        return False
-    needle = query.query.strip().lower()
-    if needle == "*":
-        return True
-    return needle in record.content.lower()
+    return all(
+        (
+            namespace_matches(namespace=namespace, record=record),
+            confidence_matches(query=query, record=record),
+            status_visible(query=query, record=record),
+            content_matches(query=query, record=record),
+        )
+    )
 
 
 def _domain_prefix(store: MemoryStore) -> tuple[str, ...]:

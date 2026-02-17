@@ -23,6 +23,7 @@ def test_load_global_config_defaults_when_missing(tmp_path: Path) -> None:
     assert config.consolidation.enabled is False
     assert config.consolidation.backend == ConsolidationBackend.RULE_BASED
     assert config.consolidation.llm_assisted_enabled is False
+    assert config.consolidation.auto_run_every_n_turns == 0
 
 
 def test_load_global_config_reads_custom_backend(tmp_path: Path) -> None:
@@ -94,7 +95,7 @@ def test_load_global_config_reads_consolidation_flags(tmp_path: Path) -> None:
     config_path.write_text(
         (
             "{"
-            '"consolidation":{"enabled":true,"backend":"langmem_manager","llm_assisted_enabled":true},'
+            '"consolidation":{"enabled":true,"backend":"langmem_manager","llm_assisted_enabled":true,"auto_run_every_n_turns":3},'
             '"checkpointer":{"backend":"sqlite","sqlite_path":".lily/checkpoints/checkpointer.sqlite"}'
             "}"
         ),
@@ -106,3 +107,4 @@ def test_load_global_config_reads_consolidation_flags(tmp_path: Path) -> None:
     assert config.consolidation.enabled is True
     assert config.consolidation.backend == ConsolidationBackend.LANGMEM_MANAGER
     assert config.consolidation.llm_assisted_enabled is True
+    assert config.consolidation.auto_run_every_n_turns == 3

@@ -9,8 +9,10 @@ from lily.memory import (
     ConsolidationRequest,
     LangMemManagerConsolidationEngine,
     MemoryQuery,
+    MemoryWriteRequest,
     RuleBasedConsolidationEngine,
     StoreBackedPersonalityMemoryRepository,
+    StoreBackedTaskMemoryRepository,
 )
 from lily.memory.langmem_tools import LangMemToolingAdapter
 from lily.session.models import Message, MessageRole
@@ -65,6 +67,47 @@ def test_rule_based_consolidation_extracts_and_writes(tmp_path: Path) -> None:
     assert "name is Jeff" in contents
 
 
+def test_rule_based_consolidation_marks_conflicts(tmp_path: Path) -> None:
+    """Incoming candidate should mark prior conflicting record as conflicted."""
+    repository = StoreBackedPersonalityMemoryRepository(
+        store_file=tmp_path / "memory" / "store.sqlite"
+    )
+    repository.remember(
+        MemoryWriteRequest(
+            namespace="user_profile/workspace:workspace/persona:lily",
+            content="favorite color is green",
+            status="verified",
+            conflict_group="favorite:color",
+        )
+    )
+    engine = RuleBasedConsolidationEngine(personality_repository=repository)
+
+    _ = engine.run(
+        _request(
+            enabled=True,
+            backend=ConsolidationBackend.RULE_BASED,
+            history=(
+                Message(
+                    role=MessageRole.USER,
+                    content="My favorite color is blue",
+                ),
+            ),
+        )
+    )
+
+    all_rows = repository.query(
+        MemoryQuery(
+            query="favorite color",
+            namespace="user_profile/workspace:workspace/persona:lily",
+            limit=20,
+            include_conflicted=True,
+        )
+    )
+    statuses = {row.content: row.status for row in all_rows}
+    assert statuses.get("favorite color is green") == "conflicted"
+    assert statuses.get("favorite color is blue") == "needs_verification"
+
+
 def test_langmem_manager_consolidation_writes(tmp_path: Path) -> None:
     """LangMem-manager engine should persist extracted candidates."""
     adapter = LangMemToolingAdapter(store_file=tmp_path / "memory" / "store.sqlite")
@@ -93,6 +136,44 @@ def test_langmem_manager_consolidation_writes(tmp_path: Path) -> None:
         if isinstance(row.get("value"), dict)
     }
     assert "prefers concise responses" in contents
+
+
+def test_rule_based_consolidation_writes_task_memory_candidates(tmp_path: Path) -> None:
+    """Rule-based backend should persist extracted task facts when repository exists."""
+    personality_repo = StoreBackedPersonalityMemoryRepository(
+        store_file=tmp_path / "memory" / "store.sqlite"
+    )
+    task_repo = StoreBackedTaskMemoryRepository(
+        store_file=tmp_path / "memory" / "store.sqlite"
+    )
+    engine = RuleBasedConsolidationEngine(
+        personality_repository=personality_repo,
+        task_repository=task_repo,
+    )
+
+    result = engine.run(
+        _request(
+            enabled=True,
+            backend=ConsolidationBackend.RULE_BASED,
+            history=(
+                Message(
+                    role=MessageRole.USER,
+                    content="task billing: include tax line item",
+                ),
+            ),
+        )
+    )
+
+    assert result.status == "ok"
+    task_rows = task_repo.query(
+        MemoryQuery(
+            query="tax",
+            namespace="task_memory/task:billing",
+            limit=20,
+        )
+    )
+    assert len(task_rows) == 1
+    assert task_rows[0].content == "include tax line item"
 
 
 def test_consolidation_disabled_returns_disabled_status(tmp_path: Path) -> None:

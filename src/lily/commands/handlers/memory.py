@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from lily.commands.handlers._memory_support import (
@@ -21,6 +22,8 @@ from lily.memory import (
     MemoryError,
     MemoryQuery,
     MemoryRecord,
+    MemorySource,
+    MemoryWriteRequest,
     PersonalityMemoryRepository,
     RuleBasedConsolidationEngine,
     TaskMemoryRepository,
@@ -153,7 +156,9 @@ class MemoryCommand:
             data={"thread_id": session.session_id, "route": "checkpointer"},
         )
 
-    def _run_long(self, *, session: Session, args: tuple[str, ...]) -> CommandResult:
+    def _run_long(  # noqa: PLR0911
+        self, *, session: Session, args: tuple[str, ...]
+    ) -> CommandResult:
         """Execute `/memory long ...` command family.
 
         Args:
@@ -165,7 +170,10 @@ class MemoryCommand:
         """
         if not args:
             return CommandResult.error(
-                "Error: /memory long requires subcommand show|task|tool|consolidate.",
+                (
+                    "Error: /memory long requires subcommand "
+                    "show|task|tool|consolidate|verify."
+                ),
                 code="invalid_args",
                 data={"command": "memory", "subcommand": "long"},
             )
@@ -178,6 +186,8 @@ class MemoryCommand:
             return self._run_long_tool(session=session, args=args[1:])
         if head == "consolidate":
             return self._run_long_consolidate(session=session, args=args[1:])
+        if head == "verify":
+            return self._run_long_verify(session=session, args=args[1:])
         return CommandResult.error(
             f"Error: unsupported /memory long subcommand '{head}'.",
             code="invalid_args",
@@ -212,13 +222,15 @@ class MemoryCommand:
         )
         if self._consolidation_backend == ConsolidationBackend.RULE_BASED:
             repository = build_personality_repository(session)
+            task_repository = build_task_repository(session)
             if repository is None:
                 return CommandResult.error(
                     "Error: memory consolidation is unavailable for this session.",
                     code="memory_unavailable",
                 )
             result = RuleBasedConsolidationEngine(
-                personality_repository=repository
+                personality_repository=repository,
+                task_repository=task_repository,
             ).run(request)
             return self._render_consolidation_result(result)
         store_file = resolve_store_file(session)
@@ -231,6 +243,142 @@ class MemoryCommand:
             tooling_adapter=LangMemToolingAdapter(store_file=store_file)
         ).run(request)
         return self._render_consolidation_result(result)
+
+    def _run_long_verify(
+        self,
+        *,
+        session: Session,
+        args: tuple[str, ...],
+    ) -> CommandResult:
+        """Execute `/memory long verify [--domain <domain>] <memory_id>`.
+
+        Args:
+            session: Active session.
+            args: Verify command args.
+
+        Returns:
+            Deterministic command result.
+        """
+        repository = build_personality_repository(session)
+        if repository is None:
+            return CommandResult.error(
+                "Error: /memory long verify is unavailable for this session.",
+                code="memory_unavailable",
+            )
+        parsed = self._parse_verify_args(args=args)
+        if isinstance(parsed, CommandResult):
+            return parsed
+        effective_domain, memory_id = parsed
+        namespace = build_personality_namespace(
+            session=session,
+            domain=effective_domain,
+        )
+        record, query_error = self._find_personality_record(
+            repository=repository,
+            namespace=namespace,
+            memory_id=memory_id,
+        )
+        if query_error is not None:
+            return query_error
+        assert record is not None
+        updated = repository.remember(
+            MemoryWriteRequest(
+                namespace=record.namespace,
+                content=record.content,
+                source=MemorySource.COMMAND,
+                confidence=record.confidence,
+                tags=record.tags,
+                preference_type=record.preference_type,
+                stability=record.stability,
+                task_id=record.task_id,
+                session_id=session.session_id,
+                status="verified",
+                expires_at=record.expires_at,
+                last_verified=datetime.now(UTC),
+                conflict_group=record.conflict_group,
+            )
+        )
+        return CommandResult.ok(
+            f"Verified memory record '{memory_id}'.",
+            code="memory_verified",
+            data={"id": updated.id, "namespace": updated.namespace},
+        )
+
+    @staticmethod
+    def _parse_verify_args(
+        *,
+        args: tuple[str, ...],
+    ) -> tuple[str, str] | CommandResult:
+        """Parse verify command args.
+
+        Args:
+            args: Verify command args.
+
+        Returns:
+            Parsed domain and memory id, or deterministic arg error.
+        """
+        domain, remaining, error = _parse_optional_flag(args=args, flag="--domain")
+        if error is not None:
+            return error
+        effective_domain = domain or "user_profile"
+        if effective_domain not in _PERSONALITY_DOMAINS:
+            return CommandResult.error(
+                (
+                    "Error: /memory long verify --domain must be one of "
+                    "persona_core|user_profile|working_rules."
+                ),
+                code="invalid_args",
+                data={"domain": effective_domain},
+            )
+        if len(remaining) != 1:
+            return CommandResult.error(
+                "Error: /memory long verify requires exactly one memory id.",
+                code="invalid_args",
+            )
+        memory_id = remaining[0].strip()
+        if not memory_id:
+            return CommandResult.error(
+                "Error: /memory long verify requires exactly one memory id.",
+                code="invalid_args",
+            )
+        return effective_domain, memory_id
+
+    def _find_personality_record(
+        self,
+        *,
+        repository: PersonalityMemoryRepository,
+        namespace: str,
+        memory_id: str,
+    ) -> tuple[MemoryRecord | None, CommandResult | None]:
+        """Find one personality record by id.
+
+        Args:
+            repository: Personality repository.
+            namespace: Namespace path.
+            memory_id: Target record id.
+
+        Returns:
+            Record and optional error tuple.
+        """
+        records, query_error = self._query_personality(
+            repository=repository,
+            namespace=namespace,
+            query="*",
+            include_archived=True,
+            include_expired=True,
+            include_conflicted=True,
+            limit=20,
+        )
+        if query_error is not None:
+            return None, query_error
+        assert records is not None
+        target = next((record for record in records if record.id == memory_id), None)
+        if target is None:
+            return None, CommandResult.error(
+                f"Error: Memory record '{memory_id}' was not found.",
+                code="memory_not_found",
+            )
+        return target, None
 
     def _run_long_show(
         self,
@@ -256,6 +404,15 @@ class MemoryCommand:
         domain, remaining, error = _parse_optional_flag(args=args, flag="--domain")
         if error is not None:
             return error
+        include_archived, remaining = _consume_bool_flag(
+            args=remaining, flag="--include-archived"
+        )
+        include_expired, remaining = _consume_bool_flag(
+            args=remaining, flag="--include-expired"
+        )
+        include_conflicted, remaining = _consume_bool_flag(
+            args=remaining, flag="--include-conflicted"
+        )
         effective_domain = domain or "user_profile"
         if effective_domain not in _PERSONALITY_DOMAINS:
             return CommandResult.error(
@@ -281,6 +438,9 @@ class MemoryCommand:
             repository=repository,
             namespace=namespace,
             query=query,
+            include_archived=include_archived,
+            include_expired=include_expired,
+            include_conflicted=include_conflicted,
         )
         if query_error is not None:
             return query_error
@@ -315,7 +475,7 @@ class MemoryCommand:
         parsed = self._parse_long_task_show_args(args=args)
         if isinstance(parsed, CommandResult):
             return parsed
-        namespace, query = parsed
+        namespace, query, include_archived, include_expired, include_conflicted = parsed
         if self._tooling_enabled and self._tooling_auto_apply:
             return self._run_long_tool_task_show(
                 session=session,
@@ -326,6 +486,9 @@ class MemoryCommand:
             repository=repository,
             namespace=build_task_namespace(task=namespace),
             query=query,
+            include_archived=include_archived,
+            include_expired=include_expired,
+            include_conflicted=include_conflicted,
         )
         if query_error is not None:
             return query_error
@@ -340,7 +503,7 @@ class MemoryCommand:
     def _parse_long_task_show_args(
         *,
         args: tuple[str, ...],
-    ) -> tuple[str, str] | CommandResult:
+    ) -> tuple[str, str, bool, bool, bool] | CommandResult:
         """Parse `/memory long task show --namespace <task> [query]` args.
 
         Args:
@@ -362,7 +525,22 @@ class MemoryCommand:
         if error is not None:
             return error
         assert namespace is not None
-        return namespace, (" ".join(remaining).strip() or "*")
+        include_archived, remaining = _consume_bool_flag(
+            args=remaining, flag="--include-archived"
+        )
+        include_expired, remaining = _consume_bool_flag(
+            args=remaining, flag="--include-expired"
+        )
+        include_conflicted, remaining = _consume_bool_flag(
+            args=remaining, flag="--include-conflicted"
+        )
+        return (
+            namespace,
+            (" ".join(remaining).strip() or "*"),
+            include_archived,
+            include_expired,
+            include_conflicted,
+        )
 
     def _run_long_tool(
         self, *, session: Session, args: tuple[str, ...]
@@ -665,11 +843,15 @@ class MemoryCommand:
         )
 
     @staticmethod
-    def _query_personality(
+    def _query_personality(  # noqa: PLR0913
         *,
         repository: PersonalityMemoryRepository,
         namespace: str,
         query: str,
+        include_archived: bool = False,
+        include_expired: bool = False,
+        include_conflicted: bool = False,
+        limit: int = 10,
     ) -> tuple[tuple[MemoryRecord, ...] | None, CommandResult | None]:
         """Query one personality namespace with deterministic error mapping.
 
@@ -677,24 +859,39 @@ class MemoryCommand:
             repository: Personality repository.
             namespace: Target namespace token.
             query: Query text.
+            include_archived: Whether archived records should be included.
+            include_expired: Whether expired records should be included.
+            include_conflicted: Whether conflicted records should be included.
+            limit: Maximum number of records to return.
 
         Returns:
             Tuple of records-or-none and error-or-none.
         """
         try:
             records = repository.query(
-                MemoryQuery(query=query, namespace=namespace, limit=10)
+                MemoryQuery(
+                    query=query,
+                    namespace=namespace,
+                    limit=limit,
+                    include_archived=include_archived,
+                    include_expired=include_expired,
+                    include_conflicted=include_conflicted,
+                )
             )
         except MemoryError as exc:
             return None, CommandResult.error(f"Error: {exc}", code=exc.code.value)
         return records, None
 
     @staticmethod
-    def _query_task(
+    def _query_task(  # noqa: PLR0913
         *,
         repository: TaskMemoryRepository,
         namespace: str,
         query: str,
+        include_archived: bool = False,
+        include_expired: bool = False,
+        include_conflicted: bool = False,
+        limit: int = 10,
     ) -> tuple[tuple[MemoryRecord, ...] | None, CommandResult | None]:
         """Query task namespace with deterministic error mapping.
 
@@ -702,13 +899,24 @@ class MemoryCommand:
             repository: Task repository.
             namespace: Target task namespace.
             query: Query text.
+            include_archived: Whether archived records should be included.
+            include_expired: Whether expired records should be included.
+            include_conflicted: Whether conflicted records should be included.
+            limit: Maximum number of records to return.
 
         Returns:
             Tuple of records-or-none and error-or-none.
         """
         try:
             records = repository.query(
-                MemoryQuery(query=query, namespace=namespace, limit=10)
+                MemoryQuery(
+                    query=query,
+                    namespace=namespace,
+                    limit=limit,
+                    include_archived=include_archived,
+                    include_expired=include_expired,
+                    include_conflicted=include_conflicted,
+                )
             )
         except MemoryError as exc:
             return None, CommandResult.error(f"Error: {exc}", code=exc.code.value)
@@ -750,6 +958,18 @@ class MemoryCommand:
                         "namespace": record.namespace,
                         "content": record.content,
                         "updated_at": record.updated_at.isoformat(),
+                        "status": record.status,
+                        "last_verified": (
+                            record.last_verified.isoformat()
+                            if record.last_verified is not None
+                            else None
+                        ),
+                        "conflict_group": record.conflict_group,
+                        "expires_at": (
+                            record.expires_at.isoformat()
+                            if record.expires_at is not None
+                            else None
+                        ),
                     }
                     for record in records
                 ],
@@ -925,3 +1145,24 @@ def _parse_required_flag(
             code="invalid_args",
         ),
     )
+
+
+def _consume_bool_flag(
+    *,
+    args: tuple[str, ...],
+    flag: str,
+) -> tuple[bool, tuple[str, ...]]:
+    """Consume boolean flag token when present.
+
+    Args:
+        args: Command token tuple.
+        flag: Boolean flag token.
+
+    Returns:
+        Tuple of flag presence and remaining args.
+    """
+    tokens = list(args)
+    if flag not in tokens:
+        return False, tuple(tokens)
+    tokens.remove(flag)
+    return True, tuple(tokens)

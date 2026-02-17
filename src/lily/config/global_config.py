@@ -6,7 +6,7 @@ import json
 from enum import StrEnum
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 
 class CheckpointerBackend(StrEnum):
@@ -51,6 +51,7 @@ class ConsolidationSettings(BaseModel):
     enabled: bool = False
     backend: ConsolidationBackend = ConsolidationBackend.RULE_BASED
     llm_assisted_enabled: bool = False
+    auto_run_every_n_turns: int = Field(default=0, ge=0)
 
 
 class LilyGlobalConfig(BaseModel):
