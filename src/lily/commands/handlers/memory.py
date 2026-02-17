@@ -6,6 +6,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from lily.commands.handlers._memory_support import (
+    build_evidence_namespace,
+    build_evidence_repository,
     build_personality_namespace,
     build_personality_repository,
     build_task_namespace,
@@ -18,6 +20,7 @@ from lily.memory import (
     ConsolidationBackend,
     ConsolidationRequest,
     ConsolidationResult,
+    FileBackedEvidenceRepository,
     LangMemManagerConsolidationEngine,
     MemoryError,
     MemoryQuery,
@@ -85,7 +88,7 @@ class MemoryCommand:
         if head == "long":
             return self._run_long(session=session, args=call.args[1:])
         if head == "evidence":
-            return self._run_evidence(args=call.args[1:])
+            return self._run_evidence(session=session, args=call.args[1:])
         return CommandResult.error(
             f"Error: unsupported /memory subcommand '{head}'.",
             code="invalid_args",
@@ -820,26 +823,150 @@ class MemoryCommand:
             )
         return LangMemToolingAdapter(store_file=store_file), None
 
-    @staticmethod
-    def _run_evidence(args: tuple[str, ...]) -> CommandResult:
-        """Execute `/memory evidence ...` placeholder path.
+    def _run_evidence(
+        self,
+        *,
+        session: Session,
+        args: tuple[str, ...],
+    ) -> CommandResult:
+        """Execute `/memory evidence show|ingest` command family.
 
         Args:
+            session: Active session.
             args: Evidence-memory tokens.
 
         Returns:
-            Deterministic placeholder result.
+            Deterministic command result.
         """
-        if not args or args[0] != "show":
+        repository = build_evidence_repository(session)
+        if repository is None:
             return CommandResult.error(
-                "Error: /memory evidence currently supports only 'show'.",
+                "Error: /memory evidence is unavailable for this session.",
+                code="memory_unavailable",
+            )
+        if not args:
+            return CommandResult.error(
+                "Error: /memory evidence requires subcommand show|ingest.",
                 code="invalid_args",
                 data={"command": "memory", "subcommand": "evidence"},
             )
+        namespace = build_evidence_namespace(session=session)
+        head = args[0]
+        if head == "ingest":
+            return self._run_evidence_ingest(
+                repository=repository,
+                namespace=namespace,
+                args=args[1:],
+            )
+        if head == "show":
+            return self._run_evidence_show(
+                repository=repository,
+                namespace=namespace,
+                args=args[1:],
+            )
+        return CommandResult.error(
+            f"Error: unsupported /memory evidence subcommand '{head}'.",
+            code="invalid_args",
+            data={"command": "memory", "subcommand": "evidence"},
+        )
+
+    @staticmethod
+    def _run_evidence_ingest(
+        *,
+        repository: FileBackedEvidenceRepository,
+        namespace: str,
+        args: tuple[str, ...],
+    ) -> CommandResult:
+        """Execute `/memory evidence ingest <path_or_ref>`.
+
+        Args:
+            repository: Evidence repository implementation.
+            namespace: Evidence namespace token.
+            args: Ingest args.
+
+        Returns:
+            Deterministic command result.
+        """
+        path_or_ref = " ".join(args).strip()
+        if not path_or_ref:
+            return CommandResult.error(
+                "Error: /memory evidence ingest requires a path.",
+                code="invalid_args",
+                data={"command": "memory", "subcommand": "evidence ingest"},
+            )
+        try:
+            rows = repository.ingest(namespace=namespace, path_or_ref=path_or_ref)
+        except MemoryError as exc:
+            return CommandResult.error(f"Error: {exc}", code=exc.code.value)
         return CommandResult.ok(
-            "Semantic evidence memory is not enabled yet.",
-            code="memory_evidence_unavailable",
-            data={"route": "placeholder"},
+            f"Ingested {len(rows)} evidence chunk(s).",
+            code="memory_evidence_ingested",
+            data={
+                "route": "semantic_evidence",
+                "namespace": namespace,
+                "source": path_or_ref,
+                "chunks": len(rows),
+                "non_canonical": True,
+            },
+        )
+
+    @staticmethod
+    def _run_evidence_show(
+        *,
+        repository: FileBackedEvidenceRepository,
+        namespace: str,
+        args: tuple[str, ...],
+    ) -> CommandResult:
+        """Execute `/memory evidence show [query]`.
+
+        Args:
+            repository: Evidence repository implementation.
+            namespace: Evidence namespace token.
+            args: Show args.
+
+        Returns:
+            Deterministic command result.
+        """
+        query = " ".join(args).strip() or "*"
+        try:
+            hits = repository.query(namespace=namespace, query=query, limit=10)
+        except MemoryError as exc:
+            return CommandResult.error(f"Error: {exc}", code=exc.code.value)
+        if not hits:
+            return CommandResult.ok(
+                "No semantic evidence hits found.",
+                code="memory_evidence_empty",
+                data={
+                    "query": query,
+                    "records": [],
+                    "route": "semantic_evidence",
+                    "non_canonical": True,
+                    "canonical_precedence": "structured_long_term",
+                },
+            )
+        lines = [
+            f"{hit.snippet} [{hit.citation}] (score={hit.score:.3f})" for hit in hits
+        ]
+        return CommandResult.ok(
+            "\n".join(lines),
+            code="memory_evidence_listed",
+            data={
+                "query": query,
+                "records": [
+                    {
+                        "id": hit.id,
+                        "namespace": hit.namespace,
+                        "source": hit.source_ref,
+                        "citation": hit.citation,
+                        "score": hit.score,
+                        "content": hit.snippet,
+                    }
+                    for hit in hits
+                ],
+                "route": "semantic_evidence",
+                "non_canonical": True,
+                "canonical_precedence": "structured_long_term",
+            },
         )
 
     @staticmethod

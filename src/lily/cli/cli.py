@@ -51,6 +51,7 @@ _HIDE_DATA_CODES = {
     "memory_deleted",
     "memory_langmem_saved",
     "memory_langmem_listed",
+    "memory_evidence_ingested",
 }
 
 
@@ -300,6 +301,7 @@ def _render_rich_success(result: CommandResult) -> bool:
         "agent_shown": _render_agent_show,
         "memory_listed": _render_memory_list,
         "memory_langmem_listed": _render_memory_list,
+        "memory_evidence_listed": _render_evidence_list,
     }
     renderer = renderers.get(result.code)
     if renderer is None:
@@ -437,6 +439,49 @@ def _render_memory_list(result: CommandResult) -> bool:
             str(record.get("content", "")),
         )
     _CONSOLE.print(table)
+    return True
+
+
+def _render_evidence_list(result: CommandResult) -> bool:
+    """Render `/memory evidence show` records with citation + score.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when table render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    raw_records = data.get("records") if data is not None else None
+    if not isinstance(raw_records, list):
+        return False
+    table = Table(
+        title=f"Semantic Evidence ({len(raw_records)} hits)",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Score", style="green", no_wrap=True)
+    table.add_column("Citation", style="magenta")
+    table.add_column("Snippet")
+    for record in raw_records:
+        if not isinstance(record, dict):
+            continue
+        score = float(record.get("score", 0.0))
+        table.add_row(
+            f"{score:.3f}",
+            str(record.get("citation", "")),
+            str(record.get("content", "")),
+        )
+    _CONSOLE.print(table)
+    _CONSOLE.print(
+        Panel(
+            "Evidence results are non-canonical context. "
+            "Structured long-term memory remains the source of truth.",
+            title="Evidence Policy",
+            border_style="yellow",
+            expand=True,
+        )
+    )
     return True
 
 

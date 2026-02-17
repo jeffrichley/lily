@@ -7,6 +7,10 @@ from lily.memory.consolidation import (
     LangMemManagerConsolidationEngine,
     RuleBasedConsolidationEngine,
 )
+from lily.memory.evidence_repository import (
+    EvidenceHit,
+    FileBackedEvidenceRepository,
+)
 from lily.memory.file_repository import (
     FileBackedPersonalityMemoryRepository,
     FileBackedTaskMemoryRepository,
@@ -32,6 +36,8 @@ __all__ = [
     "ConsolidationBackend",
     "ConsolidationRequest",
     "ConsolidationResult",
+    "EvidenceHit",
+    "FileBackedEvidenceRepository",
     "FileBackedPersonalityMemoryRepository",
     "FileBackedTaskMemoryRepository",
     "LangMemManagerConsolidationEngine",

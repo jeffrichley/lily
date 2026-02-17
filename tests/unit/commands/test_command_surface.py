@@ -619,7 +619,84 @@ def test_memory_command_family_long_short_and_evidence_paths(tmp_path: Path) -> 
 
     evidence_show = runtime.handle_input("/memory evidence show", session)
     assert evidence_show.status.value == "ok"
-    assert evidence_show.code == "memory_evidence_unavailable"
+    assert evidence_show.code == "memory_evidence_empty"
+
+
+def test_memory_evidence_ingest_and_show_with_citations(tmp_path: Path) -> None:
+    """`/memory evidence` should ingest local text and return cited hits."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    notes = tmp_path / "architecture_notes.txt"
+    notes.write_text(
+        (
+            "Agent memory design should preserve canonical precedence.\n"
+            "Evidence retrieval is non-canonical context for recall support.\n"
+        ),
+        encoding="utf-8",
+    )
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade()
+
+    ingested = runtime.handle_input(f"/memory evidence ingest {notes}", session)
+    shown = runtime.handle_input("/memory evidence show canonical precedence", session)
+
+    assert ingested.status.value == "ok"
+    assert ingested.code == "memory_evidence_ingested"
+    assert shown.status.value == "ok"
+    assert shown.code == "memory_evidence_listed"
+    assert shown.data is not None
+    assert shown.data.get("non_canonical") is True
+    assert shown.data.get("canonical_precedence") == "structured_long_term"
+    assert "architecture_notes.txt#chunk-" in shown.message
+
+
+def test_memory_evidence_results_remain_non_canonical_vs_structured(
+    tmp_path: Path,
+) -> None:
+    """Contradicting evidence should remain non-canonical versus structured memory."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    notes = tmp_path / "prefs.txt"
+    notes.write_text(
+        "User favorite color is red from an old transcript.",
+        encoding="utf-8",
+    )
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"remember", "memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade()
+
+    _ = runtime.handle_input("/remember favorite color is blue", session)
+    _ = runtime.handle_input(f"/memory evidence ingest {notes}", session)
+
+    structured = runtime.handle_input(
+        "/memory long show --domain user_profile favorite color",
+        session,
+    )
+    evidence = runtime.handle_input("/memory evidence show favorite color", session)
+
+    assert structured.status.value == "ok"
+    assert "favorite color is blue" in structured.message
+    assert evidence.status.value == "ok"
+    assert evidence.data is not None
+    assert evidence.data.get("non_canonical") is True
+    assert evidence.data.get("canonical_precedence") == "structured_long_term"
 
 
 def test_memory_long_show_domain_isolation(tmp_path: Path) -> None:

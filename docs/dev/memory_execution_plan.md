@@ -235,17 +235,17 @@ Goal: add post-run memory consolidation and profile merging.
 - [x] Add backend selection config (`consolidation.backend = rule_based|langmem_manager`).
 - [x] Add per-backend opt-in controls (`consolidation.enabled`, `consolidation.llm_assisted_enabled`).
 - [x] Add optional LLM-assisted extraction path (guarded, disabled by default).
-- [ ] Implement lifecycle/retention policy from spec:
+- [x] Implement lifecycle/retention policy from spec:
   - [x] `persona_core`: high stability, no expiry by default
   - [x] `working_rules`: high stability, no expiry by default
   - [x] `user_profile`: periodic reverification with `last_verified`
   - [x] `task_memory`: optional namespace expiry/archive metadata
   - [x] lifecycle state is metadata-only (no automatic hard deletion)
-- [ ] Add merge/conflict policy:
+- [x] Add merge/conflict policy:
   - [x] provenance preserved
   - [x] confidence updates controlled
   - [x] stale/conflicting memory handling
-- [ ] Add scheduled/triggered execution path.
+- [x] Add scheduled/triggered execution path.
   - [x] Triggered command path (`/memory long consolidate [--dry-run]`).
   - [x] Scheduled/background runner.
 
@@ -278,28 +278,28 @@ Goal: add post-run memory consolidation and profile merging.
 Goal: add semantic retrieval for large artifacts while preserving structured truth.
 
 `User-visible features`
-- [ ] Evidence retrieval for large artifacts with citations.
-- [ ] Explicitly labeled evidence outputs (`non-canonical`).
+- [x] Evidence retrieval for large artifacts with citations.
+- [x] Explicitly labeled evidence outputs (`non-canonical`).
 
 `Internal engineering tasks`
-- [ ] Add vector/evidence store abstraction.
-- [ ] Add ingestion path for long artifacts (transcripts/notes/logs).
-- [ ] Add retrieval API returning evidence citations.
-- [ ] Keep structured memory as canonical in resolver policy.
-- [ ] Complete `/memory evidence ...` command functionality.
+- [x] Add vector/evidence store abstraction.
+- [x] Add ingestion path for long artifacts (transcripts/notes/logs).
+- [x] Add retrieval API returning evidence citations.
+- [x] Keep structured memory as canonical in resolver policy.
+- [x] Complete `/memory evidence ...` command functionality.
 
 `Acceptance criteria`
-- [ ] Semantic retrieval improves recall without overriding canonical records.
-- [ ] Evidence outputs include citation/provenance metadata.
+- [x] Semantic retrieval improves recall without overriding canonical records.
+- [x] Evidence outputs include citation/provenance metadata.
 
 `Non-goals`
 - No semantic-results-only decision path for canonical memory facts.
 - No silent override of structured memory by similarity hits.
 
 `Required tests and gates`
-- [ ] Contradiction handling tests (structured vs semantic evidence).
-- [ ] Evidence citation integrity tests.
-- [ ] Canonical precedence policy tests.
+- [x] Contradiction handling tests (structured vs semantic evidence).
+- [x] Evidence citation integrity tests.
+- [x] Canonical precedence policy tests.
 
 ---
 
@@ -402,3 +402,4 @@ Goal: replace custom rule-based history compaction with LangGraph-native state/c
 - 2026-02-17: Phase 4 completed. Added controlled LangMem manage/search tool routes, global opt-in tooling flags (`enabled`, `auto_apply`), deterministic envelope adapters for tool outputs, and policy/flag regression tests.
 - 2026-02-17: Phase 5 started. Added dual-backend consolidation pipeline (`rule_based` + `langmem_manager`), opt-in backend/config toggles, triggered command path (`/memory long consolidate [--dry-run]`), and deterministic backend selection/behavior tests.
 - 2026-02-17: Phase 5 completed. Added lifecycle visibility controls (`include_archived|include_expired|include_conflicted`), `/memory long verify` reverification path, conflict-group reconciliation behavior, scheduled auto-consolidation (`auto_run_every_n_turns`), and corresponding command/repository/consolidation test coverage.
+- 2026-02-17: Phase 6 completed. Replaced evidence placeholder with working semantic evidence layer (`/memory evidence ingest|show`), added evidence repository abstraction, citation-bearing retrieval output, explicit non-canonical policy labeling, contradiction/precedence command tests, and CLI evidence table rendering.

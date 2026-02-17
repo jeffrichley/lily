@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from lily.memory import (
+    FileBackedEvidenceRepository,
     FileBackedPersonalityMemoryRepository,
     FileBackedTaskMemoryRepository,
     PersonalityMemoryRepository,
@@ -109,6 +110,34 @@ def build_task_namespace(*, task: str) -> str:
     """
     cleaned = task.strip() or "default"
     return "/".join(("task_memory", f"task:{cleaned}"))
+
+
+def build_evidence_namespace(*, session: Session) -> str:
+    """Build deterministic evidence namespace token.
+
+    Args:
+        session: Active session.
+
+    Returns:
+        Evidence namespace token.
+    """
+    scope = _memory_owner_scope(session)
+    return "/".join(("evidence", scope))
+
+
+def build_evidence_repository(session: Session) -> FileBackedEvidenceRepository | None:
+    """Build file-backed semantic evidence repository.
+
+    Args:
+        session: Active session.
+
+    Returns:
+        Evidence repository when session can resolve storage.
+    """
+    root = resolve_memory_root(session)
+    if root is None:
+        return None
+    return FileBackedEvidenceRepository(root_dir=root)
 
 
 def _memory_owner_scope(session: Session) -> str:
