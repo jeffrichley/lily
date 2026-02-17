@@ -34,16 +34,6 @@ Priority scale:
 
 ### P2
 
-- [ ] Add typed skill/tool contracts (input/output schemas)
-  - Owner: `@team`
-  - Target: `TBD`
-  - Current state: typed I/O validation is implemented for `tool_dispatch` command tools, but generalized skill-declared I/O contracts are not yet implemented across all skills/modes.
-  - Exit criteria:
-    - skill metadata supports optional skill-declared input/output schema fields
-    - runtime validates input pre-execution and output post-execution for both `tool_dispatch` and `llm_orchestration`
-    - deterministic validation errors are stable across both execution modes
-    - at least 2 non-demo skills use skill-declared typed I/O end-to-end
-
 - [ ] Add real `/agent <name>` once agent subsystem exists
   - Owner: `@team`
   - Target: `TBD`
@@ -82,6 +72,15 @@ Priority scale:
     - `docs/dev/roadmap.md` updated with explicit status ownership and current execution rule
 
 ## Recently Closed Debt
+
+- [x] Add typed skill/tool contracts (input/output schemas)
+  - Closed: `2026-02-17`
+  - Evidence:
+    - phase completion: `docs/dev/skills_platform_execution_plan.md`
+    - base contract defaults: `src/lily/runtime/executors/tool_base.py`
+    - contract conformance lane: `just contract-conformance`
+    - deterministic envelope snapshots: `tests/contracts/contract_envelopes.snapshot.json`
+    - wrapper compatibility coverage: `tests/unit/contracts/test_langchain_wrappers.py`
 
 - [x] Warning-clean test/runtime policy established and enforced
   - Closed: `2026-02-17`

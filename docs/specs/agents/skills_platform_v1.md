@@ -7,9 +7,14 @@ source_of_truth: true
 
 # Skills Platform V1
 
-Status: Proposed  
+Status: Implemented (Completed 2026-02-17)  
 Date: 2026-02-17  
 Scope: skill capability contracts, provider registry, isolated code-backed skills, security policy, and typed I/O governance.
+
+Implementation trace:
+- execution plan: `docs/dev/skills_platform_execution_plan.md`
+- exercise runbook: `docs/ops/skills_platform_v1_exercise_guide.md`
+- tool authoring workflow: `docs/dev/skills_tool_authoring.md`
 
 ## 1. Why This Feature Exists
 

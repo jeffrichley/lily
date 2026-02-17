@@ -28,6 +28,9 @@ Update cadence:
 - [x] Phase 4 docs automation implemented (`docs-check` + auto-frontmatter fix tooling).
 - [x] Placeholder frontmatter values replaced and docs quality gate is green (`c6dfd41`).
 - [x] Docs organization program closed by explicit owner decision on `2026-02-17`.
+- [x] Skills Platform V1 completed through Phase 4 (`77eb4df`).
+- [x] Contract conformance gate added and wired into CI (`just contract-conformance`, `ci-gates`).
+- [x] Skills runbook and authoring workflow docs added and promoted to canonical docs map.
 
 ## In Progress
 
@@ -35,7 +38,7 @@ Update cadence:
 
 ## Next Up
 
-- [ ] Apply this same phase-contract template to the next docs/process initiative.
+- [ ] Start supervisor/sub-agent feature planning and execution.
 
 ## Blockers and Risks
 
@@ -48,7 +51,9 @@ Update cadence:
 | Work item | Type | Canonical trace |
 |---|---|---|
 | Docs governance rollout (closed) | Internal engineering task | `docs/archive/dev/docs_organization_plan.md` |
-| Typed skill/tool contracts | Internal engineering task | `docs/dev/debt_tracker.md` |
+| Skills platform execution (closed) | User-visible + internal | `docs/dev/skills_platform_execution_plan.md` |
+| Skills authoring workflow | Internal engineering task | `docs/dev/skills_tool_authoring.md` |
+| Skills platform exercise runbook | Internal engineering task | `docs/ops/skills_platform_v1_exercise_guide.md` |
 | Memory migration scope/status | User-visible + internal | `docs/dev/memory_execution_plan.md` |
 | Personality subsystem scope/status | User-visible + internal | `docs/dev/personality_execution_plan.md` |
 | Feature priority order | User-visible features + internal engineering tasks | `docs/dev/roadmap.md` |
@@ -57,6 +62,9 @@ Update cadence:
 
 - Roadmap: `docs/dev/roadmap.md`
 - Debt tracker: `docs/dev/debt_tracker.md`
+- Skills platform execution plan: `docs/dev/skills_platform_execution_plan.md`
+- Skills tool authoring: `docs/dev/skills_tool_authoring.md`
+- Skills exercise runbook: `docs/ops/skills_platform_v1_exercise_guide.md`
 - Memory execution plan: `docs/dev/memory_execution_plan.md`
 - Personality execution plan: `docs/dev/personality_execution_plan.md`
 - Archive index: `docs/archive/README.md`
