@@ -6,6 +6,7 @@ import json
 from enum import StrEnum
 from pathlib import Path
 
+import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 
@@ -73,7 +74,7 @@ class CompactionSettings(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    backend: CompactionBackend = CompactionBackend.RULE_BASED
+    backend: CompactionBackend = CompactionBackend.LANGGRAPH_NATIVE
     max_tokens: int = Field(default=1000, ge=1)
 
 
@@ -104,6 +105,42 @@ class GlobalConfigError(RuntimeError):
     """Raised when global config cannot be decoded or validated."""
 
 
+def _decode_config_payload(path: Path) -> dict[str, object]:
+    """Decode global config payload from JSON or YAML.
+
+    Args:
+        path: Config file path.
+
+    Returns:
+        Parsed mapping payload.
+
+    Raises:
+        GlobalConfigError: If decode fails or payload is not an object.
+    """
+    raw = path.read_text(encoding="utf-8")
+    suffix = path.suffix.lower()
+    if suffix == ".json":
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise GlobalConfigError(f"Invalid global config JSON: {exc}") from exc
+    elif suffix in {".yaml", ".yml"}:
+        try:
+            payload = yaml.safe_load(raw)
+        except yaml.YAMLError as exc:
+            raise GlobalConfigError(f"Invalid global config YAML: {exc}") from exc
+    else:
+        try:
+            payload = yaml.safe_load(raw)
+        except yaml.YAMLError as exc:
+            raise GlobalConfigError(f"Invalid global config payload: {exc}") from exc
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        raise GlobalConfigError("Invalid global config payload: root must be an object")
+    return payload
+
+
 def load_global_config(path: Path) -> LilyGlobalConfig:
     """Load global Lily config from disk, defaulting when missing.
 
@@ -118,10 +155,7 @@ def load_global_config(path: Path) -> LilyGlobalConfig:
     """
     if not path.exists():
         return LilyGlobalConfig()
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise GlobalConfigError(f"Invalid global config JSON: {exc}") from exc
+    payload = _decode_config_payload(path)
     try:
         return LilyGlobalConfig.model_validate(payload)
     except ValidationError as exc:

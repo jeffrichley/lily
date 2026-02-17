@@ -82,7 +82,7 @@ class RuntimeFacade:
         consolidation_auto_run_every_n_turns: int = 0,
         evidence_chunking: EvidenceChunkingSettings | None = None,
         compaction_backend: HistoryCompactionBackend = (
-            HistoryCompactionBackend.RULE_BASED
+            HistoryCompactionBackend.LANGGRAPH_NATIVE
         ),
         compaction_max_tokens: int = 1000,
     ) -> None:

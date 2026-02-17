@@ -9,6 +9,7 @@ from typing import Annotated
 
 import click
 import typer
+import yaml
 from rich.console import Console
 from rich.json import JSON
 from rich.logging import RichHandler
@@ -126,7 +127,62 @@ def _default_global_config_file(workspace_dir: Path) -> Path:
         Global config file path.
     """
     workspace_dir.mkdir(parents=True, exist_ok=True)
-    return workspace_dir.parent / "config.json"
+    yaml_path = workspace_dir.parent / "config.yaml"
+    json_path = workspace_dir.parent / "config.json"
+    if yaml_path.exists():
+        return yaml_path
+    if json_path.exists():
+        return json_path
+    return yaml_path
+
+
+def _bootstrap_workspace(
+    *,
+    workspace_dir: Path,
+    config_file: Path | None = None,
+    overwrite_config: bool = False,
+) -> tuple[Path, Path, tuple[tuple[str, str], ...]]:
+    """Bootstrap local Lily workspace artifacts.
+
+    Args:
+        workspace_dir: Workspace skills directory path.
+        config_file: Optional global config path override.
+        overwrite_config: Whether to overwrite existing config payload.
+
+    Returns:
+        Effective workspace dir, config file path, and action rows.
+    """
+    effective_workspace_dir = workspace_dir
+    effective_config_file = config_file or _default_global_config_file(
+        effective_workspace_dir
+    )
+    targets = {
+        "workspace_skills_dir": effective_workspace_dir,
+        "checkpoints_dir": effective_workspace_dir.parent / "checkpoints",
+        "memory_dir": effective_workspace_dir.parent / "memory",
+    }
+    actions: list[tuple[str, str]] = []
+    for name, path in targets.items():
+        existed = path.exists()
+        path.mkdir(parents=True, exist_ok=True)
+        actions.append((name, "exists" if existed else "created"))
+    config_existed = effective_config_file.exists()
+    if not config_existed or overwrite_config:
+        effective_config_file.parent.mkdir(parents=True, exist_ok=True)
+        payload = LilyGlobalConfig().model_dump(mode="json")
+        effective_config_file.write_text(
+            yaml.safe_dump(payload, sort_keys=False),
+            encoding="utf-8",
+        )
+        actions.append(
+            (
+                "config_file",
+                "overwritten" if config_existed and overwrite_config else "created",
+            )
+        )
+    else:
+        actions.append(("config_file", "exists"))
+    return effective_workspace_dir, effective_config_file, tuple(actions)
 
 
 def _build_session(
@@ -623,6 +679,58 @@ def _execute_once(  # noqa: PLR0913
     return 0 if result.status == CommandStatus.OK else 1
 
 
+@app.command("init")
+def init_command(
+    workspace_dir: Annotated[
+        Path | None,
+        typer.Option(file_okay=False, dir_okay=True, help="Workspace skills root."),
+    ] = None,
+    config_file: Annotated[
+        Path | None,
+        typer.Option(
+            file_okay=True,
+            dir_okay=False,
+            help="Path to global Lily config YAML/JSON file.",
+        ),
+    ] = None,
+    overwrite_config: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite-config",
+            help="Overwrite existing config file with default template.",
+        ),
+    ] = False,
+) -> None:
+    """Initialize Lily workspace files and directories.
+
+    Args:
+        workspace_dir: Optional workspace skills root override.
+        config_file: Optional global config file path override.
+        overwrite_config: Whether to overwrite existing config payload.
+    """
+    _configure_logging()
+    effective_workspace_dir = workspace_dir or _default_workspace_dir()
+    _, effective_config_file, actions = _bootstrap_workspace(
+        workspace_dir=effective_workspace_dir,
+        config_file=config_file,
+        overwrite_config=overwrite_config,
+    )
+    table = Table(title="Lily Init", show_header=True, header_style="bold cyan")
+    table.add_column("Resource", style="bold")
+    table.add_column("Status", style="green")
+    for resource, status in actions:
+        table.add_row(resource, status)
+    _CONSOLE.print(table)
+    _CONSOLE.print(
+        Panel(
+            (f"Workspace: {effective_workspace_dir}\nConfig: {effective_config_file}"),
+            title="Initialized",
+            border_style="green",
+            expand=True,
+        )
+    )
+
+
 @app.command("run")
 def run_command(  # noqa: PLR0913
     text: Annotated[str, typer.Argument(help="Single input line to execute.")],
@@ -651,7 +759,7 @@ def run_command(  # noqa: PLR0913
         typer.Option(
             file_okay=True,
             dir_okay=False,
-            help="Path to global Lily config JSON file.",
+            help="Path to global Lily config YAML/JSON file.",
         ),
     ] = None,
 ) -> None:
@@ -712,7 +820,7 @@ def repl_command(
         typer.Option(
             file_okay=True,
             dir_okay=False,
-            help="Path to global Lily config JSON file.",
+            help="Path to global Lily config YAML/JSON file.",
         ),
     ] = None,
 ) -> None:

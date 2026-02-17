@@ -111,7 +111,7 @@ class HistoryCompactionConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    backend: HistoryCompactionBackend = HistoryCompactionBackend.RULE_BASED
+    backend: HistoryCompactionBackend = HistoryCompactionBackend.LANGGRAPH_NATIVE
     max_tokens: int = 1000
 
     @model_validator(mode="after")

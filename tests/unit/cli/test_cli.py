@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import yaml
 from _pytest.monkeypatch import MonkeyPatch
 from typer.testing import CliRunner
 
@@ -417,3 +418,94 @@ def test_run_creates_default_sqlite_checkpointer_file(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert checkpointer_file.exists()
+
+
+def test_init_bootstraps_workspace_and_default_config(tmp_path: Path) -> None:
+    """`lily init` should create workspace directories and default config file."""
+    workspace_dir = tmp_path / ".lily" / "skills"
+    config_file = tmp_path / ".lily" / "config.yaml"
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "init",
+            "--workspace-dir",
+            str(workspace_dir),
+            "--config-file",
+            str(config_file),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert workspace_dir.exists()
+    assert (workspace_dir.parent / "checkpoints").exists()
+    assert (workspace_dir.parent / "memory").exists()
+    assert config_file.exists()
+    payload = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+    assert payload["checkpointer"]["backend"] == "sqlite"
+    assert payload["compaction"]["backend"] in {"rule_based", "langgraph_native"}
+
+
+def test_init_does_not_overwrite_existing_config_without_flag(tmp_path: Path) -> None:
+    """`lily init` should keep existing config unless overwrite flag is set."""
+    workspace_dir = tmp_path / ".lily" / "skills"
+    config_file = tmp_path / ".lily" / "config.yaml"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(
+        json.dumps(
+            {
+                "checkpointer": {
+                    "backend": "memory",
+                    "sqlite_path": ".lily/checkpoints/checkpointer.sqlite",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "init",
+            "--workspace-dir",
+            str(workspace_dir),
+            "--config-file",
+            str(config_file),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+    assert payload["checkpointer"]["backend"] == "memory"
+
+
+def test_init_uses_existing_json_config_when_yaml_missing(tmp_path: Path) -> None:
+    """`lily init` should preserve legacy config.json when already present."""
+    workspace_dir = tmp_path / ".lily" / "skills"
+    config_file = tmp_path / ".lily" / "config.json"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(
+        json.dumps(
+            {
+                "checkpointer": {
+                    "backend": "memory",
+                    "sqlite_path": ".lily/checkpoints/checkpointer.sqlite",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "init",
+            "--workspace-dir",
+            str(workspace_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert not (tmp_path / ".lily" / "config.yaml").exists()
+    payload = json.loads(config_file.read_text(encoding="utf-8"))
+    assert payload["checkpointer"]["backend"] == "memory"

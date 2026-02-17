@@ -20,6 +20,10 @@ eval-regression:
 eval-capability:
     uv run pytest tests/unit/evals/test_memory_migration_quality.py
 
+# Performance eval lane (memory migration perf thresholds)
+eval-performance:
+    uv run pytest tests/unit/evals/test_memory_performance.py
+
 # Run all tests with coverage report
 test-cov:
     uv run pytest --cov=src/lily --cov-report=term-missing --cov-report=html
@@ -107,7 +111,7 @@ quality-check: format-check lint-check types complexity vulture darglint audit b
 ci-gates: quality-check eval-gates
 
 # Memory migration CI gate target.
-memory-migration-gates: quality-check eval-regression eval-capability
+memory-migration-gates: quality-check eval-regression eval-capability eval-performance
 
 # Generate Phase 7 memory observability snapshot artifact.
 memory-metrics-snapshot:

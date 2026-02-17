@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from time import perf_counter
+
+from langchain_core.messages.utils import count_tokens_approximately
 
 from lily.config import CheckpointerBackend, CheckpointerSettings
 from lily.memory import (
@@ -20,10 +24,12 @@ from lily.runtime.conversation import (
     ConversationResponse,
     _compact_history_langgraph_native,
     _compact_history_rule_based,
+    _compact_history_with_backend,
+    _to_base_message,
 )
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
-from lily.session.models import Message, MessageRole
+from lily.session.models import ConversationLimitsConfig, Message, MessageRole
 from lily.session.store import load_session, save_session
 
 RESTART_MIN_CASES = 2
@@ -36,6 +42,12 @@ RETRIEVAL_MIN_CASES = 2
 RETRIEVAL_MIN_PASS_RATE = 1.0
 COMPACTION_MIN_CASES = 3
 COMPACTION_MIN_PASS_RATE = 1.0
+PERFORMANCE_MIN_CASES = 5
+PERFORMANCE_MIN_PASS_RATE = 1.0
+COMMAND_P95_MAX_SECONDS = 0.05
+RETRIEVAL_P95_MAX_SECONDS = 0.08
+CONSOLIDATION_MAX_SECONDS = 0.5
+COMMAND_THROUGHPUT_MIN_OPS_PER_SEC = 60.0
 
 
 @dataclass(frozen=True)
@@ -325,3 +337,136 @@ def run_memory_phase7_observability_sample(*, temp_dir: Path) -> dict[str, objec
             if isinstance(row, dict) and row.get("last_verified") is not None:
                 memory_metrics.record_last_verified(last_verified=datetime.now(UTC))
     return memory_metrics.snapshot().to_dict()
+
+
+def _measure_latencies_seconds(
+    action: Callable[[], object], *, iterations: int
+) -> tuple[float, ...]:
+    """Measure deterministic per-call wall-clock durations in seconds."""
+    samples: list[float] = []
+    for _ in range(iterations):
+        started = perf_counter()
+        action()
+        samples.append(perf_counter() - started)
+    return tuple(samples)
+
+
+def _p95(values: tuple[float, ...]) -> float:
+    """Return deterministic p95 estimate for small sample lists."""
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    index = int((len(ordered) - 1) * 0.95)
+    return ordered[index]
+
+
+def run_performance_benchmark_suite(*, temp_dir: Path) -> EvalSuiteReport:
+    """Run deterministic latency/throughput/token-budget benchmark checks."""
+    bundled_dir = temp_dir / "bundled"
+    workspace_dir = temp_dir / "workspace"
+    bundled_dir.mkdir(parents=True, exist_ok=True)
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"remember", "memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    capture = _ConversationCaptureExecutor()
+    runtime = RuntimeFacade(conversation_executor=capture)
+    runtime_with_consolidation = RuntimeFacade(
+        conversation_executor=capture,
+        consolidation_enabled=True,
+    )
+    _ = runtime.handle_input("/remember favorite color is blue", session)
+    _ = runtime.handle_input("/remember favorite number is 42", session)
+
+    command_latencies = _measure_latencies_seconds(
+        lambda: runtime.handle_input("/memory show favorite", session),
+        iterations=24,
+    )
+    command_p95 = _p95(command_latencies)
+    command_mean = sum(command_latencies) / len(command_latencies)
+    command_throughput = 1.0 / command_mean if command_mean > 0 else 0.0
+
+    retrieval_latencies = _measure_latencies_seconds(
+        lambda: runtime.handle_input("what is my favorite color?", session),
+        iterations=20,
+    )
+    retrieval_p95 = _p95(retrieval_latencies)
+
+    _ = runtime_with_consolidation.handle_input(
+        "/remember favorite movie is dune",
+        session,
+    )
+    consolidation_start = perf_counter()
+    consolidation_result = runtime_with_consolidation.handle_input(
+        "/memory long consolidate",
+        session,
+    )
+    consolidation_elapsed = perf_counter() - consolidation_start
+
+    long_history = tuple(
+        Message(role=MessageRole.TOOL, content=("x" * 800)) for _ in range(12)
+    ) + tuple(
+        Message(role=MessageRole.USER, content=f"turn {index} with context payload")
+        for index in range(120)
+    )
+    pre_tokens = int(
+        sum(
+            count_tokens_approximately([_to_base_message(item)])
+            for item in long_history
+        )
+    )
+    compacted = _compact_history_with_backend(
+        history=long_history,
+        limits=ConversationLimitsConfig(),
+    )
+    post_tokens = int(
+        sum(count_tokens_approximately([_to_base_message(item)]) for item in compacted)
+    )
+
+    return EvalSuiteReport(
+        suite_id="performance_benchmarks",
+        results=(
+            EvalCaseResult(
+                case_id="performance_command_p95_budget",
+                passed=command_p95 <= COMMAND_P95_MAX_SECONDS,
+                detail=(
+                    f"p95={command_p95:.5f}s budget={COMMAND_P95_MAX_SECONDS:.5f}s"
+                ),
+            ),
+            EvalCaseResult(
+                case_id="performance_command_throughput_floor",
+                passed=command_throughput >= COMMAND_THROUGHPUT_MIN_OPS_PER_SEC,
+                detail=(
+                    f"throughput={command_throughput:.2f}ops/s "
+                    f"floor={COMMAND_THROUGHPUT_MIN_OPS_PER_SEC:.2f}"
+                ),
+            ),
+            EvalCaseResult(
+                case_id="performance_retrieval_p95_budget",
+                passed=retrieval_p95 <= RETRIEVAL_P95_MAX_SECONDS,
+                detail=(
+                    f"p95={retrieval_p95:.5f}s budget={RETRIEVAL_P95_MAX_SECONDS:.5f}s"
+                ),
+            ),
+            EvalCaseResult(
+                case_id="performance_consolidation_runtime_budget",
+                passed=consolidation_elapsed <= CONSOLIDATION_MAX_SECONDS
+                and consolidation_result.code == "memory_consolidation_ran",
+                detail=(
+                    f"elapsed={consolidation_elapsed:.5f}s "
+                    f"budget={CONSOLIDATION_MAX_SECONDS:.5f}s "
+                    f"code={consolidation_result.code}"
+                ),
+            ),
+            EvalCaseResult(
+                case_id="performance_prompt_tokens_compacted",
+                passed=post_tokens < pre_tokens,
+                detail=f"tokens={pre_tokens}->{post_tokens}",
+            ),
+        ),
+    )

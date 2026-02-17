@@ -360,7 +360,7 @@ Goal: replace custom rule-based history compaction with LangGraph-native state/c
 - [x] Add feature-flagged compaction backend (`rule_based` vs `langgraph_native`).
 - [x] Implement LangGraph-native state/context compaction path.
 - [x] Run parity + eval comparison (`rule_based` vs `langgraph_native`).
-- [ ] Flip default to `langgraph_native` after quality/eval metrics pass.
+- [x] Flip default to `langgraph_native` after quality/eval metrics pass.
 
 `Acceptance criteria`
 - [x] Deterministic command/runtime contracts are unchanged.
@@ -380,14 +380,16 @@ Goal: replace custom rule-based history compaction with LangGraph-native state/c
 
 ## Risks and Mitigations
 
-- [ ] Risk: migration changes behavior unexpectedly.
-  - [ ] Mitigation: adapter parity tests + frozen command contracts.
-- [ ] Risk: performance regression from Store backend.
-  - [ ] Mitigation: benchmark gate + bounded retrieval + compaction policy.
-- [ ] Risk: policy bypass through new tooling.
-  - [ ] Mitigation: enforce policy gate at repository and tool boundaries.
-- [ ] Risk: command-surface confusion during three-level rollout.
-  - [ ] Mitigation: keep legacy commands stable; add explicit docs/help for new families.
+- [x] Risk: migration changes behavior unexpectedly.
+  - [x] Mitigation: adapter parity tests + frozen command contracts.
+- [x] Risk: performance regression from Store backend.
+  - [x] Mitigation: benchmark gate + bounded retrieval + compaction policy.
+  - [x] Bounded retrieval and compaction policy implemented in runtime.
+  - [x] Benchmark gate with explicit latency/throughput/token thresholds.
+- [x] Risk: policy bypass through new tooling.
+  - [x] Mitigation: enforce policy gate at repository and tool boundaries.
+- [x] Risk: command-surface confusion during three-level rollout.
+  - [x] Mitigation: keep legacy commands stable; add explicit docs/help for new families.
 
 ---
 
@@ -404,4 +406,6 @@ Goal: replace custom rule-based history compaction with LangGraph-native state/c
 - 2026-02-17: Phase 5 completed. Added lifecycle visibility controls (`include_archived|include_expired|include_conflicted`), `/memory long verify` reverification path, conflict-group reconciliation behavior, scheduled auto-consolidation (`auto_run_every_n_turns`), and corresponding command/repository/consolidation test coverage.
 - 2026-02-17: Phase 6 completed. Replaced evidence placeholder with working semantic evidence layer (`/memory evidence ingest|show`), added evidence repository abstraction, citation-bearing retrieval output, explicit non-canonical policy labeling, contradiction/precedence command tests, and CLI evidence table rendering.
 - 2026-02-17: Phase 7 completed. Added memory migration eval harness/suite (`tests/unit/evals/test_memory_migration_quality.py`), split eval lanes (`eval-regression`, `eval-capability`), `memory-migration-gates` CI target, operational runbooks (`docs/ops/...`), in-process memory observability counters + snapshot artifact generation, and baseline-to-post metrics comparison report.
-- 2026-02-17: Phase 8 completed (fallback-safe rollout). Added feature-flagged history compaction backend selection (`rule_based` vs `langgraph_native`) with global config/runtime wiring, implemented native path via LangChain/LangGraph `trim_messages`, added backend parity and long-transcript effectiveness tests, and kept `rule_based` as default fallback pending a future default-flip decision.
+- 2026-02-17: Phase 8 completed (default flipped). Added feature-flagged history compaction backend selection (`rule_based` vs `langgraph_native`) with global config/runtime wiring, implemented native path via LangChain/LangGraph `trim_messages`, added backend parity and long-transcript effectiveness tests, and flipped default backend to `langgraph_native` after quality + migration gates passed.
+- 2026-02-17: Risk tracking updated. Marked migration-behavior, policy-bypass, and command-surface risks mitigated based on implemented tests/guards; left performance-regression risk open pending benchmark CI gate.
+- 2026-02-17: Performance benchmark gate added (`eval-performance`, `tests/unit/evals/test_memory_performance.py`) and wired into `memory-migration-gates`; performance-risk mitigation now complete.

@@ -453,6 +453,12 @@ def test_build_messages_compacts_low_value_tool_output_and_bounds_history() -> N
         user_text="current turn",
         model_name="test-model",
         history=history,
+        limits={
+            "tool_loop": {"enabled": False, "max_rounds": 8},
+            "timeout": {"enabled": False, "timeout_ms": 30_000},
+            "retries": {"enabled": True, "max_retries": 1},
+            "compaction": {"backend": "rule_based", "max_tokens": 1000},
+        },
     )
 
     messages = _build_messages(request)

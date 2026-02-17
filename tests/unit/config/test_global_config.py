@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 from lily.config import (
     CheckpointerBackend,
     CompactionBackend,
@@ -26,7 +28,7 @@ def test_load_global_config_defaults_when_missing(tmp_path: Path) -> None:
     assert config.evidence.chunk_size == 360
     assert config.evidence.chunk_overlap == 40
     assert config.evidence.token_encoding_name == "cl100k_base"
-    assert config.compaction.backend == CompactionBackend.RULE_BASED
+    assert config.compaction.backend == CompactionBackend.LANGGRAPH_NATIVE
     assert config.compaction.max_tokens == 1000
     assert config.consolidation.enabled is False
     assert config.consolidation.backend == ConsolidationBackend.RULE_BASED
@@ -157,3 +159,37 @@ def test_load_global_config_reads_compaction_settings(tmp_path: Path) -> None:
 
     assert config.compaction.backend == CompactionBackend.LANGGRAPH_NATIVE
     assert config.compaction.max_tokens == 1200
+
+
+def test_load_global_config_reads_yaml_payload(tmp_path: Path) -> None:
+    """Config loader should parse YAML payloads."""
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "checkpointer": {
+                    "backend": "memory",
+                    "sqlite_path": ".lily/checkpoints/checkpointer.sqlite",
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_global_config(config_path)
+
+    assert config.checkpointer.backend == CheckpointerBackend.MEMORY
+
+
+def test_load_global_config_rejects_invalid_yaml(tmp_path: Path) -> None:
+    """Invalid YAML should raise deterministic global config error."""
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("checkpointer: [unclosed", encoding="utf-8")
+
+    try:
+        load_global_config(config_path)
+    except GlobalConfigError as exc:
+        assert "Invalid global config YAML" in str(exc)
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("Expected GlobalConfigError")
