@@ -28,7 +28,7 @@ from lily.memory import (
 from lily.runtime.checkpointing import CheckpointerBuildError, build_checkpointer
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
-from lily.session.models import ModelConfig, Session
+from lily.session.models import HistoryCompactionBackend, ModelConfig, Session
 from lily.session.store import (
     SessionDecodeError,
     SessionSchemaVersionError,
@@ -246,6 +246,8 @@ def _build_runtime_for_workspace(
             chunk_overlap=config.evidence.chunk_overlap,
             token_encoding_name=config.evidence.token_encoding_name,
         ),
+        compaction_backend=HistoryCompactionBackend(config.compaction.backend.value),
+        compaction_max_tokens=config.compaction.max_tokens,
     )
 
 

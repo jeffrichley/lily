@@ -61,6 +61,22 @@ class ConsolidationBackend(StrEnum):
     LANGMEM_MANAGER = "langmem_manager"
 
 
+class CompactionBackend(StrEnum):
+    """Supported conversation compaction backend identifiers."""
+
+    RULE_BASED = "rule_based"
+    LANGGRAPH_NATIVE = "langgraph_native"
+
+
+class CompactionSettings(BaseModel):
+    """Global conversation compaction configuration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    backend: CompactionBackend = CompactionBackend.RULE_BASED
+    max_tokens: int = Field(default=1000, ge=1)
+
+
 class ConsolidationSettings(BaseModel):
     """Global memory consolidation feature flags."""
 
@@ -80,6 +96,7 @@ class LilyGlobalConfig(BaseModel):
     checkpointer: CheckpointerSettings = CheckpointerSettings()
     memory_tooling: MemoryToolingSettings = MemoryToolingSettings()
     evidence: EvidenceSettings = EvidenceSettings()
+    compaction: CompactionSettings = CompactionSettings()
     consolidation: ConsolidationSettings = ConsolidationSettings()
 
 

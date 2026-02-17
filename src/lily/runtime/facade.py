@@ -46,7 +46,13 @@ from lily.runtime.executors.tool_dispatch import (
 from lily.runtime.llm_backend import LangChainBackend
 from lily.runtime.session_lanes import run_in_session_lane
 from lily.runtime.skill_invoker import SkillInvoker
-from lily.session.models import Message, MessageRole, Session
+from lily.session.models import (
+    HistoryCompactionBackend,
+    HistoryCompactionConfig,
+    Message,
+    MessageRole,
+    Session,
+)
 
 _FOCUS_HINT_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(
@@ -75,6 +81,10 @@ class RuntimeFacade:
         consolidation_llm_assisted_enabled: bool = False,
         consolidation_auto_run_every_n_turns: int = 0,
         evidence_chunking: EvidenceChunkingSettings | None = None,
+        compaction_backend: HistoryCompactionBackend = (
+            HistoryCompactionBackend.RULE_BASED
+        ),
+        compaction_max_tokens: int = 1000,
     ) -> None:
         """Create facade with command and conversation dependencies.
 
@@ -91,6 +101,8 @@ class RuntimeFacade:
             consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
             consolidation_auto_run_every_n_turns: Scheduled consolidation interval.
             evidence_chunking: Evidence chunking settings.
+            compaction_backend: Conversation compaction backend flag.
+            compaction_max_tokens: Token budget for native compaction backend.
         """
         self._consolidation_enabled = consolidation_enabled
         self._consolidation_backend = consolidation_backend
@@ -98,6 +110,8 @@ class RuntimeFacade:
         self._consolidation_auto_run_every_n_turns = (
             consolidation_auto_run_every_n_turns
         )
+        self._compaction_backend = compaction_backend
+        self._compaction_max_tokens = compaction_max_tokens
         self._persona_repository = persona_repository or FilePersonaRepository(
             root_dir=default_persona_root()
         )
@@ -177,7 +191,14 @@ class RuntimeFacade:
             user_text=text,
             model_name=session.model_settings.model_name,
             history=tuple(session.conversation_state),
-            limits=session.model_settings.conversation_limits,
+            limits=session.model_settings.conversation_limits.model_copy(
+                update={
+                    "compaction": HistoryCompactionConfig(
+                        backend=self._compaction_backend,
+                        max_tokens=self._compaction_max_tokens,
+                    )
+                }
+            ),
             memory_summary=self._build_memory_summary(
                 session=session,
                 user_text=text,

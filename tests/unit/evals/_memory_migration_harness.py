@@ -18,7 +18,8 @@ from lily.runtime.checkpointing import build_checkpointer
 from lily.runtime.conversation import (
     ConversationRequest,
     ConversationResponse,
-    _compact_history,
+    _compact_history_langgraph_native,
+    _compact_history_rule_based,
 )
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
@@ -33,7 +34,7 @@ POLICY_MIN_CASES = 2
 POLICY_MIN_PASS_RATE = 1.0
 RETRIEVAL_MIN_CASES = 2
 RETRIEVAL_MIN_PASS_RATE = 1.0
-COMPACTION_MIN_CASES = 2
+COMPACTION_MIN_CASES = 3
 COMPACTION_MIN_PASS_RATE = 1.0
 
 
@@ -267,16 +268,26 @@ def run_compaction_effectiveness_suite(*, temp_dir: Path) -> EvalSuiteReport:
     ) + tuple(
         Message(role=MessageRole.USER, content=f"turn {index}") for index in range(70)
     )
-    compacted = _compact_history(history)
-    evicted_low_value = len(compacted) < len(history)
-    has_system_summary = any(item.role == MessageRole.SYSTEM for item in compacted)
+    rule_compacted = _compact_history_rule_based(history)
+    native_compacted = _compact_history_langgraph_native(
+        history=history,
+        max_tokens=120,
+    )
+    evicted_low_value = len(rule_compacted) < len(history)
+    native_bounded = len(native_compacted) < len(history)
+    has_system_summary = any(item.role == MessageRole.SYSTEM for item in rule_compacted)
     return EvalSuiteReport(
         suite_id="compaction_effectiveness",
         results=(
             EvalCaseResult(
-                case_id="compaction_reduces_history_size",
+                case_id="compaction_rule_based_reduces_history_size",
                 passed=evicted_low_value,
-                detail=f"{len(history)}->{len(compacted)}",
+                detail=f"{len(history)}->{len(rule_compacted)}",
+            ),
+            EvalCaseResult(
+                case_id="compaction_langgraph_native_reduces_history_size",
+                passed=native_bounded,
+                detail=f"{len(history)}->{len(native_compacted)}",
             ),
             EvalCaseResult(
                 case_id="compaction_adds_summary_event",

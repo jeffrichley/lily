@@ -354,27 +354,27 @@ Goal: operationalize migrated memory system with measurable quality/safety contr
 Goal: replace custom rule-based history compaction with LangGraph-native state/context compaction once parity is proven.
 
 `User-visible features`
-- [ ] Same or better long-thread response quality with lower maintenance burden.
+- [x] Same or better long-thread response quality with lower maintenance burden.
 
 `Internal engineering tasks`
-- [ ] Add feature-flagged compaction backend (`rule_based` vs `langgraph_native`).
-- [ ] Implement LangGraph-native state/context compaction path.
-- [ ] Run parity + eval comparison (`rule_based` vs `langgraph_native`).
+- [x] Add feature-flagged compaction backend (`rule_based` vs `langgraph_native`).
+- [x] Implement LangGraph-native state/context compaction path.
+- [x] Run parity + eval comparison (`rule_based` vs `langgraph_native`).
 - [ ] Flip default to `langgraph_native` after quality/eval metrics pass.
 
 `Acceptance criteria`
-- [ ] Deterministic command/runtime contracts are unchanged.
-- [ ] `langgraph_native` compaction matches or improves current quality metrics.
-- [ ] Legacy `rule_based` path remains as fallback until full confidence window passes.
+- [x] Deterministic command/runtime contracts are unchanged.
+- [x] `langgraph_native` compaction matches or improves current quality metrics.
+- [x] Legacy `rule_based` path remains as fallback until full confidence window passes.
 
 `Non-goals`
 - No command-surface changes.
 - No forced removal of fallback path in first rollout.
 
 `Required tests and gates`
-- [ ] Parity test matrix between both compaction backends.
-- [ ] Long-transcript compaction effectiveness tests for both backends.
-- [ ] Retrieval relevance regression checks under both backends.
+- [x] Parity test matrix between both compaction backends.
+- [x] Long-transcript compaction effectiveness tests for both backends.
+- [x] Retrieval relevance regression checks under both backends.
 
 ---
 
@@ -404,3 +404,4 @@ Goal: replace custom rule-based history compaction with LangGraph-native state/c
 - 2026-02-17: Phase 5 completed. Added lifecycle visibility controls (`include_archived|include_expired|include_conflicted`), `/memory long verify` reverification path, conflict-group reconciliation behavior, scheduled auto-consolidation (`auto_run_every_n_turns`), and corresponding command/repository/consolidation test coverage.
 - 2026-02-17: Phase 6 completed. Replaced evidence placeholder with working semantic evidence layer (`/memory evidence ingest|show`), added evidence repository abstraction, citation-bearing retrieval output, explicit non-canonical policy labeling, contradiction/precedence command tests, and CLI evidence table rendering.
 - 2026-02-17: Phase 7 completed. Added memory migration eval harness/suite (`tests/unit/evals/test_memory_migration_quality.py`), split eval lanes (`eval-regression`, `eval-capability`), `memory-migration-gates` CI target, operational runbooks (`docs/ops/...`), in-process memory observability counters + snapshot artifact generation, and baseline-to-post metrics comparison report.
+- 2026-02-17: Phase 8 completed (fallback-safe rollout). Added feature-flagged history compaction backend selection (`rule_based` vs `langgraph_native`) with global config/runtime wiring, implemented native path via LangChain/LangGraph `trim_messages`, added backend parity and long-transcript effectiveness tests, and kept `rule_based` as default fallback pending a future default-flip decision.

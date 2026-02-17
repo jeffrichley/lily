@@ -17,7 +17,14 @@ from langchain.agents.middleware import (
     before_model,
     dynamic_prompt,
 )
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+    trim_messages,
+)
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
@@ -33,7 +40,12 @@ from lily.policy import (
     resolve_effective_style,
 )
 from lily.prompting import PersonaContext, PromptBuildContext, PromptBuilder, PromptMode
-from lily.session.models import ConversationLimitsConfig, Message, MessageRole
+from lily.session.models import (
+    ConversationLimitsConfig,
+    HistoryCompactionBackend,
+    Message,
+    MessageRole,
+)
 
 _LOGGER = logging.getLogger(__name__)
 _DEFAULT_SYSTEM_PROMPT = (
@@ -357,12 +369,38 @@ def _build_messages(request: ConversationRequest) -> list[dict[str, str]]:
     Returns:
         Ordered message list for LangChain invocation.
     """
+    compacted = _compact_history_with_backend(
+        history=request.history,
+        limits=request.limits,
+    )
     messages = [
-        {"role": item.role.value, "content": item.content}
-        for item in _compact_history(request.history)
+        {"role": item.role.value, "content": item.content} for item in compacted
     ]
     messages.append({"role": "user", "content": request.user_text})
     return messages
+
+
+def _compact_history_with_backend(
+    *,
+    history: tuple[Message, ...],
+    limits: ConversationLimitsConfig,
+) -> tuple[Message, ...]:
+    """Compact history with configured backend strategy.
+
+    Args:
+        history: Full persisted conversation history.
+        limits: Conversation limits configuration.
+
+    Returns:
+        Compacted history tuple.
+    """
+    backend = limits.compaction.backend
+    if backend == HistoryCompactionBackend.LANGGRAPH_NATIVE:
+        return _compact_history_langgraph_native(
+            history=history,
+            max_tokens=limits.compaction.max_tokens,
+        )
+    return _compact_history_rule_based(history)
 
 
 def _build_agent_invoke_config(request: ConversationRequest) -> dict[str, Any]:
@@ -692,7 +730,7 @@ def _latest_assistant_text(state: AgentState[object]) -> str:
     return ""
 
 
-def _compact_history(history: tuple[Message, ...]) -> tuple[Message, ...]:
+def _compact_history_rule_based(history: tuple[Message, ...]) -> tuple[Message, ...]:
     """Compact history to deterministic bounded context.
 
     Args:
@@ -719,6 +757,69 @@ def _compact_history(history: tuple[Message, ...]) -> tuple[Message, ...]:
         tool_summary = _summarize_history(evicted_tool_events, label="tool")
         compacted.insert(0, Message(role=MessageRole.SYSTEM, content=tool_summary))
     return tuple(_enforce_char_budget(compacted, max_chars=_HISTORY_BUDGET_CHARS))
+
+
+def _compact_history_langgraph_native(
+    *,
+    history: tuple[Message, ...],
+    max_tokens: int,
+) -> tuple[Message, ...]:
+    """Compact history using LangChain native trim-messages utility.
+
+    Args:
+        history: Full persisted conversation history.
+        max_tokens: Approximate token budget.
+
+    Returns:
+        Compacted history tuple.
+    """
+    base_messages = [_to_base_message(item) for item in history]
+    trimmed = trim_messages(
+        base_messages,
+        max_tokens=max_tokens,
+        token_counter="approximate",  # nosec B106 - langchain trim mode selector
+        strategy="last",
+        include_system=True,
+        start_on="human",
+        allow_partial=False,
+    )
+    return tuple(_to_session_message(item) for item in trimmed)
+
+
+def _to_base_message(message: Message) -> BaseMessage:
+    """Convert session message to LangChain base message.
+
+    Args:
+        message: Session message payload.
+
+    Returns:
+        LangChain base message.
+    """
+    if message.role == MessageRole.USER:
+        return HumanMessage(content=message.content)
+    if message.role == MessageRole.SYSTEM:
+        return SystemMessage(content=message.content)
+    if message.role == MessageRole.ASSISTANT:
+        return AIMessage(content=message.content)
+    return ToolMessage(content=message.content, tool_call_id="lily_tool")
+
+
+def _to_session_message(message: BaseMessage) -> Message:
+    """Convert LangChain base message to session message.
+
+    Args:
+        message: LangChain base message payload.
+
+    Returns:
+        Session message payload.
+    """
+    if isinstance(message, HumanMessage):
+        return Message(role=MessageRole.USER, content=str(message.content))
+    if isinstance(message, SystemMessage):
+        return Message(role=MessageRole.SYSTEM, content=str(message.content))
+    if isinstance(message, ToolMessage):
+        return Message(role=MessageRole.TOOL, content=str(message.content))
+    return Message(role=MessageRole.ASSISTANT, content=str(message.content))
 
 
 def _is_low_value_tool_output(content: str) -> bool:

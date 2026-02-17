@@ -99,6 +99,39 @@ class RetryLimitConfig(BaseModel):
         return self
 
 
+class HistoryCompactionBackend(StrEnum):
+    """Supported history compaction backend identifiers."""
+
+    RULE_BASED = "rule_based"
+    LANGGRAPH_NATIVE = "langgraph_native"
+
+
+class HistoryCompactionConfig(BaseModel):
+    """Conversation history compaction settings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    backend: HistoryCompactionBackend = HistoryCompactionBackend.RULE_BASED
+    max_tokens: int = 1000
+
+    @model_validator(mode="after")
+    def _validate_tokens(self) -> HistoryCompactionConfig:
+        """Validate token budget for native compaction backend.
+
+        Returns:
+            Validated config model.
+
+        Raises:
+            ValueError: If backend is native and token budget is invalid.
+        """
+        if (
+            self.backend == HistoryCompactionBackend.LANGGRAPH_NATIVE
+            and self.max_tokens < 1
+        ):
+            raise ValueError("max_tokens must be >= 1 for langgraph_native backend.")
+        return self
+
+
 class ConversationLimitsConfig(BaseModel):
     """User-facing conversation/tool loop limit configuration."""
 
@@ -107,6 +140,7 @@ class ConversationLimitsConfig(BaseModel):
     tool_loop: ToolLoopLimitConfig = Field(default_factory=ToolLoopLimitConfig)
     timeout: TurnTimeoutLimitConfig = Field(default_factory=TurnTimeoutLimitConfig)
     retries: RetryLimitConfig = Field(default_factory=RetryLimitConfig)
+    compaction: HistoryCompactionConfig = Field(default_factory=HistoryCompactionConfig)
 
 
 class ModelConfig(BaseModel):

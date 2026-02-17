@@ -3,6 +3,8 @@
 from lily.config.global_config import (
     CheckpointerBackend,
     CheckpointerSettings,
+    CompactionBackend,
+    CompactionSettings,
     ConsolidationBackend,
     ConsolidationSettings,
     EvidenceChunkingMode,
@@ -16,6 +18,8 @@ from lily.config.global_config import (
 __all__ = [
     "CheckpointerBackend",
     "CheckpointerSettings",
+    "CompactionBackend",
+    "CompactionSettings",
     "ConsolidationBackend",
     "ConsolidationSettings",
     "EvidenceChunkingMode",
