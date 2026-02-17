@@ -4,11 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from lily.memory import (
+    ConsolidationBackend,
+    MemoryWriteRequest,
+    StoreBackedPersonalityMemoryRepository,
+)
 from lily.persona import FilePersonaRepository
 from lily.runtime.conversation import ConversationRequest, ConversationResponse
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
-from lily.session.models import ModelConfig, Session
+from lily.session.models import Message, MessageRole, ModelConfig, Session
 from lily.skills.types import InvocationMode, SkillEntry, SkillSnapshot, SkillSource
 
 
@@ -552,3 +557,514 @@ def test_context_aware_tone_adaptation_without_style_override(tmp_path: Path) ->
     assert result.status.value == "ok"
     assert capture.last_request is not None
     assert capture.last_request.persona_context.style_level.value == "focus"
+
+
+def test_conversation_request_includes_repository_backed_memory_summary(
+    tmp_path: Path,
+) -> None:
+    """Conversation route should inject retrieved memory summary into request."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"remember", "memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    capture = _ConversationCaptureExecutor()
+    runtime = RuntimeFacade(conversation_executor=capture)
+
+    remembered = runtime.handle_input("/remember favorite number is 42", session)
+    assert remembered.status.value == "ok"
+
+    _ = runtime.handle_input("what is my favorite number?", session)
+
+    assert capture.last_request is not None
+    assert "favorite number is 42" in capture.last_request.memory_summary
+
+
+def test_memory_command_family_long_short_and_evidence_paths(tmp_path: Path) -> None:
+    """`/memory short|long|evidence` command family should route deterministically."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"remember", "forget", "memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade()
+
+    remembered = runtime.handle_input("/remember favorite color is blue", session)
+    assert remembered.status.value == "ok"
+
+    long_show = runtime.handle_input(
+        "/memory long show --domain user_profile favorite",
+        session,
+    )
+    assert long_show.status.value == "ok"
+    assert "favorite color is blue" in long_show.message
+
+    short_show = runtime.handle_input("/memory short show", session)
+    assert short_show.status.value == "ok"
+    assert short_show.code == "memory_short_shown"
+
+    evidence_show = runtime.handle_input("/memory evidence show", session)
+    assert evidence_show.status.value == "ok"
+    assert evidence_show.code == "memory_evidence_empty"
+
+
+def test_memory_evidence_ingest_and_show_with_citations(tmp_path: Path) -> None:
+    """`/memory evidence` should ingest local text and return cited hits."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    notes = tmp_path / "architecture_notes.txt"
+    notes.write_text(
+        (
+            "Agent memory design should preserve canonical precedence.\n"
+            "Evidence retrieval is non-canonical context for recall support.\n"
+        ),
+        encoding="utf-8",
+    )
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade()
+
+    ingested = runtime.handle_input(f"/memory evidence ingest {notes}", session)
+    shown = runtime.handle_input("/memory evidence show canonical precedence", session)
+
+    assert ingested.status.value == "ok"
+    assert ingested.code == "memory_evidence_ingested"
+    assert shown.status.value == "ok"
+    assert shown.code == "memory_evidence_listed"
+    assert shown.data is not None
+    assert shown.data.get("non_canonical") is True
+    assert shown.data.get("canonical_precedence") == "structured_long_term"
+    assert "architecture_notes.txt#chunk-" in shown.message
+
+
+def test_memory_evidence_results_remain_non_canonical_vs_structured(
+    tmp_path: Path,
+) -> None:
+    """Contradicting evidence should remain non-canonical versus structured memory."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    notes = tmp_path / "prefs.txt"
+    notes.write_text(
+        "User favorite color is red from an old transcript.",
+        encoding="utf-8",
+    )
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"remember", "memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade()
+
+    _ = runtime.handle_input("/remember favorite color is blue", session)
+    _ = runtime.handle_input(f"/memory evidence ingest {notes}", session)
+
+    structured = runtime.handle_input(
+        "/memory long show --domain user_profile favorite color",
+        session,
+    )
+    evidence = runtime.handle_input("/memory evidence show favorite color", session)
+
+    assert structured.status.value == "ok"
+    assert "favorite color is blue" in structured.message
+    assert evidence.status.value == "ok"
+    assert evidence.data is not None
+    assert evidence.data.get("non_canonical") is True
+    assert evidence.data.get("canonical_precedence") == "structured_long_term"
+
+
+def test_memory_long_show_domain_isolation(tmp_path: Path) -> None:
+    """`/memory long show --domain` should isolate personality subdomains."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade()
+
+    store_file = workspace_dir.parent / "memory" / "langgraph_store.sqlite"
+    repository = StoreBackedPersonalityMemoryRepository(store_file=store_file)
+    repository.remember(
+        MemoryWriteRequest(
+            namespace="persona_core/workspace:workspace/persona:lily",
+            content="Core directive only",
+        )
+    )
+    repository.remember(
+        MemoryWriteRequest(
+            namespace="working_rules/workspace:workspace/persona:lily",
+            content="Working rule only",
+        )
+    )
+    repository.remember(
+        MemoryWriteRequest(
+            namespace="user_profile/workspace:workspace/persona:lily",
+            content="Profile data only",
+        )
+    )
+
+    core = runtime.handle_input("/memory long show --domain persona_core", session)
+    rules = runtime.handle_input("/memory long show --domain working_rules", session)
+    profile = runtime.handle_input("/memory long show --domain user_profile", session)
+
+    assert core.status.value == "ok"
+    assert "Core directive only" in core.message
+    assert "Working rule only" not in core.message
+    assert "Profile data only" not in core.message
+    assert rules.status.value == "ok"
+    assert "Working rule only" in rules.message
+    assert "Core directive only" not in rules.message
+    assert profile.status.value == "ok"
+    assert "Profile data only" in profile.message
+    assert "Core directive only" not in profile.message
+
+
+def test_memory_long_tool_requires_opt_in_flag(tmp_path: Path) -> None:
+    """Tool-backed memory command should fail when tooling flag is disabled."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade(memory_tooling_enabled=False)
+
+    result = runtime.handle_input("/memory long tool show favorite", session)
+
+    assert result.status.value == "error"
+    assert result.code == "memory_tooling_disabled"
+
+
+def test_memory_long_tool_remember_enforces_policy_redline(tmp_path: Path) -> None:
+    """Tool-backed remember should preserve deterministic policy-denied behavior."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade(memory_tooling_enabled=True)
+
+    result = runtime.handle_input(
+        "/memory long tool remember --domain user_profile api_key=sk-123",
+        session,
+    )
+
+    assert result.status.value == "error"
+    assert result.code == "memory_policy_denied"
+
+
+def test_memory_long_tool_show_uses_langmem_adapter_when_enabled(
+    tmp_path: Path,
+) -> None:
+    """Explicit tool route should search via LangMem and keep stable envelope."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade(memory_tooling_enabled=True)
+
+    wrote = runtime.handle_input(
+        "/memory long tool remember --domain user_profile favorite number is 42",
+        session,
+    )
+    assert wrote.status.value == "ok"
+    assert wrote.code == "memory_langmem_saved"
+
+    shown = runtime.handle_input(
+        "/memory long tool show --domain user_profile favorite",
+        session,
+    )
+
+    assert shown.status.value == "ok"
+    assert shown.code == "memory_langmem_listed"
+    assert shown.data is not None
+    assert shown.data.get("route") == "langmem_search_tool"
+    assert "favorite number is 42" in shown.message
+
+
+def test_memory_tooling_auto_apply_switches_standard_show_route(tmp_path: Path) -> None:
+    """Auto-apply flag should route regular long-show through LangMem tooling."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade(
+        memory_tooling_enabled=True,
+        memory_tooling_auto_apply=True,
+    )
+
+    wrote = runtime.handle_input(
+        "/memory long tool remember --domain user_profile favorite color is blue",
+        session,
+    )
+    assert wrote.status.value == "ok"
+
+    shown = runtime.handle_input(
+        "/memory long show --domain user_profile favorite", session
+    )
+
+    assert shown.status.value == "ok"
+    assert shown.code == "memory_langmem_listed"
+    assert shown.data is not None
+    assert shown.data.get("route") == "langmem_search_tool"
+
+
+def test_memory_long_consolidate_disabled_by_default(tmp_path: Path) -> None:
+    """Consolidation command should fail deterministically when disabled."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade(consolidation_enabled=False)
+
+    result = runtime.handle_input("/memory long consolidate", session)
+
+    assert result.status.value == "error"
+    assert result.code == "memory_consolidation_disabled"
+
+
+def test_memory_long_consolidate_rule_based_writes_candidates(tmp_path: Path) -> None:
+    """Rule-based consolidation should infer and persist candidate memories."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    session.conversation_state.append(
+        Message(role=MessageRole.USER, content="My favorite number is 42")
+    )
+    runtime = RuntimeFacade(consolidation_enabled=True)
+
+    consolidated = runtime.handle_input("/memory long consolidate", session)
+    shown = runtime.handle_input(
+        "/memory long show --domain user_profile favorite", session
+    )
+
+    assert consolidated.status.value == "ok"
+    assert consolidated.code == "memory_consolidation_ran"
+    assert shown.status.value == "ok"
+    assert "favorite number is 42" in shown.message
+
+
+def test_memory_long_consolidate_langmem_manager_backend(tmp_path: Path) -> None:
+    """LangMem-manager consolidation backend should write deterministic memories."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    session.conversation_state.append(
+        Message(role=MessageRole.USER, content="My name is Jeff")
+    )
+    runtime = RuntimeFacade(
+        consolidation_enabled=True,
+        consolidation_backend=ConsolidationBackend.LANGMEM_MANAGER,
+        memory_tooling_enabled=True,
+    )
+
+    consolidated = runtime.handle_input("/memory long consolidate", session)
+    shown = runtime.handle_input(
+        "/memory long tool show --domain user_profile name",
+        session,
+    )
+
+    assert consolidated.status.value == "ok"
+    assert consolidated.data is not None
+    assert consolidated.data.get("backend") == "langmem_manager"
+    assert shown.status.value == "ok"
+    assert shown.code == "memory_langmem_listed"
+    assert "name is Jeff" in shown.message
+
+
+def test_memory_long_verify_updates_last_verified(tmp_path: Path) -> None:
+    """`/memory long verify` should set verified status and last_verified timestamp."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"remember", "memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade()
+
+    remembered = runtime.handle_input("/remember my favorite editor is vim", session)
+    assert remembered.status.value == "ok"
+    memory_id = str((remembered.data or {}).get("id", ""))
+
+    verified = runtime.handle_input(f"/memory long verify {memory_id}", session)
+    listed = runtime.handle_input(
+        "/memory long show --domain user_profile --include-conflicted favorite",
+        session,
+    )
+
+    assert verified.status.value == "ok"
+    assert verified.code == "memory_verified"
+    assert listed.status.value == "ok"
+    assert listed.data is not None
+    records = listed.data.get("records")
+    assert isinstance(records, list)
+    target = next((item for item in records if item.get("id") == memory_id), None)
+    assert isinstance(target, dict)
+    assert target.get("status") == "verified"
+    assert target.get("last_verified")
+
+
+def test_memory_long_show_excludes_conflicted_unless_requested(tmp_path: Path) -> None:
+    """Conflicted records should be hidden by default and visible when requested."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade(consolidation_enabled=True)
+    session.conversation_state.append(
+        Message(role=MessageRole.USER, content="My favorite color is green")
+    )
+    _ = runtime.handle_input("/memory long consolidate", session)
+    session.conversation_state.append(
+        Message(role=MessageRole.USER, content="My favorite color is blue")
+    )
+    _ = runtime.handle_input("/memory long consolidate", session)
+
+    hidden = runtime.handle_input(
+        "/memory long show --domain user_profile green",
+        session,
+    )
+    visible = runtime.handle_input(
+        "/memory long show --domain user_profile --include-conflicted green",
+        session,
+    )
+
+    assert hidden.status.value == "ok"
+    assert hidden.code == "memory_empty"
+    assert visible.status.value == "ok"
+    assert "favorite color is green" in visible.message
+
+
+def test_scheduled_auto_consolidation_runs_on_interval(tmp_path: Path) -> None:
+    """Scheduled auto consolidation should run on configured conversation interval."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    session.conversation_state.append(
+        Message(role=MessageRole.USER, content="My favorite movie is Inception")
+    )
+    runtime = RuntimeFacade(
+        conversation_executor=_ConversationCaptureExecutor(),
+        consolidation_enabled=True,
+        consolidation_auto_run_every_n_turns=1,
+    )
+
+    _ = runtime.handle_input("hello there", session)
+    shown = runtime.handle_input(
+        "/memory long show --domain user_profile movie",
+        session,
+    )
+
+    assert shown.status.value == "ok"
+    assert "favorite movie is Inception" in shown.message

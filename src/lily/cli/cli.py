@@ -9,6 +9,7 @@ from typing import Annotated
 
 import click
 import typer
+import yaml
 from rich.console import Console
 from rich.json import JSON
 from rich.logging import RichHandler
@@ -17,9 +18,18 @@ from rich.panel import Panel
 from rich.table import Table
 
 from lily.commands.types import CommandResult, CommandStatus
+from lily.config import GlobalConfigError, LilyGlobalConfig, load_global_config
+from lily.memory import ConsolidationBackend as MemoryConsolidationBackend
+from lily.memory import (
+    EvidenceChunkingMode as MemoryEvidenceChunkingMode,
+)
+from lily.memory import (
+    EvidenceChunkingSettings,
+)
+from lily.runtime.checkpointing import CheckpointerBuildError, build_checkpointer
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
-from lily.session.models import ModelConfig, Session
+from lily.session.models import HistoryCompactionBackend, ModelConfig, Session
 from lily.session.store import (
     SessionDecodeError,
     SessionSchemaVersionError,
@@ -46,6 +56,9 @@ _HIDE_DATA_CODES = {
     "memory_empty",
     "memory_saved",
     "memory_deleted",
+    "memory_langmem_saved",
+    "memory_langmem_listed",
+    "memory_evidence_ingested",
 }
 
 
@@ -102,6 +115,74 @@ def _default_session_file(workspace_dir: Path) -> Path:
     """
     workspace_dir.mkdir(parents=True, exist_ok=True)
     return workspace_dir.parent / "session.json"
+
+
+def _default_global_config_file(workspace_dir: Path) -> Path:
+    """Return default global config path for current workspace root.
+
+    Args:
+        workspace_dir: Workspace skills directory path.
+
+    Returns:
+        Global config file path.
+    """
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    yaml_path = workspace_dir.parent / "config.yaml"
+    json_path = workspace_dir.parent / "config.json"
+    if yaml_path.exists():
+        return yaml_path
+    if json_path.exists():
+        return json_path
+    return yaml_path
+
+
+def _bootstrap_workspace(
+    *,
+    workspace_dir: Path,
+    config_file: Path | None = None,
+    overwrite_config: bool = False,
+) -> tuple[Path, Path, tuple[tuple[str, str], ...]]:
+    """Bootstrap local Lily workspace artifacts.
+
+    Args:
+        workspace_dir: Workspace skills directory path.
+        config_file: Optional global config path override.
+        overwrite_config: Whether to overwrite existing config payload.
+
+    Returns:
+        Effective workspace dir, config file path, and action rows.
+    """
+    effective_workspace_dir = workspace_dir
+    effective_config_file = config_file or _default_global_config_file(
+        effective_workspace_dir
+    )
+    targets = {
+        "workspace_skills_dir": effective_workspace_dir,
+        "checkpoints_dir": effective_workspace_dir.parent / "checkpoints",
+        "memory_dir": effective_workspace_dir.parent / "memory",
+    }
+    actions: list[tuple[str, str]] = []
+    for name, path in targets.items():
+        existed = path.exists()
+        path.mkdir(parents=True, exist_ok=True)
+        actions.append((name, "exists" if existed else "created"))
+    config_existed = effective_config_file.exists()
+    if not config_existed or overwrite_config:
+        effective_config_file.parent.mkdir(parents=True, exist_ok=True)
+        payload = LilyGlobalConfig().model_dump(mode="json")
+        effective_config_file.write_text(
+            yaml.safe_dump(payload, sort_keys=False),
+            encoding="utf-8",
+        )
+        actions.append(
+            (
+                "config_file",
+                "overwritten" if config_existed and overwrite_config else "created",
+            )
+        )
+    else:
+        actions.append(("config_file", "exists"))
+    return effective_workspace_dir, effective_config_file, tuple(actions)
 
 
 def _build_session(
@@ -179,13 +260,51 @@ def _persist_session(session: Session, session_file: Path) -> None:
         )
 
 
-def _build_runtime() -> RuntimeFacade:
-    """Build default runtime facade.
+def _build_runtime_for_workspace(
+    *,
+    workspace_dir: Path,
+    config_file: Path | None,
+) -> RuntimeFacade:
+    """Build runtime facade with configured checkpointer backend.
+
+    Args:
+        workspace_dir: Workspace skills directory path.
+        config_file: Optional global config override path.
 
     Returns:
-        Runtime facade with default wiring.
+        Runtime facade wired with configured checkpointer.
     """
-    return RuntimeFacade()
+    effective_config_file = config_file or _default_global_config_file(workspace_dir)
+    config: LilyGlobalConfig
+    try:
+        config = load_global_config(effective_config_file)
+    except GlobalConfigError as exc:
+        _CONSOLE.print(
+            f"[yellow]Global config at {effective_config_file} is invalid; "
+            "falling back to defaults.[/yellow]"
+        )
+        _CONSOLE.print(f"[yellow]Reason: {exc}[/yellow]")
+        config = LilyGlobalConfig()
+    result = build_checkpointer(config.checkpointer)
+    return RuntimeFacade(
+        conversation_checkpointer=result.saver,
+        memory_tooling_enabled=config.memory_tooling.enabled,
+        memory_tooling_auto_apply=config.memory_tooling.auto_apply,
+        consolidation_enabled=config.consolidation.enabled,
+        consolidation_backend=MemoryConsolidationBackend(
+            config.consolidation.backend.value
+        ),
+        consolidation_llm_assisted_enabled=config.consolidation.llm_assisted_enabled,
+        consolidation_auto_run_every_n_turns=config.consolidation.auto_run_every_n_turns,
+        evidence_chunking=EvidenceChunkingSettings(
+            mode=MemoryEvidenceChunkingMode(config.evidence.chunking_mode.value),
+            chunk_size=config.evidence.chunk_size,
+            chunk_overlap=config.evidence.chunk_overlap,
+            token_encoding_name=config.evidence.token_encoding_name,
+        ),
+        compaction_backend=HistoryCompactionBackend(config.compaction.backend.value),
+        compaction_max_tokens=config.compaction.max_tokens,
+    )
 
 
 def _render_result(result: CommandResult) -> None:
@@ -251,6 +370,8 @@ def _render_rich_success(result: CommandResult) -> bool:
         "agent_set": _render_agent_set,
         "agent_shown": _render_agent_show,
         "memory_listed": _render_memory_list,
+        "memory_langmem_listed": _render_memory_list,
+        "memory_evidence_listed": _render_evidence_list,
     }
     renderer = renderers.get(result.code)
     if renderer is None:
@@ -391,6 +512,49 @@ def _render_memory_list(result: CommandResult) -> bool:
     return True
 
 
+def _render_evidence_list(result: CommandResult) -> bool:
+    """Render `/memory evidence show` records with citation + score.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when table render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    raw_records = data.get("records") if data is not None else None
+    if not isinstance(raw_records, list):
+        return False
+    table = Table(
+        title=f"Semantic Evidence ({len(raw_records)} hits)",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Score", style="green", no_wrap=True)
+    table.add_column("Citation", style="magenta")
+    table.add_column("Snippet")
+    for record in raw_records:
+        if not isinstance(record, dict):
+            continue
+        score = float(record.get("score", 0.0))
+        table.add_row(
+            f"{score:.3f}",
+            str(record.get("citation", "")),
+            str(record.get("content", "")),
+        )
+    _CONSOLE.print(table)
+    _CONSOLE.print(
+        Panel(
+            "Evidence results are non-canonical context. "
+            "Structured long-term memory remains the source of truth.",
+            title="Evidence Policy",
+            border_style="yellow",
+            expand=True,
+        )
+    )
+    return True
+
+
 def _render_agent_list(result: CommandResult) -> bool:
     """Render `/agent list` in table form.
 
@@ -473,13 +637,14 @@ def _render_agent_show(result: CommandResult) -> bool:
     return True
 
 
-def _execute_once(
+def _execute_once(  # noqa: PLR0913
     *,
     text: str,
     bundled_dir: Path,
     workspace_dir: Path,
     model_name: str,
     session_file: Path,
+    config_file: Path | None,
 ) -> int:
     """Execute one input line through runtime facade.
 
@@ -489,6 +654,7 @@ def _execute_once(
         workspace_dir: Workspace skills root.
         model_name: Model name for session construction.
         session_file: Session persistence file path.
+        config_file: Optional global config path.
 
     Returns:
         Process exit code.
@@ -499,15 +665,74 @@ def _execute_once(
         model_name=model_name,
         session_file=session_file,
     )
-    runtime = _build_runtime()
+    try:
+        runtime = _build_runtime_for_workspace(
+            workspace_dir=workspace_dir,
+            config_file=config_file,
+        )
+    except CheckpointerBuildError as exc:
+        _CONSOLE.print(f"[bold red]Failed to initialize checkpointer: {exc}[/bold red]")
+        return 1
     result = runtime.handle_input(text, session)
     _persist_session(session, session_file)
     _render_result(result)
     return 0 if result.status == CommandStatus.OK else 1
 
 
+@app.command("init")
+def init_command(
+    workspace_dir: Annotated[
+        Path | None,
+        typer.Option(file_okay=False, dir_okay=True, help="Workspace skills root."),
+    ] = None,
+    config_file: Annotated[
+        Path | None,
+        typer.Option(
+            file_okay=True,
+            dir_okay=False,
+            help="Path to global Lily config YAML/JSON file.",
+        ),
+    ] = None,
+    overwrite_config: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite-config",
+            help="Overwrite existing config file with default template.",
+        ),
+    ] = False,
+) -> None:
+    """Initialize Lily workspace files and directories.
+
+    Args:
+        workspace_dir: Optional workspace skills root override.
+        config_file: Optional global config file path override.
+        overwrite_config: Whether to overwrite existing config payload.
+    """
+    _configure_logging()
+    effective_workspace_dir = workspace_dir or _default_workspace_dir()
+    _, effective_config_file, actions = _bootstrap_workspace(
+        workspace_dir=effective_workspace_dir,
+        config_file=config_file,
+        overwrite_config=overwrite_config,
+    )
+    table = Table(title="Lily Init", show_header=True, header_style="bold cyan")
+    table.add_column("Resource", style="bold")
+    table.add_column("Status", style="green")
+    for resource, status in actions:
+        table.add_row(resource, status)
+    _CONSOLE.print(table)
+    _CONSOLE.print(
+        Panel(
+            (f"Workspace: {effective_workspace_dir}\nConfig: {effective_config_file}"),
+            title="Initialized",
+            border_style="green",
+            expand=True,
+        )
+    )
+
+
 @app.command("run")
-def run_command(
+def run_command(  # noqa: PLR0913
     text: Annotated[str, typer.Argument(help="Single input line to execute.")],
     bundled_dir: Annotated[
         Path | None,
@@ -529,6 +754,14 @@ def run_command(
             help="Path to persisted session JSON file.",
         ),
     ] = None,
+    config_file: Annotated[
+        Path | None,
+        typer.Option(
+            file_okay=True,
+            dir_okay=False,
+            help="Path to global Lily config YAML/JSON file.",
+        ),
+    ] = None,
 ) -> None:
     """Execute one input line and print deterministic result.
 
@@ -538,6 +771,7 @@ def run_command(
         workspace_dir: Optional workspace skills root override.
         model_name: Model identifier for session execution.
         session_file: Optional persisted session file path override.
+        config_file: Optional global Lily config file path override.
 
     Raises:
         Exit: Raised with command status code for shell integration.
@@ -554,6 +788,7 @@ def run_command(
         workspace_dir=effective_workspace_dir,
         model_name=model_name,
         session_file=effective_session_file,
+        config_file=config_file,
     )
     raise typer.Exit(code=exit_code)
 
@@ -580,6 +815,14 @@ def repl_command(
             help="Path to persisted session JSON file.",
         ),
     ] = None,
+    config_file: Annotated[
+        Path | None,
+        typer.Option(
+            file_okay=True,
+            dir_okay=False,
+            help="Path to global Lily config YAML/JSON file.",
+        ),
+    ] = None,
 ) -> None:
     """Run interactive REPL for slash-command testing.
 
@@ -588,6 +831,10 @@ def repl_command(
         workspace_dir: Optional workspace skills root override.
         model_name: Model identifier for session execution.
         session_file: Optional persisted session file path override.
+        config_file: Optional global Lily config file path override.
+
+    Raises:
+        Exit: Raised when configured checkpointer cannot be initialized.
     """
     _configure_logging()
     _CONSOLE.print(
@@ -604,7 +851,14 @@ def repl_command(
         model_name=model_name,
         session_file=effective_session_file,
     )
-    runtime = _build_runtime()
+    try:
+        runtime = _build_runtime_for_workspace(
+            workspace_dir=effective_workspace_dir,
+            config_file=config_file,
+        )
+    except CheckpointerBuildError as exc:
+        _CONSOLE.print(f"[bold red]Failed to initialize checkpointer: {exc}[/bold red]")
+        raise typer.Exit(code=1) from exc
 
     while True:
         try:

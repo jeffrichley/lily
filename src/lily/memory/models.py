@@ -71,6 +71,8 @@ class MemoryRecord(BaseModel):
     session_id: str | None = None
     status: str | None = None
     expires_at: datetime | None = None
+    last_verified: datetime | None = None
+    conflict_group: str | None = None
 
 
 class MemoryWriteRequest(BaseModel):
@@ -89,6 +91,8 @@ class MemoryWriteRequest(BaseModel):
     session_id: str | None = None
     status: str | None = None
     expires_at: datetime | None = None
+    last_verified: datetime | None = None
+    conflict_group: str | None = None
 
 
 class MemoryQuery(BaseModel):
@@ -100,3 +104,6 @@ class MemoryQuery(BaseModel):
     namespace: str | None = None
     limit: int = Field(default=5, ge=1, le=20)
     min_confidence: float | None = None
+    include_archived: bool = False
+    include_expired: bool = False
+    include_conflicted: bool = False

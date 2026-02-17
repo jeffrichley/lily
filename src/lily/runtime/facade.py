@@ -5,9 +5,27 @@ from __future__ import annotations
 import re
 from typing import cast
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
+
+from lily.commands.handlers._memory_support import (
+    build_personality_namespace,
+    build_personality_repository,
+    build_task_namespace,
+    build_task_repository,
+    resolve_store_file,
+)
 from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
+from lily.memory import (
+    ConsolidationBackend,
+    ConsolidationRequest,
+    EvidenceChunkingSettings,
+    LangMemManagerConsolidationEngine,
+    LangMemToolingAdapter,
+    PromptMemoryRetrievalService,
+    RuleBasedConsolidationEngine,
+)
 from lily.persona import FilePersonaRepository, PersonaProfile, default_persona_root
 from lily.prompting import PersonaContext, PersonaStyleLevel, PromptMode
 from lily.runtime.conversation import (
@@ -28,7 +46,13 @@ from lily.runtime.executors.tool_dispatch import (
 from lily.runtime.llm_backend import LangChainBackend
 from lily.runtime.session_lanes import run_in_session_lane
 from lily.runtime.skill_invoker import SkillInvoker
-from lily.session.models import Message, MessageRole, Session
+from lily.session.models import (
+    HistoryCompactionBackend,
+    HistoryCompactionConfig,
+    Message,
+    MessageRole,
+    Session,
+)
 
 _FOCUS_HINT_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(
@@ -44,11 +68,23 @@ _PLAYFUL_HINT_PATTERNS: tuple[re.Pattern[str], ...] = (
 class RuntimeFacade:
     """Facade for deterministic command and conversational routing."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         command_registry: CommandRegistry | None = None,
         conversation_executor: ConversationExecutor | None = None,
         persona_repository: FilePersonaRepository | None = None,
+        conversation_checkpointer: BaseCheckpointSaver | None = None,
+        memory_tooling_enabled: bool = False,
+        memory_tooling_auto_apply: bool = False,
+        consolidation_enabled: bool = False,
+        consolidation_backend: ConsolidationBackend = ConsolidationBackend.RULE_BASED,
+        consolidation_llm_assisted_enabled: bool = False,
+        consolidation_auto_run_every_n_turns: int = 0,
+        evidence_chunking: EvidenceChunkingSettings | None = None,
+        compaction_backend: HistoryCompactionBackend = (
+            HistoryCompactionBackend.LANGGRAPH_NATIVE
+        ),
+        compaction_max_tokens: int = 1000,
     ) -> None:
         """Create facade with command and conversation dependencies.
 
@@ -56,13 +92,40 @@ class RuntimeFacade:
             command_registry: Optional deterministic command registry.
             conversation_executor: Optional conversation execution adapter.
             persona_repository: Optional persona profile repository.
+            conversation_checkpointer: Optional checkpointer for default conversation
+                executor wiring.
+            memory_tooling_enabled: Whether LangMem command routes are enabled.
+            memory_tooling_auto_apply: Whether standard memory routes auto-use tools.
+            consolidation_enabled: Whether consolidation pipeline is enabled.
+            consolidation_backend: Consolidation backend selection.
+            consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
+            consolidation_auto_run_every_n_turns: Scheduled consolidation interval.
+            evidence_chunking: Evidence chunking settings.
+            compaction_backend: Conversation compaction backend flag.
+            compaction_max_tokens: Token budget for native compaction backend.
         """
+        self._consolidation_enabled = consolidation_enabled
+        self._consolidation_backend = consolidation_backend
+        self._consolidation_llm_assisted_enabled = consolidation_llm_assisted_enabled
+        self._consolidation_auto_run_every_n_turns = (
+            consolidation_auto_run_every_n_turns
+        )
+        self._compaction_backend = compaction_backend
+        self._compaction_max_tokens = compaction_max_tokens
         self._persona_repository = persona_repository or FilePersonaRepository(
             root_dir=default_persona_root()
         )
-        self._command_registry = command_registry or self._build_default_registry()
+        self._command_registry = command_registry or self._build_default_registry(
+            memory_tooling_enabled=memory_tooling_enabled,
+            memory_tooling_auto_apply=memory_tooling_auto_apply,
+            consolidation_enabled=consolidation_enabled,
+            consolidation_backend=consolidation_backend,
+            consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
+            evidence_chunking=evidence_chunking,
+        )
         self._conversation_executor = (
-            conversation_executor or LangChainConversationExecutor()
+            conversation_executor
+            or LangChainConversationExecutor(checkpointer=conversation_checkpointer)
         )
 
     def handle_input(self, text: str, session: Session) -> CommandResult:
@@ -106,6 +169,7 @@ class RuntimeFacade:
 
         result = self._run_conversation(text=text, session=session)
         self._record_turn(session, user_text=text, assistant_text=result.message)
+        self._maybe_run_scheduled_consolidation(session)
         return result
 
     def _run_conversation(self, *, text: str, session: Session) -> CommandResult:
@@ -127,7 +191,18 @@ class RuntimeFacade:
             user_text=text,
             model_name=session.model_settings.model_name,
             history=tuple(session.conversation_state),
-            limits=session.model_settings.conversation_limits,
+            limits=session.model_settings.conversation_limits.model_copy(
+                update={
+                    "compaction": HistoryCompactionConfig(
+                        backend=self._compaction_backend,
+                        max_tokens=self._compaction_max_tokens,
+                    )
+                }
+            ),
+            memory_summary=self._build_memory_summary(
+                session=session,
+                user_text=text,
+            ),
             persona_context=PersonaContext(
                 active_persona_id=persona.persona_id,
                 style_level=style_level,
@@ -165,6 +240,38 @@ class RuntimeFacade:
             data={"route": "conversation"},
         )
 
+    def _build_memory_summary(self, *, session: Session, user_text: str) -> str:
+        """Build repository-backed memory summary for prompt injection.
+
+        Args:
+            session: Active session state.
+            user_text: Current user turn text.
+
+        Returns:
+            Retrieved memory summary string, or empty when unavailable.
+        """
+        personality_repository = build_personality_repository(session)
+        task_repository = build_task_repository(session)
+        if personality_repository is None or task_repository is None:
+            return ""
+        retrieval = PromptMemoryRetrievalService(
+            personality_repository=personality_repository,
+            task_repository=task_repository,
+        )
+        personality_namespaces = {
+            domain: build_personality_namespace(session=session, domain=domain)
+            for domain in ("working_rules", "persona_core", "user_profile")
+        }
+        task_namespaces = (build_task_namespace(task=session.session_id),)
+        try:
+            return retrieval.build_memory_summary(
+                user_text=user_text,
+                personality_namespaces=personality_namespaces,
+                task_namespaces=task_namespaces,
+            )
+        except Exception:  # pragma: no cover - defensive fallback
+            return ""
+
     def _resolve_persona(self, persona_id: str) -> PersonaProfile:
         """Resolve active persona profile with deterministic fallback.
 
@@ -184,8 +291,25 @@ class RuntimeFacade:
             instructions="Provide clear, accurate, and concise assistance.",
         )
 
-    def _build_default_registry(self) -> CommandRegistry:
+    def _build_default_registry(  # noqa: PLR0913
+        self,
+        *,
+        memory_tooling_enabled: bool,
+        memory_tooling_auto_apply: bool,
+        consolidation_enabled: bool,
+        consolidation_backend: ConsolidationBackend,
+        consolidation_llm_assisted_enabled: bool,
+        evidence_chunking: EvidenceChunkingSettings | None,
+    ) -> CommandRegistry:
         """Construct default command registry with hidden LLM backend wiring.
+
+        Args:
+            memory_tooling_enabled: Whether LangMem command routes are enabled.
+            memory_tooling_auto_apply: Whether standard memory routes auto-use tools.
+            consolidation_enabled: Whether consolidation pipeline is enabled.
+            consolidation_backend: Consolidation backend selection.
+            consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
+            evidence_chunking: Evidence chunking settings.
 
         Returns:
             Command registry with invoker and executor dependencies.
@@ -207,7 +331,80 @@ class RuntimeFacade:
         return CommandRegistry(
             skill_invoker=invoker,
             persona_repository=self._persona_repository,
+            memory_tooling_enabled=memory_tooling_enabled,
+            memory_tooling_auto_apply=memory_tooling_auto_apply,
+            consolidation_enabled=consolidation_enabled,
+            consolidation_backend=consolidation_backend,
+            consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
+            evidence_chunking=evidence_chunking,
         )
+
+    def _maybe_run_scheduled_consolidation(self, session: Session) -> None:
+        """Run periodic consolidation when scheduled interval is met.
+
+        Args:
+            session: Active session.
+        """
+        if not self._should_run_scheduled_consolidation(session):
+            return
+        self._run_scheduled_consolidation(session)
+
+    def _should_run_scheduled_consolidation(self, session: Session) -> bool:
+        """Check whether scheduled consolidation should run for this turn.
+
+        Args:
+            session: Active session.
+
+        Returns:
+            Whether scheduled consolidation should run now.
+        """
+        if not self._consolidation_enabled:
+            return False
+        interval = self._consolidation_auto_run_every_n_turns
+        if interval < 1:
+            return False
+        user_turns = sum(
+            1 for event in session.conversation_state if event.role == MessageRole.USER
+        )
+        return user_turns > 0 and user_turns % interval == 0
+
+    def _run_scheduled_consolidation(self, session: Session) -> None:
+        """Run scheduled consolidation once for current session state.
+
+        Args:
+            session: Active session.
+        """
+        request = ConsolidationRequest(
+            session_id=session.session_id,
+            history=tuple(session.conversation_state),
+            personality_namespace=build_personality_namespace(
+                session=session,
+                domain="user_profile",
+            ),
+            enabled=True,
+            backend=self._consolidation_backend,
+            llm_assisted_enabled=self._consolidation_llm_assisted_enabled,
+            dry_run=False,
+        )
+        try:
+            if self._consolidation_backend == ConsolidationBackend.RULE_BASED:
+                personality_repository = build_personality_repository(session)
+                task_repository = build_task_repository(session)
+                if personality_repository is None:
+                    return
+                RuleBasedConsolidationEngine(
+                    personality_repository=personality_repository,
+                    task_repository=task_repository,
+                ).run(request)
+                return
+            store_file = resolve_store_file(session)
+            if store_file is None:
+                return
+            LangMemManagerConsolidationEngine(
+                tooling_adapter=LangMemToolingAdapter(store_file=store_file)
+            ).run(request)
+        except Exception:  # pragma: no cover - best effort scheduling
+            return
 
     @staticmethod
     def _record_turn(session: Session, *, user_text: str, assistant_text: str) -> None:

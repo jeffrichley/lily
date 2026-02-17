@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from lily.commands.handlers._memory_support import resolve_memory_root
+from lily.commands.handlers._memory_support import (
+    build_personality_namespace,
+    build_personality_repository,
+)
 from lily.commands.parser import CommandCall
 from lily.commands.types import CommandResult
 from lily.memory import (
-    FileBackedPersonalityMemoryRepository,
     MemoryError,
     MemorySource,
     MemoryWriteRequest,
@@ -34,17 +36,17 @@ class RememberCommand:
                 code="invalid_args",
                 data={"command": "remember"},
             )
-        root = resolve_memory_root(session)
-        if root is None:
+        repository = build_personality_repository(session)
+        if repository is None:
             return CommandResult.error(
                 "Error: /remember is unavailable for this session.",
                 code="memory_unavailable",
             )
-        repository = FileBackedPersonalityMemoryRepository(root_dir=root)
+        namespace = build_personality_namespace(session=session, domain="user_profile")
         try:
             record = repository.remember(
                 MemoryWriteRequest(
-                    namespace="global",
+                    namespace=namespace,
                     content=content,
                     source=MemorySource.COMMAND,
                     session_id=session.session_id,

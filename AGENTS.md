@@ -34,3 +34,8 @@
 
 - User-facing commands should prefer structured Rich rendering (tables/panels).
 - Avoid raw JSON data panels for default interactive output unless a dedicated JSON mode is requested.
+
+## Dispatch Pattern Rule
+
+- Prefer strategy/registry dispatch over long `if`/`elif` chains when branching by mode/backend/type.
+- Use explicit handler maps keyed by stable identifiers so adding new backends/modes does not require editing a large conditional block.

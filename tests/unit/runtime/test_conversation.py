@@ -11,10 +11,17 @@ from lily.runtime.conversation import (
     ConversationRequest,
     ConversationResponse,
     LangChainConversationExecutor,
+    _build_messages,
     _LangChainAgentRunner,
 )
 from lily.runtime.facade import RuntimeFacade
-from lily.session.models import Message, MessageRole, ModelConfig, Session
+from lily.session.models import (
+    HistoryCompactionBackend,
+    Message,
+    MessageRole,
+    ModelConfig,
+    Session,
+)
 from lily.skills.types import SkillSnapshot
 
 
@@ -173,6 +180,19 @@ class _ConversationErrorExecutor:
             "Conversation backend is unavailable.",
             code="conversation_backend_unavailable",
         )
+
+
+class _ConversationCaptureExecutor:
+    """Facade-level conversation executor fixture that captures requests."""
+
+    def __init__(self) -> None:
+        """Initialize last-request capture slot."""
+        self.last_request: ConversationRequest | None = None
+
+    def run(self, request: ConversationRequest) -> ConversationResponse:
+        """Capture request and return deterministic response."""
+        self.last_request = request
+        return ConversationResponse(text="ok")
 
 
 def _session() -> Session:
@@ -412,3 +432,124 @@ def test_runtime_maps_conversation_errors_to_deterministic_result() -> None:
     assert result.status.value == "error"
     assert result.code == "conversation_backend_unavailable"
     assert result.message == "Error: Conversation backend is unavailable."
+
+
+def test_build_messages_compacts_low_value_tool_output_and_bounds_history() -> None:
+    """Message builder should evict low-value tool payloads and compact history."""
+    history = tuple(
+        [
+            Message(role=MessageRole.USER, content=f"user turn {index}")
+            for index in range(30)
+        ]
+        + [
+            Message(
+                role=MessageRole.TOOL,
+                content="x" * 500,
+            )
+        ]
+    )
+    request = ConversationRequest(
+        session_id="session-test",
+        user_text="current turn",
+        model_name="test-model",
+        history=history,
+        limits={
+            "tool_loop": {"enabled": False, "max_rounds": 8},
+            "timeout": {"enabled": False, "timeout_ms": 30_000},
+            "retries": {"enabled": True, "max_retries": 1},
+            "compaction": {"backend": "rule_based", "max_tokens": 1000},
+        },
+    )
+
+    messages = _build_messages(request)
+
+    assert messages[-1] == {"role": "user", "content": "current turn"}
+    assert len(messages) <= 23
+    assert not any(
+        message["role"] == "tool" and message["content"] == ("x" * 500)
+        for message in messages
+    )
+
+
+def test_build_messages_langgraph_native_backend_bounds_history() -> None:
+    """LangGraph-native compaction should bound history under token budget."""
+    history = tuple(
+        Message(role=MessageRole.USER, content=f"user turn {index}")
+        for index in range(80)
+    )
+    request = ConversationRequest.model_validate(
+        {
+            "session_id": "session-test",
+            "user_text": "current turn",
+            "model_name": "test-model",
+            "history": [item.model_dump() for item in history],
+            "limits": {
+                "tool_loop": {"enabled": False, "max_rounds": 8},
+                "timeout": {"enabled": False, "timeout_ms": 30_000},
+                "retries": {"enabled": True, "max_retries": 1},
+                "compaction": {"backend": "langgraph_native", "max_tokens": 80},
+            },
+        }
+    )
+
+    messages = _build_messages(request)
+
+    assert messages[-1] == {"role": "user", "content": "current turn"}
+    assert len(messages) < len(history) + 1
+
+
+def test_compaction_backend_parity_preserves_latest_history_turn() -> None:
+    """Both compaction backends should preserve recent turns near prompt tail."""
+    history = tuple(
+        Message(role=MessageRole.USER, content=f"user turn {index}")
+        for index in range(60)
+    )
+    rule_request = ConversationRequest(
+        session_id="session-test",
+        user_text="now",
+        model_name="test-model",
+        history=history,
+    )
+    native_request = ConversationRequest.model_validate(
+        {
+            "session_id": "session-test",
+            "user_text": "now",
+            "model_name": "test-model",
+            "history": [item.model_dump() for item in history],
+            "limits": {
+                "tool_loop": {"enabled": False, "max_rounds": 8},
+                "timeout": {"enabled": False, "timeout_ms": 30_000},
+                "retries": {"enabled": True, "max_retries": 1},
+                "compaction": {"backend": "langgraph_native", "max_tokens": 120},
+            },
+        }
+    )
+
+    rule_messages = _build_messages(rule_request)
+    native_messages = _build_messages(native_request)
+
+    assert rule_messages[-2]["role"] in {"user", "assistant", "system", "tool"}
+    assert native_messages[-2]["role"] in {"user", "assistant", "system", "tool"}
+    assert any(item["content"] == "user turn 59" for item in rule_messages)
+    assert any(item["content"] == "user turn 59" for item in native_messages)
+
+
+def test_runtime_facade_can_override_compaction_backend() -> None:
+    """Runtime facade should pass configured compaction backend into request limits."""
+    capture = _ConversationCaptureExecutor()
+    runtime = RuntimeFacade(
+        conversation_executor=capture,
+        compaction_backend=HistoryCompactionBackend.LANGGRAPH_NATIVE,
+        compaction_max_tokens=77,
+    )
+    session = _session()
+
+    result = runtime.handle_input("hello lily", session)
+
+    assert result.status.value == "ok"
+    assert capture.last_request is not None
+    assert (
+        capture.last_request.limits.compaction.backend
+        == HistoryCompactionBackend.LANGGRAPH_NATIVE
+    )
+    assert capture.last_request.limits.compaction.max_tokens == 77

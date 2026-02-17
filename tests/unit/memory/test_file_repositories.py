@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from lily.memory import (
@@ -118,3 +119,62 @@ def test_memory_policy_denied_blocks_sensitive_writes(tmp_path: Path) -> None:
         assert exc.code == MemoryErrorCode.POLICY_DENIED
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected MemoryError")
+
+
+def test_query_excludes_archived_conflicted_and_expired_by_default(
+    tmp_path: Path,
+) -> None:
+    """Default query should hide archived/conflicted/expired records."""
+    repo = _personality_repo(tmp_path)
+    now = datetime.now(UTC)
+    repo.remember(
+        MemoryWriteRequest(
+            namespace="global",
+            content="active preference",
+            status="verified",
+        )
+    )
+    repo.remember(
+        MemoryWriteRequest(
+            namespace="global",
+            content="archived preference",
+            status="archived",
+        )
+    )
+    repo.remember(
+        MemoryWriteRequest(
+            namespace="global",
+            content="conflicted preference",
+            status="conflicted",
+        )
+    )
+    repo.remember(
+        MemoryWriteRequest(
+            namespace="global",
+            content="expired preference",
+            status="verified",
+            expires_at=now - timedelta(days=1),
+        )
+    )
+
+    visible = repo.query(MemoryQuery(query="*", namespace="global", limit=20))
+    all_rows = repo.query(
+        MemoryQuery(
+            query="*",
+            namespace="global",
+            limit=20,
+            include_archived=True,
+            include_conflicted=True,
+            include_expired=True,
+        )
+    )
+
+    visible_contents = {row.content for row in visible}
+    all_contents = {row.content for row in all_rows}
+    assert visible_contents == {"active preference"}
+    assert {
+        "active preference",
+        "archived preference",
+        "conflicted preference",
+        "expired preference",
+    } <= all_contents

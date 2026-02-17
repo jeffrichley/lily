@@ -17,7 +17,15 @@ from langchain.agents.middleware import (
     before_model,
     dynamic_prompt,
 )
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+    trim_messages,
+)
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
 from langgraph.runtime import Runtime
@@ -32,7 +40,12 @@ from lily.policy import (
     resolve_effective_style,
 )
 from lily.prompting import PersonaContext, PromptBuildContext, PromptBuilder, PromptMode
-from lily.session.models import ConversationLimitsConfig, Message
+from lily.session.models import (
+    ConversationLimitsConfig,
+    HistoryCompactionBackend,
+    Message,
+    MessageRole,
+)
 
 _LOGGER = logging.getLogger(__name__)
 _DEFAULT_SYSTEM_PROMPT = (
@@ -40,6 +53,13 @@ _DEFAULT_SYSTEM_PROMPT = (
     "Provide clear, direct, helpful responses.\n"
     "If information is missing, say what is missing instead of guessing.\n"
 )
+_MAX_COMPACT_HISTORY_EVENTS = 20
+_MAX_TOOL_CONTENT_CHARS = 240
+_HISTORY_BUDGET_CHARS = 4000
+_COMPACTION_SUMMARY_MAX_CHARS = 320
+_COMPACTION_SUMMARY_HEAD_CHARS = 220
+_COMPACTION_SUMMARY_TAIL_CHARS = 80
+_MIN_HISTORY_EVENTS = 2
 
 
 def _default_persona_context() -> PersonaContext:
@@ -61,6 +81,7 @@ class ConversationRequest(BaseModel):
     model_name: str = Field(min_length=1)
     history: tuple[Message, ...] = ()
     limits: ConversationLimitsConfig = Field(default_factory=ConversationLimitsConfig)
+    memory_summary: str = ""
     persona_context: PersonaContext = Field(default_factory=_default_persona_context)
     prompt_mode: PromptMode = PromptMode.FULL
 
@@ -72,6 +93,7 @@ class ConversationRuntimeContext(BaseModel):
 
     session_id: str = Field(min_length=1)
     model_name: str = Field(min_length=1)
+    memory_summary: str = ""
     persona_context: PersonaContext
     prompt_mode: PromptMode
 
@@ -129,7 +151,7 @@ class _LangChainAgentRunner:
 
     def __init__(
         self,
-        checkpointer: InMemorySaver | None = None,
+        checkpointer: BaseCheckpointSaver | None = None,
         *,
         prompt_builder: PromptBuilder | None = None,
     ) -> None:
@@ -166,6 +188,7 @@ class _LangChainAgentRunner:
         runtime_context = ConversationRuntimeContext(
             session_id=request.session_id,
             model_name=request.model_name,
+            memory_summary=request.memory_summary,
             persona_context=request.persona_context,
             prompt_mode=request.prompt_mode,
         )
@@ -250,6 +273,7 @@ def _build_dynamic_prompt_middleware(prompt_builder: PromptBuilder) -> object:
             mode=runtime_context.prompt_mode,
             session_id=runtime_context.session_id,
             model_name=runtime_context.model_name,
+            memory_summary=runtime_context.memory_summary,
         )
         return prompt_builder.build(build_context)
 
@@ -345,13 +369,38 @@ def _build_messages(request: ConversationRequest) -> list[dict[str, str]]:
     Returns:
         Ordered message list for LangChain invocation.
     """
-    messages: list[dict[str, str]] = []
-    for item in request.history:
-        if item.role.value == "system":
-            continue
-        messages.append({"role": item.role.value, "content": item.content})
+    compacted = _compact_history_with_backend(
+        history=request.history,
+        limits=request.limits,
+    )
+    messages = [
+        {"role": item.role.value, "content": item.content} for item in compacted
+    ]
     messages.append({"role": "user", "content": request.user_text})
     return messages
+
+
+def _compact_history_with_backend(
+    *,
+    history: tuple[Message, ...],
+    limits: ConversationLimitsConfig,
+) -> tuple[Message, ...]:
+    """Compact history with configured backend strategy.
+
+    Args:
+        history: Full persisted conversation history.
+        limits: Conversation limits configuration.
+
+    Returns:
+        Compacted history tuple.
+    """
+    backend = limits.compaction.backend
+    if backend == HistoryCompactionBackend.LANGGRAPH_NATIVE:
+        return _compact_history_langgraph_native(
+            history=history,
+            max_tokens=limits.compaction.max_tokens,
+        )
+    return _compact_history_rule_based(history)
 
 
 def _build_agent_invoke_config(request: ConversationRequest) -> dict[str, Any]:
@@ -393,15 +442,17 @@ class LangChainConversationExecutor:
         self,
         runner: AgentRunner | None = None,
         *,
+        checkpointer: BaseCheckpointSaver | None = None,
         normalize_text: Callable[[str], str] | None = None,
     ) -> None:
         """Create LangChain conversation executor.
 
         Args:
             runner: Optional runner override for tests.
+            checkpointer: Optional checkpointer override for default runner wiring.
             normalize_text: Optional text normalization override for tests.
         """
-        self._runner = runner or _LangChainAgentRunner()
+        self._runner = runner or _LangChainAgentRunner(checkpointer=checkpointer)
         self._normalize_text = normalize_text or (lambda text: text.strip())
 
     def run(self, request: ConversationRequest) -> ConversationResponse:
@@ -677,3 +728,157 @@ def _latest_assistant_text(state: AgentState[object]) -> str:
         if role == "ai" and isinstance(content, str):
             return content
     return ""
+
+
+def _compact_history_rule_based(history: tuple[Message, ...]) -> tuple[Message, ...]:
+    """Compact history to deterministic bounded context.
+
+    Args:
+        history: Full persisted conversation history.
+
+    Returns:
+        Compacted history tuple for prompt invocation.
+    """
+    filtered: list[Message] = []
+    evicted_tool_events: list[Message] = []
+    for item in history:
+        if item.role == MessageRole.TOOL and _is_low_value_tool_output(item.content):
+            evicted_tool_events.append(item)
+            continue
+        filtered.append(item)
+    if len(filtered) > _MAX_COMPACT_HISTORY_EVENTS:
+        older = filtered[:-_MAX_COMPACT_HISTORY_EVENTS]
+        recent = filtered[-_MAX_COMPACT_HISTORY_EVENTS:]
+        summary = _summarize_history(older)
+        compacted = [Message(role=MessageRole.SYSTEM, content=summary), *recent]
+    else:
+        compacted = filtered
+    if evicted_tool_events:
+        tool_summary = _summarize_history(evicted_tool_events, label="tool")
+        compacted.insert(0, Message(role=MessageRole.SYSTEM, content=tool_summary))
+    return tuple(_enforce_char_budget(compacted, max_chars=_HISTORY_BUDGET_CHARS))
+
+
+def _compact_history_langgraph_native(
+    *,
+    history: tuple[Message, ...],
+    max_tokens: int,
+) -> tuple[Message, ...]:
+    """Compact history using LangChain native trim-messages utility.
+
+    Args:
+        history: Full persisted conversation history.
+        max_tokens: Approximate token budget.
+
+    Returns:
+        Compacted history tuple.
+    """
+    base_messages = [_to_base_message(item) for item in history]
+    trimmed = trim_messages(
+        base_messages,
+        max_tokens=max_tokens,
+        token_counter="approximate",  # nosec B106 - langchain trim mode selector
+        strategy="last",
+        include_system=True,
+        start_on="human",
+        allow_partial=False,
+    )
+    return tuple(_to_session_message(item) for item in trimmed)
+
+
+def _to_base_message(message: Message) -> BaseMessage:
+    """Convert session message to LangChain base message.
+
+    Args:
+        message: Session message payload.
+
+    Returns:
+        LangChain base message.
+    """
+    if message.role == MessageRole.USER:
+        return HumanMessage(content=message.content)
+    if message.role == MessageRole.SYSTEM:
+        return SystemMessage(content=message.content)
+    if message.role == MessageRole.ASSISTANT:
+        return AIMessage(content=message.content)
+    return ToolMessage(content=message.content, tool_call_id="lily_tool")
+
+
+def _to_session_message(message: BaseMessage) -> Message:
+    """Convert LangChain base message to session message.
+
+    Args:
+        message: LangChain base message payload.
+
+    Returns:
+        Session message payload.
+    """
+    if isinstance(message, HumanMessage):
+        return Message(role=MessageRole.USER, content=str(message.content))
+    if isinstance(message, SystemMessage):
+        return Message(role=MessageRole.SYSTEM, content=str(message.content))
+    if isinstance(message, ToolMessage):
+        return Message(role=MessageRole.TOOL, content=str(message.content))
+    return Message(role=MessageRole.ASSISTANT, content=str(message.content))
+
+
+def _is_low_value_tool_output(content: str) -> bool:
+    """Determine whether tool output is low-value for prompt context.
+
+    Args:
+        content: Tool output text.
+
+    Returns:
+        Whether content should be evicted from active context.
+    """
+    text = content.strip()
+    if len(text) <= _MAX_TOOL_CONTENT_CHARS:
+        return False
+    lowered = text.lower()
+    return not ("error" in lowered or "failed" in lowered)
+
+
+def _summarize_history(
+    events: list[Message],
+    *,
+    label: str = "history",
+) -> str:
+    """Create deterministic summary for compacted historical events.
+
+    Args:
+        events: Events being compacted.
+        label: Summary label.
+
+    Returns:
+        Deterministic summary string.
+    """
+    snippets = []
+    for event in events:
+        preview = " ".join(event.content.split())
+        snippets.append(f"{event.role.value}:{preview[:80]}")
+    joined = " | ".join(snippets)
+    if len(joined) > _COMPACTION_SUMMARY_MAX_CHARS:
+        joined = (
+            f"{joined[:_COMPACTION_SUMMARY_HEAD_CHARS]} [...] "
+            f"{joined[-_COMPACTION_SUMMARY_TAIL_CHARS:]}"
+        )
+    return f"Compacted {label} summary ({len(events)} events): {joined}"
+
+
+def _enforce_char_budget(events: list[Message], *, max_chars: int) -> list[Message]:
+    """Trim oldest events until total char budget is satisfied.
+
+    Args:
+        events: Candidate events.
+        max_chars: Maximum total content characters.
+
+    Returns:
+        Budget-compliant event list.
+    """
+    remaining = list(events)
+    while (
+        sum(len(event.content) for event in remaining) > max_chars
+        and len(remaining) > _MIN_HISTORY_EVENTS
+    ):
+        remaining.pop(0)
+    return remaining

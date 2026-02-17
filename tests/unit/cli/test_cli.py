@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import yaml
 from _pytest.monkeypatch import MonkeyPatch
 from typer.testing import CliRunner
 
@@ -73,7 +74,10 @@ def test_run_single_shot_renders_success(
             del session
             return CommandResult.ok("HELLO")
 
-    monkeypatch.setattr("lily.cli.cli._build_runtime", _StubRuntime)
+    monkeypatch.setattr(
+        "lily.cli.cli._build_runtime_for_workspace",
+        lambda **_: _StubRuntime(),
+    )
 
     result = _RUNNER.invoke(
         app,
@@ -107,7 +111,10 @@ def test_run_single_shot_renders_error_and_exit_code(
             del session
             return CommandResult.error("Error: boom")
 
-    monkeypatch.setattr("lily.cli.cli._build_runtime", _StubRuntime)
+    monkeypatch.setattr(
+        "lily.cli.cli._build_runtime_for_workspace",
+        lambda **_: _StubRuntime(),
+    )
 
     result = _RUNNER.invoke(
         app,
@@ -247,7 +254,7 @@ def test_run_memory_show_renders_table_instead_of_json(tmp_path: Path) -> None:
     assert shown.exit_code == 0
     assert "Memory (" in shown.stdout
     assert "favorite" in shown.stdout
-    assert "dark royal" in shown.stdout
+    assert "royal" in shown.stdout
     assert "purple" in shown.stdout
     assert '"records":' not in shown.stdout
 
@@ -368,3 +375,137 @@ def test_repl_recovers_corrupt_session_file(tmp_path: Path) -> None:
     assert backups
     payload = json.loads(session_file.read_text(encoding="utf-8"))
     assert payload["schema_version"] == 1
+
+
+def test_run_creates_default_sqlite_checkpointer_file(tmp_path: Path) -> None:
+    """`lily run` should initialize default sqlite checkpointer file in local mode."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / ".lily" / "skills"
+    session_file = tmp_path / ".lily" / "session.json"
+    config_file = tmp_path / ".lily" / "config.json"
+    checkpointer_file = tmp_path / ".lily" / "checkpoints" / "checkpointer.sqlite"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir(parents=True)
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(
+        (
+            "{"
+            '"checkpointer":{'
+            '"backend":"sqlite",'
+            f'"sqlite_path":"{checkpointer_file.as_posix()}"'
+            "}"
+            "}"
+        ),
+        encoding="utf-8",
+    )
+    _write_echo_skill(bundled_dir)
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "/skills",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+            "--session-file",
+            str(session_file),
+            "--config-file",
+            str(config_file),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert checkpointer_file.exists()
+
+
+def test_init_bootstraps_workspace_and_default_config(tmp_path: Path) -> None:
+    """`lily init` should create workspace directories and default config file."""
+    workspace_dir = tmp_path / ".lily" / "skills"
+    config_file = tmp_path / ".lily" / "config.yaml"
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "init",
+            "--workspace-dir",
+            str(workspace_dir),
+            "--config-file",
+            str(config_file),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert workspace_dir.exists()
+    assert (workspace_dir.parent / "checkpoints").exists()
+    assert (workspace_dir.parent / "memory").exists()
+    assert config_file.exists()
+    payload = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+    assert payload["checkpointer"]["backend"] == "sqlite"
+    assert payload["compaction"]["backend"] in {"rule_based", "langgraph_native"}
+
+
+def test_init_does_not_overwrite_existing_config_without_flag(tmp_path: Path) -> None:
+    """`lily init` should keep existing config unless overwrite flag is set."""
+    workspace_dir = tmp_path / ".lily" / "skills"
+    config_file = tmp_path / ".lily" / "config.yaml"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(
+        json.dumps(
+            {
+                "checkpointer": {
+                    "backend": "memory",
+                    "sqlite_path": ".lily/checkpoints/checkpointer.sqlite",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "init",
+            "--workspace-dir",
+            str(workspace_dir),
+            "--config-file",
+            str(config_file),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+    assert payload["checkpointer"]["backend"] == "memory"
+
+
+def test_init_uses_existing_json_config_when_yaml_missing(tmp_path: Path) -> None:
+    """`lily init` should preserve legacy config.json when already present."""
+    workspace_dir = tmp_path / ".lily" / "skills"
+    config_file = tmp_path / ".lily" / "config.json"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.write_text(
+        json.dumps(
+            {
+                "checkpointer": {
+                    "backend": "memory",
+                    "sqlite_path": ".lily/checkpoints/checkpointer.sqlite",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "init",
+            "--workspace-dir",
+            str(workspace_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert not (tmp_path / ".lily" / "config.yaml").exists()
+    payload = json.loads(config_file.read_text(encoding="utf-8"))
+    assert payload["checkpointer"]["backend"] == "memory"

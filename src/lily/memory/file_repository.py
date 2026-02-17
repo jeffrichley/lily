@@ -17,12 +17,19 @@ from lily.memory.models import (
     MemoryStore,
     MemoryWriteRequest,
 )
+from lily.memory.query_filters import (
+    confidence_matches,
+    content_matches,
+    namespace_matches,
+    status_visible,
+)
+from lily.memory.record_factory import create_memory_record, memory_update_fields
 from lily.memory.repository import PersonalityMemoryRepository, TaskMemoryRepository
+from lily.observability import memory_metrics
 from lily.policy import evaluate_memory_write
 
 _PERSONALITY_FILE = "personality_memory.json"
 _TASK_FILE = "task_memory.json"
-_SCHEMA_VERSION = 1
 
 
 class _FileMemoryStore:
@@ -62,6 +69,7 @@ class _FileMemoryStore:
             )
         decision = evaluate_memory_write(normalized_content)
         if not decision.allowed:
+            memory_metrics.record_denied_write(namespace=normalized_namespace)
             raise MemoryError(
                 MemoryErrorCode.POLICY_DENIED,
                 decision.reason,
@@ -74,42 +82,23 @@ class _FileMemoryStore:
             if existing_fingerprint != fingerprint:
                 continue
             updated = record.model_copy(
-                update={
-                    "source": request.source,
-                    "confidence": request.confidence,
-                    "tags": request.tags,
-                    "updated_at": now,
-                    "preference_type": request.preference_type,
-                    "stability": request.stability,
-                    "task_id": request.task_id,
-                    "session_id": request.session_id,
-                    "status": request.status,
-                    "expires_at": request.expires_at,
-                }
+                update=memory_update_fields(request=request, updated_at=now)
             )
             records[index] = updated
             self._save_records(records)
+            memory_metrics.record_write(namespace=normalized_namespace)
             return updated
 
-        created = MemoryRecord(
-            schema_version=_SCHEMA_VERSION,
+        created = create_memory_record(
             store=self._store,
             namespace=normalized_namespace,
             content=normalized_content,
-            source=request.source,
-            confidence=request.confidence,
-            tags=request.tags,
-            created_at=now,
-            updated_at=now,
-            preference_type=request.preference_type,
-            stability=request.stability,
-            task_id=request.task_id,
-            session_id=request.session_id,
-            status=request.status,
-            expires_at=request.expires_at,
+            request=request,
+            now=now,
         )
         records.append(created)
         self._save_records(records)
+        memory_metrics.record_write(namespace=normalized_namespace)
         return created
 
     def forget(self, memory_id: str) -> None:
@@ -146,23 +135,23 @@ class _FileMemoryStore:
             Ordered matching memory records.
         """
         records = self._load_records()
-        needle = query.query.strip().lower()
         namespace = query.namespace.strip() if query.namespace is not None else None
-        wildcard = needle == "*"
-        matches = []
-        for record in records:
-            if namespace is not None and record.namespace != namespace:
-                continue
-            if (
-                query.min_confidence is not None
-                and record.confidence < query.min_confidence
-            ):
-                continue
-            if not wildcard and needle not in record.content.lower():
-                continue
-            matches.append(record)
+        matches = [
+            record
+            for record in records
+            if _record_visible(
+                query=query,
+                record=record,
+                namespace=namespace,
+            )
+        ]
         ordered = sorted(matches, key=lambda record: record.updated_at, reverse=True)
-        return tuple(ordered[: query.limit])
+        selected = tuple(ordered[: query.limit])
+        memory_metrics.record_read(
+            namespace=namespace or "unknown",
+            hit_count=len(selected),
+        )
+        return selected
 
     def _load_records(self) -> list[MemoryRecord]:
         """Load and validate memory records from backing file.
@@ -331,3 +320,29 @@ def _fingerprint(namespace: str, content: str) -> str:
     """
     value = f"{namespace.strip().lower()}::{content.strip().lower()}".encode()
     return sha256(value).hexdigest()
+
+
+def _record_visible(
+    *,
+    query: MemoryQuery,
+    record: MemoryRecord,
+    namespace: str | None,
+) -> bool:
+    """Check whether one record passes deterministic visibility filters.
+
+    Args:
+        query: Memory query payload.
+        record: Candidate memory record.
+        namespace: Optional required namespace filter.
+
+    Returns:
+        ``True`` when record is visible and matches query.
+    """
+    return all(
+        (
+            namespace_matches(namespace=namespace, record=record),
+            confidence_matches(query=query, record=record),
+            status_visible(query=query, record=record),
+            content_matches(query=query, record=record),
+        )
+    )
