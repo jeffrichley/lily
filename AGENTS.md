@@ -30,6 +30,22 @@
   - what remains deferred
 - Avoid implying full subsystem completion when only compatibility surfaces exist.
 
+## PR Template Compliance
+
+- For every `gh pr create` or `gh pr edit`, follow the repository PR template at:
+  - `.github/pull_request_template.md`
+- Required headings must appear exactly:
+  - `Summary`
+  - `Verification`
+  - `Risk Assessment`
+  - `Documentation Impact`
+  - `Checklist (Ruthless)`
+- In `Documentation Impact`, check exactly one option:
+  - `No docs update needed`
+  - `Docs updated in this PR (list paths below)`
+  - `Docs follow-up required (owner + target date below)`
+- Do not request review until the PR body passes template compliance.
+
 ## CLI Output UX Rule
 
 - User-facing commands should prefer structured Rich rendering (tables/panels).
