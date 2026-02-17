@@ -10,7 +10,7 @@ source_of_truth: true
 Purpose: execution tracker for shipping Lily personality architecture in a controlled order.
 
 Related:
-- `docs/dev/personality_roadmap.md`
+- `docs/archive/specs/personality/personality_roadmap.md`
 - `docs/adr/ADR-001-memory-model.md`
 
 ## Tracking Rules
@@ -187,7 +187,7 @@ Phase 2 current-state note:
 - 2026-02-16: Completed Phase 4 policy boundaries (pre/post policy checks, precedence enforcement, tool-call guardrails, conversation/memory policy-denied envelopes, and redline fixtures).
 - 2026-02-16: Completed Phase 5 typed contracts (`command_tool` input/output schemas, deterministic validation envelopes, LangChain structured-response extraction, and conformance tests for add/subtract/multiply).
 - 2026-02-16: Completed Gate B baseline quality enforcement with 10-20 canonical eval coverage and pass-rate threshold tests.
-- 2026-02-16: Completed Phase 6 persona command surface (`/persona`, `/style`, `/remember`, `/forget`, `/memory show`) with bundled persona profiles (`lily`, `chad`, `barbie`) and docs in `docs/dev/persona_commands.md`.
+- 2026-02-16: Completed Phase 6 persona command surface (`/persona`, `/style`, `/remember`, `/forget`, `/memory show`) with bundled persona profiles (`lily`, `chad`, `barbie`) and docs in `docs/specs/commands/persona_commands.md`.
 - 2026-02-16: Completed Phase 7 quality gates with deterministic personality/task/fun/safety eval suites and CI threshold enforcement (`just ci-gates`).
 - 2026-02-16: Completed Phase 8 baseline enhancements (`/reload_persona`, persona export/import, context-aware tone adaptation, and persona-backed `/agent` compatibility commands).
 

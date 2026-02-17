@@ -7,7 +7,7 @@ source_of_truth: true
 
 # Memory Execution Plan (V1)
 
-Purpose: phased implementation plan for `docs/dev/memory_spec_v1.md` with deterministic gates.
+Purpose: phased implementation plan for `docs/specs/memory/memory_spec_v1.md` with deterministic gates.
 
 Scope contract:
 - This plan is fixed-scope per phase.
@@ -27,7 +27,7 @@ Scope contract:
 - None (alignment gate only).
 
 `Internal engineering tasks`
-- [x] Spec accepted by team (`docs/dev/memory_spec_v1.md`).
+- [x] Spec accepted by team (`docs/specs/memory/memory_spec_v1.md`).
 - [x] Command contracts frozen for migration window:
   - [x] `/remember`
   - [x] `/memory show`
@@ -404,7 +404,7 @@ Goal: replace custom rule-based history compaction with LangGraph-native state/c
 
 - 2026-02-16: Plan created from V1 spec + LangGraph/LangMem + Anthropic best-practice synthesis.
 - 2026-02-16: Plan restructured to AGENTS phase-contract format (fixed scope, acceptance criteria, non-goals, required tests/gates, feature/internal split).
-- 2026-02-16: Gate M0 completed. Baseline eval/quality gates passed and observability baseline snapshot captured in `docs/dev/memory_m0_baseline_2026-02-16.md`.
+- 2026-02-16: Gate M0 completed. Baseline eval/quality gates passed and observability baseline snapshot captured in `docs/archive/dev/baselines/memory_m0_baseline_2026-02-16.md`.
 - 2026-02-16: Phase 1 completed. Added global checkpointer config, SQLite-backed persistent checkpointer wiring, profile contract for production backend, and restart/history continuity tests.
 - 2026-02-16: Phase 2 completed. Added store-backed memory repositories, repository-interface command wiring, compatibility command aliases, and initial `/memory short|long|evidence` command-family rollout with parity/isolation tests.
 - 2026-02-17: Phase 3 completed. Added repository-backed retrieval service, deterministic ranking and memory-summary prompt injection, and deterministic context compaction with long-transcript tests.

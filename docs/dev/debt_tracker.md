@@ -68,8 +68,8 @@ Priority scale:
   - Owner: `@team`
   - Closed: `2026-02-17`
   - Evidence:
-    - `docs/dev/punchlist.md` converted to archived summary + canonical links
-    - `docs/dev/later_backlog.md` reduced to curated idea list (non-status tracker)
+    - `docs/archive/dev/punchlist.md` converted to archived summary + canonical links
+    - `ideas/later_backlog.md` reduced to curated idea list (non-status tracker)
     - `docs/dev/roadmap.md` updated with explicit status ownership and current execution rule
 
 ## Recently Closed Debt

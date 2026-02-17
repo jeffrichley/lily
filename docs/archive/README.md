@@ -17,3 +17,4 @@ Rules:
 
 - `docs/archive/dev/punchlist.md`
 - `docs/archive/process/needed.md`
+- `docs/archive/specs/agent_mode_v0/`

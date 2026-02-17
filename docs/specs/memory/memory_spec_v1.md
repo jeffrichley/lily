@@ -9,7 +9,7 @@ source_of_truth: false
 
 Status: Proposed  
 Date: 2026-02-16  
-Supersedes: `docs/dev/memory_spec_v0.md` (conceptual draft)  
+Supersedes: `docs/archive/specs/memory/memory_spec_v0.md` (conceptual draft)  
 Scope: Short-term + long-term memory architecture and migration strategy
 
 ---

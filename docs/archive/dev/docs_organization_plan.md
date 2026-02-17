@@ -1,8 +1,8 @@
 ---
 owner: "@team"
 last_updated: "2026-02-17"
-status: "active"
-source_of_truth: true
+status: "archived"
+source_of_truth: false
 ---
 
 # Docs Organization Plan

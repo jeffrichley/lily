@@ -11,8 +11,8 @@ source_of_truth: false
 - Date: 2026-02-16
 - Owners: Lily core runtime
 - Related:
-  - `docs/dev/personality_roadmap.md`
-  - `docs/specs/agent_mode_v0/SESSION_MODEL_V0.md`
+  - `docs/archive/specs/personality/personality_roadmap.md`
+  - `docs/archive/specs/agent_mode_v0/SESSION_MODEL_V0.md`
 
 ## Context
 

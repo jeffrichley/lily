@@ -47,7 +47,7 @@ Update cadence:
 
 | Work item | Type | Canonical trace |
 |---|---|---|
-| Docs governance rollout | Internal engineering task | `docs/dev/docs_organization_plan.md` |
+| Docs governance rollout (closed) | Internal engineering task | `docs/archive/dev/docs_organization_plan.md` |
 | Typed skill/tool contracts | Internal engineering task | `docs/dev/debt_tracker.md` |
 | Memory migration scope/status | User-visible + internal | `docs/dev/memory_execution_plan.md` |
 | Personality subsystem scope/status | User-visible + internal | `docs/dev/personality_execution_plan.md` |

@@ -9,6 +9,16 @@ source_of_truth: true
 
 Purpose: keep documentation useful, minimal, and non-duplicative.
 
+## Allowed Top-Level Directories
+
+Only these directories should exist directly under `docs/`:
+- `docs/dev`
+- `docs/process`
+- `docs/specs`
+- `docs/adr`
+- `docs/ops`
+- `docs/archive`
+
 ## Canonical Documents
 
 Use these files as the only source of truth for each concern:
@@ -22,7 +32,7 @@ Use these files as the only source of truth for each concern:
 | Personality domain phase execution status | `docs/dev/personality_execution_plan.md` |
 | Process and workflow rules | `docs/process/process.md` |
 | Docs weekly operating cadence | `docs/process/docs_cadence.md` |
-| This docs governance rollout plan | `docs/dev/docs_organization_plan.md` |
+| Active specs index | `docs/specs/README.md` |
 | Historical docs index | `docs/archive/README.md` |
 
 ## Promotion Rules
