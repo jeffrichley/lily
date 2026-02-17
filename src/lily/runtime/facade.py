@@ -7,9 +7,16 @@ from typing import cast
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
+from lily.commands.handlers._memory_support import (
+    build_personality_namespace,
+    build_personality_repository,
+    build_task_namespace,
+    build_task_repository,
+)
 from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
+from lily.memory import PromptMemoryRetrievalService
 from lily.persona import FilePersonaRepository, PersonaProfile, default_persona_root
 from lily.prompting import PersonaContext, PersonaStyleLevel, PromptMode
 from lily.runtime.conversation import (
@@ -134,6 +141,10 @@ class RuntimeFacade:
             model_name=session.model_settings.model_name,
             history=tuple(session.conversation_state),
             limits=session.model_settings.conversation_limits,
+            memory_summary=self._build_memory_summary(
+                session=session,
+                user_text=text,
+            ),
             persona_context=PersonaContext(
                 active_persona_id=persona.persona_id,
                 style_level=style_level,
@@ -170,6 +181,38 @@ class RuntimeFacade:
             code="conversation_reply",
             data={"route": "conversation"},
         )
+
+    def _build_memory_summary(self, *, session: Session, user_text: str) -> str:
+        """Build repository-backed memory summary for prompt injection.
+
+        Args:
+            session: Active session state.
+            user_text: Current user turn text.
+
+        Returns:
+            Retrieved memory summary string, or empty when unavailable.
+        """
+        personality_repository = build_personality_repository(session)
+        task_repository = build_task_repository(session)
+        if personality_repository is None or task_repository is None:
+            return ""
+        retrieval = PromptMemoryRetrievalService(
+            personality_repository=personality_repository,
+            task_repository=task_repository,
+        )
+        personality_namespaces = {
+            domain: build_personality_namespace(session=session, domain=domain)
+            for domain in ("working_rules", "persona_core", "user_profile")
+        }
+        task_namespaces = (build_task_namespace(task=session.session_id),)
+        try:
+            return retrieval.build_memory_summary(
+                user_text=user_text,
+                personality_namespaces=personality_namespaces,
+                task_namespaces=task_namespaces,
+            )
+        except Exception:  # pragma: no cover - defensive fallback
+            return ""
 
     def _resolve_persona(self, persona_id: str) -> PersonaProfile:
         """Resolve active persona profile with deterministic fallback.

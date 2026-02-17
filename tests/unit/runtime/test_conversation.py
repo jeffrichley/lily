@@ -11,6 +11,7 @@ from lily.runtime.conversation import (
     ConversationRequest,
     ConversationResponse,
     LangChainConversationExecutor,
+    _build_messages,
     _LangChainAgentRunner,
 )
 from lily.runtime.facade import RuntimeFacade
@@ -412,3 +413,34 @@ def test_runtime_maps_conversation_errors_to_deterministic_result() -> None:
     assert result.status.value == "error"
     assert result.code == "conversation_backend_unavailable"
     assert result.message == "Error: Conversation backend is unavailable."
+
+
+def test_build_messages_compacts_low_value_tool_output_and_bounds_history() -> None:
+    """Message builder should evict low-value tool payloads and compact history."""
+    history = tuple(
+        [
+            Message(role=MessageRole.USER, content=f"user turn {index}")
+            for index in range(30)
+        ]
+        + [
+            Message(
+                role=MessageRole.TOOL,
+                content="x" * 500,
+            )
+        ]
+    )
+    request = ConversationRequest(
+        session_id="session-test",
+        user_text="current turn",
+        model_name="test-model",
+        history=history,
+    )
+
+    messages = _build_messages(request)
+
+    assert messages[-1] == {"role": "user", "content": "current turn"}
+    assert len(messages) <= 23
+    assert not any(
+        message["role"] == "tool" and message["content"] == ("x" * 500)
+        for message in messages
+    )

@@ -150,41 +150,41 @@ Goal: move custom file-repository internals to LangGraph Store-backed adapters w
 Goal: make prompt memory injection repository-backed, selective, and bounded.
 
 `User-visible features`
-- [ ] More relevant responses from retrieved long-term memory.
-- [ ] Stable output quality on long-running threads via deterministic context compaction.
+- [x] More relevant responses from retrieved long-term memory.
+- [x] Stable output quality on long-running threads via deterministic context compaction.
 
 `Internal engineering tasks`
-- [ ] Add retrieval service for prompt assembly:
-  - [ ] `persona_core` query path
-  - [ ] `user_profile` query path
-  - [ ] `working_rules` query path
-  - [ ] `task_memory` query path (namespace constrained)
-- [ ] Add deterministic ranking/filter policy:
-  - [ ] confidence threshold
-  - [ ] recency tie-break
-  - [ ] bounded result count
-- [ ] Inject retrieved summary into `PromptBuildContext.memory_summary`.
-- [ ] Add context compaction policy:
-  - [ ] deterministic summarize/trim strategy
-  - [ ] low-value tool output eviction rules
-  - [ ] context budget guardrails and truncation controls
+- [x] Add retrieval service for prompt assembly:
+  - [x] `persona_core` query path
+  - [x] `user_profile` query path
+  - [x] `working_rules` query path
+  - [x] `task_memory` query path (namespace constrained)
+- [x] Add deterministic ranking/filter policy:
+  - [x] confidence threshold
+  - [x] recency tie-break
+  - [x] bounded result count
+- [x] Inject retrieved summary into `PromptBuildContext.memory_summary`.
+- [x] Add context compaction policy:
+  - [x] deterministic summarize/trim strategy
+  - [x] low-value tool output eviction rules
+  - [x] context budget guardrails and truncation controls
 
 `Acceptance criteria`
-- [ ] Prompt memory section is repository-backed (not manual-only).
-- [ ] Retrieval composition preserves priority of durable operating constraints:
-  - [ ] `working_rules` + `persona_core` before `user_profile` before `task_memory` (within configured caps)
-- [ ] Token/context bloat remains bounded under long transcripts.
-- [ ] Retrieval behavior is deterministic under same inputs/state.
+- [x] Prompt memory section is repository-backed (not manual-only).
+- [x] Retrieval composition preserves priority of durable operating constraints:
+  - [x] `working_rules` + `persona_core` before `user_profile` before `task_memory` (within configured caps)
+- [x] Token/context bloat remains bounded under long transcripts.
+- [x] Retrieval behavior is deterministic under same inputs/state.
 
 `Non-goals`
 - No autonomous long-term memory writes.
 - No semantic evidence as canonical truth.
 
 `Required tests and gates`
-- [ ] Retrieval relevance tests.
-- [ ] Prompt-size and truncation tests.
-- [ ] Long-transcript compaction effectiveness tests.
-- [ ] Retrieval-priority tests across long-term subdomains.
+- [x] Retrieval relevance tests.
+- [x] Prompt-size and truncation tests.
+- [x] Long-transcript compaction effectiveness tests.
+- [x] Retrieval-priority tests across long-term subdomains.
 
 ---
 

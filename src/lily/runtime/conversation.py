@@ -33,7 +33,7 @@ from lily.policy import (
     resolve_effective_style,
 )
 from lily.prompting import PersonaContext, PromptBuildContext, PromptBuilder, PromptMode
-from lily.session.models import ConversationLimitsConfig, Message
+from lily.session.models import ConversationLimitsConfig, Message, MessageRole
 
 _LOGGER = logging.getLogger(__name__)
 _DEFAULT_SYSTEM_PROMPT = (
@@ -41,6 +41,13 @@ _DEFAULT_SYSTEM_PROMPT = (
     "Provide clear, direct, helpful responses.\n"
     "If information is missing, say what is missing instead of guessing.\n"
 )
+_MAX_COMPACT_HISTORY_EVENTS = 20
+_MAX_TOOL_CONTENT_CHARS = 240
+_HISTORY_BUDGET_CHARS = 4000
+_COMPACTION_SUMMARY_MAX_CHARS = 320
+_COMPACTION_SUMMARY_HEAD_CHARS = 220
+_COMPACTION_SUMMARY_TAIL_CHARS = 80
+_MIN_HISTORY_EVENTS = 2
 
 
 def _default_persona_context() -> PersonaContext:
@@ -62,6 +69,7 @@ class ConversationRequest(BaseModel):
     model_name: str = Field(min_length=1)
     history: tuple[Message, ...] = ()
     limits: ConversationLimitsConfig = Field(default_factory=ConversationLimitsConfig)
+    memory_summary: str = ""
     persona_context: PersonaContext = Field(default_factory=_default_persona_context)
     prompt_mode: PromptMode = PromptMode.FULL
 
@@ -73,6 +81,7 @@ class ConversationRuntimeContext(BaseModel):
 
     session_id: str = Field(min_length=1)
     model_name: str = Field(min_length=1)
+    memory_summary: str = ""
     persona_context: PersonaContext
     prompt_mode: PromptMode
 
@@ -167,6 +176,7 @@ class _LangChainAgentRunner:
         runtime_context = ConversationRuntimeContext(
             session_id=request.session_id,
             model_name=request.model_name,
+            memory_summary=request.memory_summary,
             persona_context=request.persona_context,
             prompt_mode=request.prompt_mode,
         )
@@ -251,6 +261,7 @@ def _build_dynamic_prompt_middleware(prompt_builder: PromptBuilder) -> object:
             mode=runtime_context.prompt_mode,
             session_id=runtime_context.session_id,
             model_name=runtime_context.model_name,
+            memory_summary=runtime_context.memory_summary,
         )
         return prompt_builder.build(build_context)
 
@@ -346,11 +357,10 @@ def _build_messages(request: ConversationRequest) -> list[dict[str, str]]:
     Returns:
         Ordered message list for LangChain invocation.
     """
-    messages: list[dict[str, str]] = []
-    for item in request.history:
-        if item.role.value == "system":
-            continue
-        messages.append({"role": item.role.value, "content": item.content})
+    messages = [
+        {"role": item.role.value, "content": item.content}
+        for item in _compact_history(request.history)
+    ]
     messages.append({"role": "user", "content": request.user_text})
     return messages
 
@@ -680,3 +690,94 @@ def _latest_assistant_text(state: AgentState[object]) -> str:
         if role == "ai" and isinstance(content, str):
             return content
     return ""
+
+
+def _compact_history(history: tuple[Message, ...]) -> tuple[Message, ...]:
+    """Compact history to deterministic bounded context.
+
+    Args:
+        history: Full persisted conversation history.
+
+    Returns:
+        Compacted history tuple for prompt invocation.
+    """
+    filtered: list[Message] = []
+    evicted_tool_events: list[Message] = []
+    for item in history:
+        if item.role == MessageRole.TOOL and _is_low_value_tool_output(item.content):
+            evicted_tool_events.append(item)
+            continue
+        filtered.append(item)
+    if len(filtered) > _MAX_COMPACT_HISTORY_EVENTS:
+        older = filtered[:-_MAX_COMPACT_HISTORY_EVENTS]
+        recent = filtered[-_MAX_COMPACT_HISTORY_EVENTS:]
+        summary = _summarize_history(older)
+        compacted = [Message(role=MessageRole.SYSTEM, content=summary), *recent]
+    else:
+        compacted = filtered
+    if evicted_tool_events:
+        tool_summary = _summarize_history(evicted_tool_events, label="tool")
+        compacted.insert(0, Message(role=MessageRole.SYSTEM, content=tool_summary))
+    return tuple(_enforce_char_budget(compacted, max_chars=_HISTORY_BUDGET_CHARS))
+
+
+def _is_low_value_tool_output(content: str) -> bool:
+    """Determine whether tool output is low-value for prompt context.
+
+    Args:
+        content: Tool output text.
+
+    Returns:
+        Whether content should be evicted from active context.
+    """
+    text = content.strip()
+    if len(text) <= _MAX_TOOL_CONTENT_CHARS:
+        return False
+    lowered = text.lower()
+    return not ("error" in lowered or "failed" in lowered)
+
+
+def _summarize_history(
+    events: list[Message],
+    *,
+    label: str = "history",
+) -> str:
+    """Create deterministic summary for compacted historical events.
+
+    Args:
+        events: Events being compacted.
+        label: Summary label.
+
+    Returns:
+        Deterministic summary string.
+    """
+    snippets = []
+    for event in events:
+        preview = " ".join(event.content.split())
+        snippets.append(f"{event.role.value}:{preview[:80]}")
+    joined = " | ".join(snippets)
+    if len(joined) > _COMPACTION_SUMMARY_MAX_CHARS:
+        joined = (
+            f"{joined[:_COMPACTION_SUMMARY_HEAD_CHARS]} [...] "
+            f"{joined[-_COMPACTION_SUMMARY_TAIL_CHARS:]}"
+        )
+    return f"Compacted {label} summary ({len(events)} events): {joined}"
+
+
+def _enforce_char_budget(events: list[Message], *, max_chars: int) -> list[Message]:
+    """Trim oldest events until total char budget is satisfied.
+
+    Args:
+        events: Candidate events.
+        max_chars: Maximum total content characters.
+
+    Returns:
+        Budget-compliant event list.
+    """
+    remaining = list(events)
+    while (
+        sum(len(event.content) for event in remaining) > max_chars
+        and len(remaining) > _MIN_HISTORY_EVENTS
+    ):
+        remaining.pop(0)
+    return remaining

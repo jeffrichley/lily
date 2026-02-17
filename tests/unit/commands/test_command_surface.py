@@ -555,6 +555,34 @@ def test_context_aware_tone_adaptation_without_style_override(tmp_path: Path) ->
     assert capture.last_request.persona_context.style_level.value == "focus"
 
 
+def test_conversation_request_includes_repository_backed_memory_summary(
+    tmp_path: Path,
+) -> None:
+    """Conversation route should inject retrieved memory summary into request."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"remember", "memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    capture = _ConversationCaptureExecutor()
+    runtime = RuntimeFacade(conversation_executor=capture)
+
+    remembered = runtime.handle_input("/remember favorite number is 42", session)
+    assert remembered.status.value == "ok"
+
+    _ = runtime.handle_input("what is my favorite number?", session)
+
+    assert capture.last_request is not None
+    assert "favorite number is 42" in capture.last_request.memory_summary
+
+
 def test_memory_command_family_long_short_and_evidence_paths(tmp_path: Path) -> None:
     """`/memory short|long|evidence` command family should route deterministically."""
     bundled_dir = tmp_path / "bundled"
