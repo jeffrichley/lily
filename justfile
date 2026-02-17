@@ -100,7 +100,7 @@ ci-gates: quality-check eval-gates
 
 # --- Lighter targets for day-to-day dev ---
 # Recommended while developing: format + lint + types. Fast except mypy; catches most issues.
-quality-dev: format lint types
+quality-dev: format lint types darglint
 
 # Run interactive CLI REPL (slash-command testing)
 repl:
