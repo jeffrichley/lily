@@ -155,6 +155,14 @@ def _hash_snapshot(
                     "env": list(entry.eligibility.env),
                     "binaries": list(entry.eligibility.binaries),
                 },
+                "plugin": {
+                    "entrypoint": entry.plugin.entrypoint,
+                    "source_files": list(entry.plugin.source_files),
+                    "asset_files": list(entry.plugin.asset_files),
+                    "profile": entry.plugin.profile,
+                    "write_access": entry.plugin.write_access,
+                    "env_allowlist": list(entry.plugin.env_allowlist),
+                },
             }
             for entry in entries
         ],
@@ -308,6 +316,7 @@ def _resolve_candidate(
         capabilities=metadata.capabilities,
         capabilities_declared=metadata.capabilities_declared,
         eligibility=metadata.eligibility,
+        plugin=metadata.plugin,
     )
 
     tools_ok, tool_reasons = evaluate_tool_requirements(entry, context)

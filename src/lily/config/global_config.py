@@ -7,7 +7,9 @@ from enum import StrEnum
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+
+_SHA256_HEX_LEN = 64
 
 
 class CheckpointerBackend(StrEnum):
@@ -89,6 +91,53 @@ class ConsolidationSettings(BaseModel):
     auto_run_every_n_turns: int = Field(default=0, ge=0)
 
 
+class SkillSandboxSettings(BaseModel):
+    """Container sandbox settings for plugin-backed skills."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    image: str = (
+        "python:3.13-slim@sha256:"
+        "0000000000000000000000000000000000000000000000000000000000000000"
+    )
+    policy_version: str = "v1"
+    timeout_seconds: int = Field(default=15, ge=1, le=300)
+    memory_mb: int = Field(default=256, ge=64, le=4096)
+    cpu_cores: float = Field(default=0.5, gt=0.0, le=4.0)
+    logs_max_bytes: int = Field(default=16_384, ge=1024, le=1_000_000)
+    hitl_default_on: bool = True
+    sqlite_path: str = ".lily/db/security.sqlite"
+    non_root_user: str = "65532:65532"
+
+    @model_validator(mode="after")
+    def _validate_image_digest(self) -> SkillSandboxSettings:
+        """Require pinned image digest for deterministic sandbox identity.
+
+        Returns:
+            Validated sandbox settings model.
+
+        Raises:
+            ValueError: If image digest is missing or malformed.
+        """
+        image = self.image.strip()
+        if "@sha256:" not in image:
+            raise ValueError("security.sandbox.image must be pinned by sha256 digest.")
+        digest = image.split("@sha256:", maxsplit=1)[1]
+        if len(digest) != _SHA256_HEX_LEN or any(
+            ch not in "0123456789abcdef" for ch in digest
+        ):
+            raise ValueError("security.sandbox.image digest must be 64 lowercase hex.")
+        return self
+
+
+class SecuritySettings(BaseModel):
+    """Global security settings for skills execution."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sandbox: SkillSandboxSettings = SkillSandboxSettings()
+
+
 class LilyGlobalConfig(BaseModel):
     """Root global Lily configuration model."""
 
@@ -99,6 +148,7 @@ class LilyGlobalConfig(BaseModel):
     evidence: EvidenceSettings = EvidenceSettings()
     compaction: CompactionSettings = CompactionSettings()
     consolidation: ConsolidationSettings = ConsolidationSettings()
+    security: SecuritySettings = SecuritySettings()
 
 
 class GlobalConfigError(RuntimeError):

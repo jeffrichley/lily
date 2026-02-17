@@ -7,18 +7,37 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from lily.config import SkillSandboxSettings
 from lily.runtime.executors.tool_dispatch import (
     AddTool,
     BuiltinToolProvider,
     McpToolProvider,
     MultiplyTool,
+    PluginToolProvider,
     ProviderPolicyDeniedError,
     SubtractTool,
     ToolContract,
     ToolDispatchExecutor,
 )
+from lily.runtime.plugin_runner import PluginRuntimeError
+from lily.runtime.security import (
+    ApprovalDecision,
+    ApprovalRequest,
+    SecurityApprovalStore,
+    SecurityGate,
+    SecurityHashService,
+    SecurityPreflightScanner,
+    SecurityPrompt,
+)
 from lily.session.models import ModelConfig, Session
-from lily.skills.types import InvocationMode, SkillEntry, SkillSnapshot, SkillSource
+from lily.skills.types import (
+    InvocationMode,
+    SkillCapabilitySpec,
+    SkillEntry,
+    SkillPluginSpec,
+    SkillSnapshot,
+    SkillSource,
+)
 
 
 def _session() -> Session:
@@ -43,6 +62,7 @@ def _entry(
         path=Path(f"/skills/{name}/SKILL.md"),
         invocation_mode=InvocationMode.TOOL_DISPATCH,
         command_tool=command_tool,
+        capabilities=SkillCapabilitySpec(declared_tools=("builtin:add",)),
     )
 
 
@@ -286,3 +306,129 @@ def test_tool_dispatch_maps_mcp_policy_denied_error() -> None:
 
     assert result.status.value == "error"
     assert result.code == "provider_policy_denied"
+
+
+class _ApprovalPromptStub(SecurityPrompt):
+    """Prompt stub for plugin provider tests."""
+
+    def request_approval(self, request: ApprovalRequest) -> ApprovalDecision | None:
+        del request
+        return ApprovalDecision.RUN_ONCE
+
+
+class _PluginRunnerStub:
+    """Runner stub for plugin-provider tests."""
+
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+
+    def run(
+        self,
+        *,
+        entry: SkillEntry,
+        user_text: str,
+        security_hash: str,
+        agent_id: str,
+        session_id: str,
+    ) -> dict[str, Any]:
+        del entry
+        del security_hash
+        del agent_id
+        del session_id
+        if self.fail:
+            raise PluginRuntimeError(
+                code="plugin_runtime_failed",
+                message="Error: plugin container failed.",
+            )
+        return {"display": user_text.upper(), "data": {"ok": True}}
+
+
+def test_tool_dispatch_routes_through_plugin_provider(tmp_path: Path) -> None:
+    """Plugin provider should route through security gate and runner stubs."""
+    skill_root = tmp_path / "skills" / "echo_plugin"
+    skill_root.mkdir(parents=True, exist_ok=True)
+    (skill_root / "SKILL.md").write_text("# plugin", encoding="utf-8")
+    (skill_root / "plugin.py").write_text(
+        "def run(payload, **kwargs):\n    return {'display': payload}\n",
+        encoding="utf-8",
+    )
+    entry = SkillEntry(
+        name="echo_plugin",
+        source=SkillSource.BUNDLED,
+        path=skill_root / "SKILL.md",
+        invocation_mode=InvocationMode.TOOL_DISPATCH,
+        command_tool_provider="plugin",
+        command_tool="execute",
+        capabilities=SkillCapabilitySpec(declared_tools=("plugin:execute",)),
+        plugin=SkillPluginSpec(entrypoint="plugin.py", source_files=("plugin.py",)),
+    )
+    providers = (
+        PluginToolProvider(
+            security_gate=SecurityGate(
+                hash_service=SecurityHashService(
+                    sandbox=SkillSandboxSettings(),
+                    project_root=Path.cwd(),
+                ),
+                preflight=SecurityPreflightScanner(),
+                store=SecurityApprovalStore(sqlite_path=tmp_path / "security.sqlite"),
+                prompt=_ApprovalPromptStub(),
+                sandbox=SkillSandboxSettings(),
+            ),
+            runner=_PluginRunnerStub(),
+        ),
+    )
+    executor = ToolDispatchExecutor(providers=providers)
+    session = _session().model_copy(
+        update={"skill_snapshot": SkillSnapshot(version="v-test", skills=(entry,))}
+    )
+
+    result = executor.execute(entry, session, "hello")
+
+    assert result.status.value == "ok"
+    assert result.message == "HELLO"
+    assert result.code == "tool_ok"
+
+
+def test_tool_dispatch_maps_plugin_runtime_error(tmp_path: Path) -> None:
+    """Plugin runtime failures should return deterministic plugin code."""
+    skill_root = tmp_path / "skills" / "echo_plugin"
+    skill_root.mkdir(parents=True, exist_ok=True)
+    (skill_root / "SKILL.md").write_text("# plugin", encoding="utf-8")
+    (skill_root / "plugin.py").write_text(
+        "def run(payload, **kwargs):\n    return {'display': payload}\n",
+        encoding="utf-8",
+    )
+    entry = SkillEntry(
+        name="echo_plugin",
+        source=SkillSource.BUNDLED,
+        path=skill_root / "SKILL.md",
+        invocation_mode=InvocationMode.TOOL_DISPATCH,
+        command_tool_provider="plugin",
+        command_tool="execute",
+        capabilities=SkillCapabilitySpec(declared_tools=("plugin:execute",)),
+        plugin=SkillPluginSpec(entrypoint="plugin.py", source_files=("plugin.py",)),
+    )
+    providers = (
+        PluginToolProvider(
+            security_gate=SecurityGate(
+                hash_service=SecurityHashService(
+                    sandbox=SkillSandboxSettings(),
+                    project_root=Path.cwd(),
+                ),
+                preflight=SecurityPreflightScanner(),
+                store=SecurityApprovalStore(sqlite_path=tmp_path / "security.sqlite"),
+                prompt=_ApprovalPromptStub(),
+                sandbox=SkillSandboxSettings(),
+            ),
+            runner=_PluginRunnerStub(fail=True),
+        ),
+    )
+    executor = ToolDispatchExecutor(providers=providers)
+    session = _session().model_copy(
+        update={"skill_snapshot": SkillSnapshot(version="v-test", skills=(entry,))}
+    )
+
+    result = executor.execute(entry, session, "hello")
+
+    assert result.status.value == "error"
+    assert result.code == "plugin_runtime_failed"

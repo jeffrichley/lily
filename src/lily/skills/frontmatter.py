@@ -119,6 +119,7 @@ def _validate_tool_dispatch_metadata(metadata: SkillMetadata, origin: str) -> No
     declared = set(metadata.capabilities.declared_tools)
     qualified = f"{metadata.command_tool_provider}:{metadata.command_tool}"
     if metadata.command_tool in declared or qualified in declared:
+        _validate_plugin_metadata(metadata, origin)
         return
     raise ValueError(
         (
@@ -127,6 +128,35 @@ def _validate_tool_dispatch_metadata(metadata: SkillMetadata, origin: str) -> No
             "capabilities.declared_tools"
         ),
     )
+
+
+def _validate_plugin_metadata(metadata: SkillMetadata, origin: str) -> None:
+    """Apply plugin-provider metadata validation rules.
+
+    Args:
+        metadata: Parsed skill metadata.
+        origin: Optional contextual origin suffix for errors.
+
+    Raises:
+        ValueError: If plugin metadata is invalid.
+    """
+    if metadata.command_tool_provider != "plugin":
+        return
+    if metadata.plugin.entrypoint is None:
+        raise ValueError(
+            f"Malformed skill frontmatter{origin}: plugin provider requires "
+            "plugin.entrypoint",
+        )
+    for field_name, values in (
+        ("plugin.source_files", metadata.plugin.source_files),
+        ("plugin.asset_files", metadata.plugin.asset_files),
+        ("plugin.env_allowlist", metadata.plugin.env_allowlist),
+    ):
+        if any(not value.strip() for value in values):
+            raise ValueError(
+                f"Malformed skill frontmatter{origin}: {field_name} contains empty "
+                "value",
+            )
 
 
 def parse_skill_markdown(

@@ -10,6 +10,7 @@ from lily.skills.types import (
     SkillEligibilitySpec,
     SkillEntry,
     SkillMetadata,
+    SkillPluginSpec,
     SkillSnapshot,
     SkillSource,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "SkillEligibilitySpec",
     "SkillEntry",
     "SkillMetadata",
+    "SkillPluginSpec",
     "SkillSnapshot",
     "SkillSource",
     "build_skill_snapshot",

@@ -180,6 +180,132 @@ Scope contract:
 
 ---
 
+## Gate S2: Phase 3 Alignment (Must Pass Before Sandbox/HITL Work)
+
+`User-visible features`
+- None (alignment gate only).
+
+`Internal engineering tasks`
+- [x] Confirm Phase 3 locked scope from spec:
+  - [x] plugin entrypoint contract for code-backed tools
+  - [x] container-only runtime path (no subprocess fallback)
+  - [x] preflight hard-deny checks
+  - [x] security hash generation + approval cache/store
+  - [x] terminal HITL prompt with `run_once|always_allow|deny`
+  - [x] SQLite persistence for approvals/provenance at `.lily/db/security.sqlite`
+- [x] Confirm container-runtime implementation contract:
+  - [x] container orchestration uses Docker Python SDK (`docker` library) in runtime path
+  - [x] no direct shell/subprocess `docker run` execution path in runtime
+  - [x] default execution image is pinned by digest and configured globally
+  - [x] V1 uses one default image for `safe_eval` (no per-skill arbitrary image selection)
+- [x] Confirm runtime environment contract:
+  - [x] non-root container user
+  - [x] network disabled by default
+  - [x] read-only root filesystem
+  - [x] explicit mount contract only: `/input` (ro) + `/output` (rw)
+  - [x] explicit env allowlist only (no implicit host env passthrough)
+  - [x] resource controls (memory/cpu/timeout/log-size limits)
+- [x] Confirm explicit Phase 3 exclusions:
+  - [x] no TUI approval controls
+  - [x] no auto-rewrite/remediation pass for denied code
+  - [x] no YOLO bypass mode
+  - [x] no non-container plugin execution path
+- [x] Freeze deterministic security/result code contract for Phase 3:
+  - [x] `plugin_contract_invalid`
+  - [x] `plugin_container_unavailable`
+  - [x] `plugin_timeout`
+  - [x] `plugin_runtime_failed`
+  - [x] `security_preflight_denied`
+  - [x] `security_hash_mismatch` (approval invalidated)
+  - [x] `approval_required`
+  - [x] `approval_denied`
+  - [x] `approval_persist_failed`
+
+`Acceptance criteria`
+- [x] S2 checklist completed and referenced in implementation PR.
+- [x] Phase 3 error-code contract documented in code/tests before rollout.
+
+`Non-goals`
+- no supervisor/subagent orchestration logic.
+- no full typed-contract completion across all skill modes (Phase 4).
+
+`Required tests and gates`
+- [x] `just docs-check` green before and after Phase 3 edits.
+
+---
+
+## Phase 3: Containerized Plugin Runtime + HITL (`P5`)
+
+`User-visible features`
+- [x] Eligible plugin-backed skills execute through container sandbox.
+- [x] Terminal approval prompt supports deterministic choices:
+  - [x] `run_once`
+  - [x] `always_allow`
+  - [x] `deny`
+- [x] Security denials and approval failures are presented as high-visibility security alerts.
+
+`Internal engineering tasks`
+- [x] Plugin contract + loading:
+  - [x] define versioned plugin entrypoint interface (typed request/response envelope)
+  - [x] enforce plugin metadata/entrypoint validation at load or first invoke
+  - [x] deterministic plugin contract errors (`plugin_contract_invalid`)
+- [x] Container runner:
+  - [x] implement container-only executor adapter via Docker Python SDK (no subprocess path)
+  - [x] select pinned default runner image from global config (digest required)
+  - [x] enforce resource limits (timeout/cpu/memory/output caps)
+  - [x] enforce no-network default
+  - [x] enforce read-only root + explicit `/input` and `/output` boundaries
+  - [x] enforce non-root user and explicit env allowlist
+- [x] Security preflight:
+  - [x] add hard-deny static checks for banned patterns/categories
+  - [x] emit deterministic `security_preflight_denied` with stable diagnostics
+  - [x] block execution before container start on deny
+- [x] Security hash:
+  - [x] canonical manifest hashing for skill bundle + config/runtime identity
+  - [x] include provider/policy/profile/version fingerprints
+  - [x] invalidate prior approvals when hash changes
+- [x] HITL flow:
+  - [x] prompt approval per `(agent, skill, security_hash)`
+  - [x] implement grant semantics (`run_once`, `always_allow`)
+  - [x] enforce explicit HITL checkpoint for write requests
+  - [x] deterministic deny path on user refusal
+- [x] SQLite persistence:
+  - [x] create `.lily/db/security.sqlite` initialization/migration-safe setup
+  - [x] persist approval grants + provenance records
+  - [x] reload and enforce grants across process restarts
+
+`Acceptance criteria`
+- [x] Untrusted plugin execution runs through container adapter only.
+- [x] Runtime container path uses Docker Python SDK and does not shell out to `docker run`.
+- [x] Default plugin runner image is pinned by digest and used deterministically for V1.
+- [x] Hard-deny preflight failures block execution before runtime and return deterministic errors.
+- [x] Approval reuse works when hash is unchanged; hash change requires new approval.
+- [x] `run_once` and `always_allow` behave correctly across multiple invocations.
+- [x] Write operations trigger HITL checkpoint even under `always_allow`.
+- [x] Approval/provenance records persist and reload from SQLite.
+
+`Non-goals`
+- no TUI-native approval controls.
+- no auto-fix/auto-rewrite for denied code.
+- no generalized plugin marketplace/distribution workflow.
+- no network-enabled profile rollout beyond explicitly approved test cases.
+
+`Required tests and gates`
+- [x] unit tests for plugin contract validation + deterministic contract failures.
+- [x] integration tests for container execution success/timeout/crash paths.
+- [x] tests asserting Docker SDK path is used (no subprocess invocation in runtime path).
+- [x] tests for image-selection contract (pinned digest required; invalid image config fails deterministically).
+- [x] unit/integration tests for preflight hard-deny behavior.
+- [x] unit tests for security hash determinism + invalidation behavior.
+- [x] integration tests for HITL grant semantics (`run_once`/`always_allow`/`deny`).
+- [x] integration tests for write-checkpoint enforcement.
+- [x] SQLite persistence/reload tests for approvals/provenance.
+- [x] CLI rendering tests for Phase 3 security/approval alerts.
+- [x] `just quality-check`.
+- [x] `just docs-check`.
+
+---
+
 ## Status Log
 
 - 2026-02-17: Plan created. User selected Phase 1-only implementation start with rule-based security governance, SQLite security backend, and terminal-first HITL deferred to later phase.
@@ -187,3 +313,5 @@ Scope contract:
 - 2026-02-17: Phase 1 completed. Added capability contract fields + loader validation, runtime capability denial for undeclared tool use, `/skills` diagnostic rendering, and terminal security-alert Rich panels; targeted unit tests plus `just quality-check` and `just docs-check` passed.
 - 2026-02-17: Phase 2 detailed plan added (Gate S1 + provider-registry execution scope, acceptance criteria, non-goals, and tests/gates).
 - 2026-02-17: Gate S1 and Phase 2 completed. Added provider registry (`builtin` + MCP adapter contract), provider-scoped deterministic errors, provider-aware tool dispatch/runtime metadata, capability checks supporting provider-qualified declarations, and mocked MCP routing/failure tests; `just quality-check` and `just docs-check` passed.
+- 2026-02-17: Phase 3 detailed plan added (Gate S2 + containerized plugin runtime/HITL/security-hash/SQLite persistence scope, acceptance criteria, non-goals, and tests/gates).
+- 2026-02-17: Gate S2 and Phase 3 completed. Added plugin provider contract validation, Docker SDK container runtime, hard-deny preflight scanner, canonical security hashing, terminal HITL approvals (`run_once`/`always_allow`/`deny`), SQLite-backed approval/provenance persistence at `.lily/db/security.sqlite`, and security alert code/render coverage; `just quality-check` and `just docs-check` passed.
