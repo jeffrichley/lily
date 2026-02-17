@@ -1,3 +1,10 @@
+---
+owner: "@team"
+last_updated: "2026-02-17"
+status: "active"
+source_of_truth: true
+---
+
 # Memory Execution Plan (V1)
 
 Purpose: phased implementation plan for `docs/dev/memory_spec_v1.md` with deterministic gates.

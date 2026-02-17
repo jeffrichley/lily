@@ -1,3 +1,10 @@
+---
+owner: "@team"
+last_updated: "2026-02-17"
+status: "active"
+source_of_truth: true
+---
+
 # Personality Execution Plan
 
 Purpose: execution tracker for shipping Lily personality architecture in a controlled order.

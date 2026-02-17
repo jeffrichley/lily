@@ -1,3 +1,10 @@
+---
+owner: "@team"
+last_updated: "2026-02-17"
+status: "active"
+source_of_truth: true
+---
+
 # Lily Debt Tracker
 
 Purpose: track technical/product debt that should be cleaned up intentionally, not implicitly.

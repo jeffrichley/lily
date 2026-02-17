@@ -1,3 +1,10 @@
+---
+owner: "@team"
+last_updated: "2026-02-17"
+status: "active"
+source_of_truth: true
+---
+
 # Lily Roadmap (Guiding Light)
 
 Purpose: define what we build, in what order, and why.
@@ -5,6 +12,7 @@ Purpose: define what we build, in what order, and why.
 This roadmap is the source of truth for prioritization.
 If something is not on this list (or not promoted on this list), we do not build it yet.
 Debt tracking lives in `docs/dev/debt_tracker.md`.
+Live weekly execution status lives in `docs/dev/status.md`.
 
 Status snapshot (2026-02-17):
 - The original core hardening phases in this roadmap are complete.
