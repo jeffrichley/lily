@@ -114,10 +114,13 @@ def run_restart_continuity_suite(*, temp_dir: Path) -> EvalSuiteReport:
     runtime = RuntimeFacade()
     session_file = temp_dir / "session.json"
 
-    _ = runtime.handle_input("/remember favorite number is 42", session)
-    save_session(session, session_file)
-    restored = load_session(session_file)
-    shown = runtime.handle_input("/memory show favorite", restored)
+    try:
+        _ = runtime.handle_input("/remember favorite number is 42", session)
+        save_session(session, session_file)
+        restored = load_session(session_file)
+        shown = runtime.handle_input("/memory show favorite", restored)
+    finally:
+        runtime.close()
 
     sqlite_path = temp_dir / "checkpoints.sqlite"
     checkpointer = build_checkpointer(
@@ -126,7 +129,8 @@ def run_restart_continuity_suite(*, temp_dir: Path) -> EvalSuiteReport:
             sqlite_path=str(sqlite_path),
         )
     )
-    _ = RuntimeFacade(conversation_checkpointer=checkpointer.saver)
+    runtime_with_sqlite = RuntimeFacade(conversation_checkpointer=checkpointer.saver)
+    runtime_with_sqlite.close()
     sqlite_ok = sqlite_path.exists()
     return EvalSuiteReport(
         suite_id="restart_continuity",
@@ -242,17 +246,20 @@ def run_retrieval_relevance_suite(*, temp_dir: Path) -> EvalSuiteReport:
     session = factory.create(active_agent="lily")
     capture = _ConversationCaptureExecutor()
     runtime = RuntimeFacade(conversation_executor=capture)
-    _ = runtime.handle_input("/remember favorite color is blue", session)
+    try:
+        _ = runtime.handle_input("/remember favorite color is blue", session)
 
-    trial_passes = 0
-    trials = 3
-    for _ in range(trials):
-        _ = runtime.handle_input("what is my favorite color?", session)
-        if (
-            capture.last_request
-            and "favorite color is blue" in capture.last_request.memory_summary
-        ):
-            trial_passes += 1
+        trial_passes = 0
+        trials = 3
+        for _ in range(trials):
+            _ = runtime.handle_input("what is my favorite color?", session)
+            if (
+                capture.last_request
+                and "favorite color is blue" in capture.last_request.memory_summary
+            ):
+                trial_passes += 1
+    finally:
+        runtime.close()
     return EvalSuiteReport(
         suite_id="retrieval_relevance",
         results=(
@@ -326,12 +333,18 @@ def run_memory_phase7_observability_sample(*, temp_dir: Path) -> dict[str, objec
     )
     session = factory.create(active_agent="lily")
     runtime = RuntimeFacade(consolidation_enabled=True)
-    _ = runtime.handle_input("/remember favorite number is 42", session)
-    _ = runtime.handle_input("/remember token=abc123", session)
-    _ = runtime.handle_input("what is my favorite number?", session)
-    _ = runtime.handle_input("/memory show favorite", session)
-    _ = runtime.handle_input("/memory long consolidate", session)
-    listed = runtime.handle_input("/memory long show --domain user_profile", session)
+    try:
+        _ = runtime.handle_input("/remember favorite number is 42", session)
+        _ = runtime.handle_input("/remember token=abc123", session)
+        _ = runtime.handle_input("what is my favorite number?", session)
+        _ = runtime.handle_input("/memory show favorite", session)
+        _ = runtime.handle_input("/memory long consolidate", session)
+        listed = runtime.handle_input(
+            "/memory long show --domain user_profile",
+            session,
+        )
+    finally:
+        runtime.close()
     if listed.data is not None:
         for row in listed.data.get("records", []):
             if isinstance(row, dict) and row.get("last_verified") is not None:
@@ -380,33 +393,37 @@ def run_performance_benchmark_suite(*, temp_dir: Path) -> EvalSuiteReport:
         conversation_executor=capture,
         consolidation_enabled=True,
     )
-    _ = runtime.handle_input("/remember favorite color is blue", session)
-    _ = runtime.handle_input("/remember favorite number is 42", session)
+    try:
+        _ = runtime.handle_input("/remember favorite color is blue", session)
+        _ = runtime.handle_input("/remember favorite number is 42", session)
 
-    command_latencies = _measure_latencies_seconds(
-        lambda: runtime.handle_input("/memory show favorite", session),
-        iterations=24,
-    )
-    command_p95 = _p95(command_latencies)
-    command_mean = sum(command_latencies) / len(command_latencies)
-    command_throughput = 1.0 / command_mean if command_mean > 0 else 0.0
+        command_latencies = _measure_latencies_seconds(
+            lambda: runtime.handle_input("/memory show favorite", session),
+            iterations=24,
+        )
+        command_p95 = _p95(command_latencies)
+        command_mean = sum(command_latencies) / len(command_latencies)
+        command_throughput = 1.0 / command_mean if command_mean > 0 else 0.0
 
-    retrieval_latencies = _measure_latencies_seconds(
-        lambda: runtime.handle_input("what is my favorite color?", session),
-        iterations=20,
-    )
-    retrieval_p95 = _p95(retrieval_latencies)
+        retrieval_latencies = _measure_latencies_seconds(
+            lambda: runtime.handle_input("what is my favorite color?", session),
+            iterations=20,
+        )
+        retrieval_p95 = _p95(retrieval_latencies)
 
-    _ = runtime_with_consolidation.handle_input(
-        "/remember favorite movie is dune",
-        session,
-    )
-    consolidation_start = perf_counter()
-    consolidation_result = runtime_with_consolidation.handle_input(
-        "/memory long consolidate",
-        session,
-    )
-    consolidation_elapsed = perf_counter() - consolidation_start
+        _ = runtime_with_consolidation.handle_input(
+            "/remember favorite movie is dune",
+            session,
+        )
+        consolidation_start = perf_counter()
+        consolidation_result = runtime_with_consolidation.handle_input(
+            "/memory long consolidate",
+            session,
+        )
+        consolidation_elapsed = perf_counter() - consolidation_start
+    finally:
+        runtime.close()
+        runtime_with_consolidation.close()
 
     long_history = tuple(
         Message(role=MessageRole.TOOL, content=("x" * 800)) for _ in range(12)

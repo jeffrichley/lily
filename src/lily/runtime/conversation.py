@@ -145,6 +145,9 @@ class AgentRunner(Protocol):
             request: Normalized conversation request.
         """
 
+    def close(self) -> None:
+        """Release runner resources when supported."""
+
 
 class _LangChainAgentRunner:
     """Default LangChain v1/graph runner with in-memory checkpointer."""
@@ -210,6 +213,17 @@ class _LangChainAgentRunner:
             _build_after_model_middleware(),
             ToolGuardrailMiddleware(),
         )
+
+    def close(self) -> None:
+        """Close underlying checkpointer resources when available."""
+        maybe_close = getattr(self._checkpointer, "close", None)
+        if callable(maybe_close):
+            maybe_close()
+            return
+        conn = getattr(self._checkpointer, "conn", None)
+        conn_close = getattr(conn, "close", None)
+        if callable(conn_close):
+            conn_close()
 
 
 class ToolGuardrailMiddleware(
@@ -672,6 +686,12 @@ class LangChainConversationExecutor:
         ]
         return "\n".join(chunk for chunk in chunks if chunk)
 
+    def close(self) -> None:
+        """Release runner resources when available."""
+        maybe_close = getattr(self._runner, "close", None)
+        if callable(maybe_close):
+            maybe_close()
+
 
 def _apply_precedence(request: ConversationRequest) -> PersonaContext:
     """Apply precedence contract to derive effective persona style.
@@ -777,7 +797,7 @@ def _compact_history_langgraph_native(
     trimmed = trim_messages(
         base_messages,
         max_tokens=max_tokens,
-        token_counter="approximate",  # nosec B106 - langchain trim mode selector
+        token_counter="approximate",  # nosec B106
         strategy="last",
         include_system=True,
         start_on="human",

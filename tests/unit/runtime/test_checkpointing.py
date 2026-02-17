@@ -36,6 +36,7 @@ def test_build_checkpointer_sqlite_creates_file(tmp_path: Path) -> None:
     assert isinstance(result.saver, SqliteSaver)
     assert result.resolved_sqlite_path == sqlite_path
     assert sqlite_path.exists()
+    result.saver.conn.close()
 
 
 def test_sqlite_checkpointer_persists_history_and_replay_across_restart(

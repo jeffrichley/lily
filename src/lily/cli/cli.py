@@ -673,10 +673,15 @@ def _execute_once(  # noqa: PLR0913
     except CheckpointerBuildError as exc:
         _CONSOLE.print(f"[bold red]Failed to initialize checkpointer: {exc}[/bold red]")
         return 1
-    result = runtime.handle_input(text, session)
-    _persist_session(session, session_file)
-    _render_result(result)
-    return 0 if result.status == CommandStatus.OK else 1
+    try:
+        result = runtime.handle_input(text, session)
+        _persist_session(session, session_file)
+        _render_result(result)
+        return 0 if result.status == CommandStatus.OK else 1
+    finally:
+        maybe_close = getattr(runtime, "close", None)
+        if callable(maybe_close):
+            maybe_close()
 
 
 @app.command("init")
@@ -860,20 +865,25 @@ def repl_command(
         _CONSOLE.print(f"[bold red]Failed to initialize checkpointer: {exc}[/bold red]")
         raise typer.Exit(code=1) from exc
 
-    while True:
-        try:
-            raw = typer.prompt("lily")
-        except (EOFError, KeyboardInterrupt, click.Abort):
-            _CONSOLE.print("\nbye", style="yellow")
-            break
+    try:
+        while True:
+            try:
+                raw = typer.prompt("lily")
+            except (EOFError, KeyboardInterrupt, click.Abort):
+                _CONSOLE.print("\nbye", style="yellow")
+                break
 
-        text = raw.strip()
-        if text.lower() in {"exit", "quit", "exit()", "quit()"}:
-            _CONSOLE.print("bye", style="yellow")
-            break
-        if not text:
-            continue
+            text = raw.strip()
+            if text.lower() in {"exit", "quit", "exit()", "quit()"}:
+                _CONSOLE.print("bye", style="yellow")
+                break
+            if not text:
+                continue
 
-        result = runtime.handle_input(text, session)
-        _persist_session(session, effective_session_file)
-        _render_result(result)
+            result = runtime.handle_input(text, session)
+            _persist_session(session, effective_session_file)
+            _render_result(result)
+    finally:
+        maybe_close = getattr(runtime, "close", None)
+        if callable(maybe_close):
+            maybe_close()

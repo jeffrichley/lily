@@ -56,6 +56,10 @@ markers = [
     "integration: Integration tests that test multiple components together",
     "slow: Tests that take a long time to run",
 ]
+filterwarnings = [
+    "error::ResourceWarning",
+    "ignore:Importing Send from langgraph.constants is deprecated.*:DeprecationWarning:trustcall\\._base",
+]
 
 [tool.ruff]
 line-length = 88

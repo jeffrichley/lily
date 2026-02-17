@@ -143,6 +143,12 @@ class RuntimeFacade:
             lambda: self._handle_input_serialized(text=text, session=session),
         )
 
+    def close(self) -> None:
+        """Release runtime resources (for example sqlite-backed checkpointers)."""
+        maybe_close = getattr(self._conversation_executor, "close", None)
+        if callable(maybe_close):
+            maybe_close()
+
     def _handle_input_serialized(self, *, text: str, session: Session) -> CommandResult:
         """Handle one input while holding per-session execution lane.
 

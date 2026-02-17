@@ -41,7 +41,7 @@ class EvidenceChunkingMode(StrEnum):
     """Supported evidence chunking strategy modes."""
 
     RECURSIVE = "recursive"
-    TOKEN = "token"  # nosec B105 - chunker mode label, not credential data
+    TOKEN = "token"  # nosec B105
 
 
 class EvidenceSettings(BaseModel):

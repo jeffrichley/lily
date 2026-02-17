@@ -39,3 +39,13 @@
 
 - Prefer strategy/registry dispatch over long `if`/`elif` chains when branching by mode/backend/type.
 - Use explicit handler maps keyed by stable identifiers so adding new backends/modes does not require editing a large conditional block.
+
+## Warning Policy
+
+- Treat test/runtime warnings as defects, not noise.
+- Before merge, quality/test runs should be warning-clean.
+- If a warning cannot be eliminated immediately, document:
+  - exact warning signature
+  - why it is currently unavoidable
+  - owner and target date for removal
+- Do not add new warning suppressions unless explicitly approved by the user.
