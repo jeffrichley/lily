@@ -23,14 +23,16 @@ Update cadence:
 
 - [x] Phase 1 docs governance delivered and committed (`41871ac`).
 - [x] Canonical map and frontmatter contract established (`docs/README.md`).
+- [x] Phase 2 docs consolidation delivered and committed (`b81f851`).
+- [x] Phase 3 docs cadence and PR docs-impact workflow delivered.
 
 ## In Progress
 
-- [ ] Phase 2 docs consolidation and archive migration, owner `@team`, target `2026-02-17`.
+- [ ] Weekly status cadence follow-through (need two consecutive weekly updates), owner `@team`, target `2026-02-24`.
 
 ## Next Up
 
-- [ ] Phase 3 operating cadence rules (weekly ritual + PR docs-impact checks).
+- [ ] Phase 4 light automation (frontmatter/staleness CI checks).
 
 ## Blockers and Risks
 

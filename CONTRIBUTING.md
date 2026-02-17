@@ -11,6 +11,7 @@ Every pull request **must** use the repository PR template. The description is v
    - **Summary**
    - **Verification**
    - **Risk Assessment**
+   - **Documentation Impact**
    - **Checklist (Ruthless)**
 
 2. **Decisions, not placeholders**  
@@ -19,6 +20,7 @@ Every pull request **must** use the repository PR template. The description is v
    - **Perf Impact** (no impact / improvement / regression)
    - **Breaking Change?** (Yes / No)
    - **Config / Schema Changes** (None / Yes)
+   - **Documentation Impact** (No docs update needed / Docs updated in this PR / Docs follow-up required)
 
 3. **Verification gates**  
    The Verification section must mention:
@@ -37,7 +39,8 @@ Every pull request **must** use the repository PR template. The description is v
 1. When opening a PR, use the **template** shown by GitHub (it’s based on `.github/pull_request_template.md`). If you didn’t use it, click “Get started” or open the template and copy its structure into the description.
 2. Fill in every required section. Replace placeholders and comments with real content.
 3. Check **one** option for Risk Level, Perf Impact, Breaking Change?, and Config / Schema Changes.
-4. Before marking the PR ready for review, run `/cleanup` and `/coverage` (or `just quality-check` and `just test-cov`), then **check** the corresponding boxes in **Required Gates** under Verification.
+4. Check **one** option in **Documentation Impact** and include doc paths or follow-up owner/date when applicable.
+5. Before marking the PR ready for review, run `/cleanup` and `/coverage` (or `just quality-check` and `just test-cov`), then **check** the corresponding boxes in **Required Gates** under Verification.
 
 ### If the check fails
 
@@ -45,6 +48,7 @@ CI will post a failure with a list of what’s missing. Fix the PR description:
 
 - Add any missing headings (copy from the template).
 - Check the required checkboxes in Risk Level, Perf Impact, Breaking Change?, and Config / Schema Changes.
+- Check the required checkbox in Documentation Impact and provide paths or follow-up owner/date.
 - Add a short Summary, and either list tests (or say "None") and failure modes (or say "N/A").
 - For non-draft PRs, check the /cleanup and /coverage boxes in Verification.
 

@@ -31,25 +31,74 @@ jobs:
               const re = new RegExp(`^#{1,6}\\s+${escapeHeading(h)}\\s*$`, 'im');
               return re.test(body);
             }
+            function countCheckedInSection(heading, choices) {
+              const lines = body.split('\n');
+              const headingRe = new RegExp(`^#{1,6}\\s+${escapeHeading(heading)}\\s*$`, 'i');
+              let start = -1;
+              for (let i = 0; i < lines.length; i += 1) {
+                if (headingRe.test(lines[i])) {
+                  start = i;
+                  break;
+                }
+              }
+              if (start === -1) {
+                return 0;
+              }
+              let end = lines.length;
+              for (let i = start + 1; i < lines.length; i += 1) {
+                if (/^#{1,6}\s+/.test(lines[i])) {
+                  end = i;
+                  break;
+                }
+              }
+              const section = lines.slice(start, end).join('\n');
+              return choices.filter(choice => {
+                const re = new RegExp(`-\\s*\\[x\\]\\s+${escapeHeading(choice)}\\s*$`, 'im');
+                return re.test(section);
+              }).length;
+            }
 
             const requiredHeadings = [
               'Summary',
               'Verification',
               'Risk Assessment',
+              'Documentation Impact',
               'Checklist (Ruthless)',
             ];
             const missingHeadings = requiredHeadings.filter(h => !hasHeading(h));
+            const docsImpactChoices = [
+              'No docs update needed',
+              'Docs updated in this PR (list paths below)',
+              'Docs follow-up required (owner + target date below)',
+            ];
+            const docsImpactChecked = countCheckedInSection('Documentation Impact', docsImpactChoices);
+            const problems = [];
+
             if (missingHeadings.length) {
               const checklist = missingHeadings.map(h => `- [ ] Add section: **${h}**`).join('\n');
+              problems.push(
+                '## PR body template check — missing sections\n\n' +
+                'Add these required sections to the PR description (see `.github/pull_request_template.md`):\n\n' +
+                checklist
+              );
+            }
+
+            if (hasHeading('Documentation Impact') && docsImpactChecked !== 1) {
+              problems.push(
+                '## PR body template check — documentation impact decision missing\n\n' +
+                'In **Documentation Impact**, check exactly one option:\n' +
+                '- [ ] No docs update needed\n' +
+                '- [ ] Docs updated in this PR (list paths below)\n' +
+                '- [ ] Docs follow-up required (owner + target date below)'
+              );
+            }
+
+            if (problems.length) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: '## PR body template check — missing sections\n\n' +
-                  'Add these required sections to the PR description (see `.github/pull_request_template.md`):\n\n' +
-                  checklist,
+                body: problems.join('\n\n---\n\n'),
               });
-              core.setFailed(
-                'PR body is missing required sections: ' + missingHeadings.join(', ')
-              );
+              core.setFailed('PR body template check failed.');
             }

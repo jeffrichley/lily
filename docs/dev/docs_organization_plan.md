@@ -42,15 +42,18 @@ Purpose: establish a lean docs operating system with clear ownership and minimal
 ## Phase 3: Operating Cadence
 
 `Acceptance criteria`
-- [ ] Weekly 15-minute docs update ritual is documented and followed.
-- [ ] PR template includes docs-impact checks.
+- [x] Weekly 15-minute docs update ritual is documented and followed.
+- [x] PR template includes docs-impact checks.
 
 `Non-goals`
 - No automation in this phase.
 
 `Required tests and gates`
 - [ ] Two consecutive weekly status updates completed.
-- [ ] New PRs include docs-impact decisions.
+- [x] New PRs include docs-impact decisions.
+
+Phase 3 gate note:
+- The consecutive-week update gate is time-based and will be complete after the `2026-02-24` status update.
 
 ## Phase 4: Light Automation
 

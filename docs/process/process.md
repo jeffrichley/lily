@@ -7,6 +7,8 @@ source_of_truth: true
 
 We go process-first, not architecture-first.
 
+Docs operations cadence is defined in `docs/process/docs_cadence.md`.
+
 For *this* phase (stealing concepts from OpenClaw), the first thing is to lock in **what Lily must do at runtime** as observable behaviors — then we can decide what “skills” and “commands” exist, and only then touch libraries.
 
 ## The process we’ll go through

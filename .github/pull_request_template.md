@@ -159,6 +159,19 @@ If yes, include before/after examples or a minimal snippet.
 
 ---
 
+# Documentation Impact
+
+- [ ] No docs update needed
+- [ ] Docs updated in this PR (list paths below)
+- [ ] Docs follow-up required (owner + target date below)
+
+<!--
+If docs were updated, list canonical paths (for example: docs/dev/status.md).
+If follow-up is required, include owner and target date and link the follow-up item.
+-->
+
+---
+
 # Security / Privacy
 
 - [ ] No secrets/keys added

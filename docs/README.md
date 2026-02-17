@@ -21,6 +21,7 @@ Use these files as the only source of truth for each concern:
 | Memory domain phase execution status | `docs/dev/memory_execution_plan.md` |
 | Personality domain phase execution status | `docs/dev/personality_execution_plan.md` |
 | Process and workflow rules | `docs/process/process.md` |
+| Docs weekly operating cadence | `docs/process/docs_cadence.md` |
 | This docs governance rollout plan | `docs/dev/docs_organization_plan.md` |
 | Historical docs index | `docs/archive/README.md` |
 
