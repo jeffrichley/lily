@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from lily.commands.handlers._memory_support import resolve_memory_root
+from lily.commands.handlers._memory_support import build_personality_repository
 from lily.commands.parser import CommandCall
 from lily.commands.types import CommandResult
-from lily.memory import FileBackedPersonalityMemoryRepository, MemoryError
+from lily.memory import MemoryError
 from lily.session.models import Session
 
 
@@ -28,14 +28,13 @@ class ForgetCommand:
                 code="invalid_args",
                 data={"command": "forget"},
             )
-        root = resolve_memory_root(session)
-        if root is None:
+        repository = build_personality_repository(session)
+        if repository is None:
             return CommandResult.error(
                 "Error: /forget is unavailable for this session.",
                 code="memory_unavailable",
             )
         memory_id = call.args[0].strip()
-        repository = FileBackedPersonalityMemoryRepository(root_dir=root)
         try:
             repository.forget(memory_id)
         except MemoryError as exc:

@@ -92,56 +92,56 @@ Goal: replace ephemeral `InMemorySaver` runtime behavior with persistent checkpo
 Goal: move custom file-repository internals to LangGraph Store-backed adapters while preserving behavior.
 
 `User-visible features`
-- [ ] Existing memory commands continue to work without behavior break.
-- [ ] Initial three-level memory command family introduced (compatibility preserved):
-  - [ ] `/memory short show`
-  - [ ] `/memory long show [query]`
-  - [ ] `/memory long show --domain persona_core [query]`
-  - [ ] `/memory long show --domain user_profile [query]`
-  - [ ] `/memory long show --domain working_rules [query]`
-  - [ ] `/memory long task show --namespace <task_or_project> [query]`
-  - [ ] `/memory evidence show [query]` (placeholder until Phase 6 backend)
+- [x] Existing memory commands continue to work without behavior break.
+- [x] Initial three-level memory command family introduced (compatibility preserved):
+  - [x] `/memory short show`
+  - [x] `/memory long show [query]`
+  - [x] `/memory long show --domain persona_core [query]`
+  - [x] `/memory long show --domain user_profile [query]`
+  - [x] `/memory long show --domain working_rules [query]`
+  - [x] `/memory long task show --namespace <task_or_project> [query]`
+  - [x] `/memory evidence show [query]` (placeholder until Phase 6 backend)
 
 `Internal engineering tasks`
-- [ ] Define `StoreBackedPersonalityMemoryRepository`.
-- [ ] Define `StoreBackedTaskMemoryRepository`.
-- [ ] Implement canonical long-term subdomain model:
-  - [ ] `persona_core`
-  - [ ] `user_profile`
-  - [ ] `working_rules`
-  - [ ] `task_memory`
-- [ ] Implement namespace builders/mappers for subdomains:
-  - [ ] `("memory", "personality", "persona_core", <user_or_workspace>, <scope>)`
-  - [ ] `("memory", "personality", "user_profile", <user_or_workspace>, <scope>)`
-  - [ ] `("memory", "personality", "working_rules", <user_or_workspace>, <scope>)`
-  - [ ] `("memory", "task", "task_memory", <task_or_project>, <scope>)`
-- [ ] Preserve deterministic error mapping:
-  - [ ] `memory_invalid_input`
-  - [ ] `memory_not_found`
-  - [ ] `memory_store_unavailable`
-  - [ ] `memory_namespace_required`
-  - [ ] `memory_schema_mismatch`
-  - [ ] `memory_policy_denied`
-- [ ] Preserve split-domain semantics via namespace policy.
-- [ ] Keep `/remember` and `/forget` as compatibility aliases to long-term personality writes/deletes.
-- [ ] Keep file-backed implementation as fallback adapter (non-primary).
-- [ ] Add command handler wiring to repository interfaces (not concrete file classes).
+- [x] Define `StoreBackedPersonalityMemoryRepository`.
+- [x] Define `StoreBackedTaskMemoryRepository`.
+- [x] Implement canonical long-term subdomain model:
+  - [x] `persona_core`
+  - [x] `user_profile`
+  - [x] `working_rules`
+  - [x] `task_memory`
+- [x] Implement namespace builders/mappers for subdomains:
+  - [x] `("memory", "personality", "persona_core", <user_or_workspace>, <scope>)`
+  - [x] `("memory", "personality", "user_profile", <user_or_workspace>, <scope>)`
+  - [x] `("memory", "personality", "working_rules", <user_or_workspace>, <scope>)`
+  - [x] `("memory", "task", "task_memory", <task_or_project>, <scope>)`
+- [x] Preserve deterministic error mapping:
+  - [x] `memory_invalid_input`
+  - [x] `memory_not_found`
+  - [x] `memory_store_unavailable`
+  - [x] `memory_namespace_required`
+  - [x] `memory_schema_mismatch`
+  - [x] `memory_policy_denied`
+- [x] Preserve split-domain semantics via namespace policy.
+- [x] Keep `/remember` and `/forget` as compatibility aliases to long-term personality writes/deletes.
+- [x] Keep file-backed implementation as fallback adapter (non-primary).
+- [x] Add command handler wiring to repository interfaces (not concrete file classes).
 
 `Acceptance criteria`
-- [ ] Existing handlers run against Store-backed repositories with unchanged deterministic envelopes.
-- [ ] New command family routes to correct domains and namespace constraints.
-- [ ] No cross-subdomain leakage across `persona_core`, `user_profile`, `working_rules`, and `task_memory`.
-- [ ] File-backed fallback remains functional.
+- [x] Existing handlers run against Store-backed repositories with unchanged deterministic envelopes.
+- [x] New command family routes to correct domains and namespace constraints.
+- [x] No cross-subdomain leakage across `persona_core`, `user_profile`, `working_rules`, and `task_memory`.
+- [x] File-backed fallback remains functional.
 
 `Non-goals`
 - No prompt memory retrieval/ranking logic yet.
 - No background consolidation.
 
 `Required tests and gates`
-- [ ] Parity tests: file-backed vs store-backed behavior.
-- [ ] Command contract snapshot tests for legacy commands.
-- [ ] Namespace isolation tests for task memory commands.
-- [ ] Subdomain isolation tests for personality long-term domains.
+- [x] Parity tests: file-backed vs store-backed behavior.
+- [x] Command contract snapshot tests for legacy commands.
+- [x] Namespace isolation tests for task memory commands.
+- [x] Subdomain isolation tests for personality long-term domains.
 
 ---
 
@@ -359,3 +359,4 @@ Goal: operationalize migrated memory system with measurable quality/safety contr
 - 2026-02-16: Plan restructured to AGENTS phase-contract format (fixed scope, acceptance criteria, non-goals, required tests/gates, feature/internal split).
 - 2026-02-16: Gate M0 completed. Baseline eval/quality gates passed and observability baseline snapshot captured in `docs/dev/memory_m0_baseline_2026-02-16.md`.
 - 2026-02-16: Phase 1 completed. Added global checkpointer config, SQLite-backed persistent checkpointer wiring, profile contract for production backend, and restart/history continuity tests.
+- 2026-02-16: Phase 2 completed. Added store-backed memory repositories, repository-interface command wiring, compatibility command aliases, and initial `/memory short|long|evidence` command-family rollout with parity/isolation tests.

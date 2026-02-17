@@ -552,3 +552,38 @@ def test_context_aware_tone_adaptation_without_style_override(tmp_path: Path) ->
     assert result.status.value == "ok"
     assert capture.last_request is not None
     assert capture.last_request.persona_context.style_level.value == "focus"
+
+
+def test_memory_command_family_long_short_and_evidence_paths(tmp_path: Path) -> None:
+    """`/memory short|long|evidence` command family should route deterministically."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"remember", "forget", "memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade()
+
+    remembered = runtime.handle_input("/remember favorite color is blue", session)
+    assert remembered.status.value == "ok"
+
+    long_show = runtime.handle_input(
+        "/memory long show --domain user_profile favorite",
+        session,
+    )
+    assert long_show.status.value == "ok"
+    assert "favorite color is blue" in long_show.message
+
+    short_show = runtime.handle_input("/memory short show", session)
+    assert short_show.status.value == "ok"
+    assert short_show.code == "memory_short_shown"
+
+    evidence_show = runtime.handle_input("/memory evidence show", session)
+    assert evidence_show.status.value == "ok"
+    assert evidence_show.code == "memory_evidence_unavailable"

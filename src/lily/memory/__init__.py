@@ -14,6 +14,10 @@ from lily.memory.models import (
     MemoryWriteRequest,
 )
 from lily.memory.repository import PersonalityMemoryRepository, TaskMemoryRepository
+from lily.memory.store_repository import (
+    StoreBackedPersonalityMemoryRepository,
+    StoreBackedTaskMemoryRepository,
+)
 
 __all__ = [
     "FileBackedPersonalityMemoryRepository",
@@ -26,5 +30,7 @@ __all__ = [
     "MemoryStore",
     "MemoryWriteRequest",
     "PersonalityMemoryRepository",
+    "StoreBackedPersonalityMemoryRepository",
+    "StoreBackedTaskMemoryRepository",
     "TaskMemoryRepository",
 ]

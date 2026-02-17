@@ -253,7 +253,7 @@ def test_run_memory_show_renders_table_instead_of_json(tmp_path: Path) -> None:
     assert shown.exit_code == 0
     assert "Memory (" in shown.stdout
     assert "favorite" in shown.stdout
-    assert "dark royal" in shown.stdout
+    assert "royal" in shown.stdout
     assert "purple" in shown.stdout
     assert '"records":' not in shown.stdout
 

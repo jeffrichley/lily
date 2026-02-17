@@ -17,12 +17,12 @@ from lily.memory.models import (
     MemoryStore,
     MemoryWriteRequest,
 )
+from lily.memory.record_factory import create_memory_record, memory_update_fields
 from lily.memory.repository import PersonalityMemoryRepository, TaskMemoryRepository
 from lily.policy import evaluate_memory_write
 
 _PERSONALITY_FILE = "personality_memory.json"
 _TASK_FILE = "task_memory.json"
-_SCHEMA_VERSION = 1
 
 
 class _FileMemoryStore:
@@ -74,39 +74,18 @@ class _FileMemoryStore:
             if existing_fingerprint != fingerprint:
                 continue
             updated = record.model_copy(
-                update={
-                    "source": request.source,
-                    "confidence": request.confidence,
-                    "tags": request.tags,
-                    "updated_at": now,
-                    "preference_type": request.preference_type,
-                    "stability": request.stability,
-                    "task_id": request.task_id,
-                    "session_id": request.session_id,
-                    "status": request.status,
-                    "expires_at": request.expires_at,
-                }
+                update=memory_update_fields(request=request, updated_at=now)
             )
             records[index] = updated
             self._save_records(records)
             return updated
 
-        created = MemoryRecord(
-            schema_version=_SCHEMA_VERSION,
+        created = create_memory_record(
             store=self._store,
             namespace=normalized_namespace,
             content=normalized_content,
-            source=request.source,
-            confidence=request.confidence,
-            tags=request.tags,
-            created_at=now,
-            updated_at=now,
-            preference_type=request.preference_type,
-            stability=request.stability,
-            task_id=request.task_id,
-            session_id=request.session_id,
-            status=request.status,
-            expires_at=request.expires_at,
+            request=request,
+            now=now,
         )
         records.append(created)
         self._save_records(records)
