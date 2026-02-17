@@ -57,14 +57,13 @@ Priority scale:
     - conflict/failure behavior defined
     - concurrency tests include multi-process cases
 
-- [ ] Consolidate planning docs to reduce stale duplication
+- [x] Consolidate planning docs to reduce stale duplication
   - Owner: `@team`
-  - Target: `2026-03-01`
-  - Current state: roadmap/punchlist/memory plan overlap can drift.
-  - Exit criteria:
-    - single source of truth per domain is explicit
-    - cross-links updated
-    - stale/deprecated plan sections removed
+  - Closed: `2026-02-17`
+  - Evidence:
+    - `docs/dev/punchlist.md` converted to archived summary + canonical links
+    - `docs/dev/later_backlog.md` reduced to curated idea list (non-status tracker)
+    - `docs/dev/roadmap.md` updated with explicit status ownership and current execution rule
 
 ## Recently Closed Debt
 

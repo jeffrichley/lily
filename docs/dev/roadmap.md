@@ -6,6 +6,10 @@ This roadmap is the source of truth for prioritization.
 If something is not on this list (or not promoted on this list), we do not build it yet.
 Debt tracking lives in `docs/dev/debt_tracker.md`.
 
+Status snapshot (2026-02-17):
+- The original core hardening phases in this roadmap are complete.
+- Current active work should be selected from `docs/dev/debt_tracker.md` and domain plans.
+
 ## Priority Scale
 
 - `5` = Must have for usable Lily (build now)
@@ -149,11 +153,12 @@ Exit criteria:
 
 ## What We Build Right Now
 
-Current active target: **Phase A**.
+Current active target: **Debt-driven follow-through and next-phase features**.
 
-Until Phase A exits green, new work should be limited to:
-- bug fixes in current v0 runtime
-- work that directly unblocks Phase A items
+Execution rule:
+- use `docs/dev/debt_tracker.md` for active open engineering debt
+- use domain execution plans for phase work (for example memory/personality plans)
+- keep this roadmap focused on priority and ordering, not checkbox status
 
 ## System Improvements (Internal Work)
 
@@ -181,3 +186,4 @@ For every new task:
 ## Change Log
 
 - 2026-02-14: Initial roadmap created as execution guide after Agent Mode v0 completion.
+- 2026-02-17: Pruned status ownership; active execution status moved to debt/domain plan docs.
