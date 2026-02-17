@@ -37,12 +37,12 @@ Priority scale:
 - [ ] Add typed skill/tool contracts (input/output schemas)
   - Owner: `@team`
   - Target: `TBD`
-  - Current state: deterministic envelopes exist, but typed I/O contracts are still deferred.
+  - Current state: typed I/O validation is implemented for `tool_dispatch` command tools, but generalized skill-declared I/O contracts are not yet implemented across all skills/modes.
   - Exit criteria:
-    - skill metadata supports optional typed input/output models
-    - runtime validates input pre-execution and output post-execution
-    - deterministic validation errors implemented
-    - at least 2 skills validated end-to-end
+    - skill metadata supports optional skill-declared input/output schema fields
+    - runtime validates input pre-execution and output post-execution for both `tool_dispatch` and `llm_orchestration`
+    - deterministic validation errors are stable across both execution modes
+    - at least 2 non-demo skills use skill-declared typed I/O end-to-end
 
 - [ ] Add real `/agent <name>` once agent subsystem exists
   - Owner: `@team`
