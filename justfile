@@ -12,6 +12,14 @@ test:
 eval-gates:
     uv run pytest tests/unit/evals/test_baseline.py tests/unit/evals/test_phase7_quality.py
 
+# Regression eval lane (frozen contracts)
+eval-regression:
+    uv run pytest tests/unit/evals/test_baseline.py tests/unit/evals/test_phase7_quality.py
+
+# Capability eval lane (memory migration behaviors)
+eval-capability:
+    uv run pytest tests/unit/evals/test_memory_migration_quality.py
+
 # Run all tests with coverage report
 test-cov:
     uv run pytest --cov=src/lily --cov-report=term-missing --cov-report=html
@@ -97,6 +105,13 @@ quality-check: format-check lint-check types complexity vulture darglint audit b
 
 # CI-ready aggregate gates: static checks + eval thresholds.
 ci-gates: quality-check eval-gates
+
+# Memory migration CI gate target.
+memory-migration-gates: quality-check eval-regression eval-capability
+
+# Generate Phase 7 memory observability snapshot artifact.
+memory-metrics-snapshot:
+    uv run python scripts/generate_memory_metrics_snapshot.py
 
 # --- Lighter targets for day-to-day dev ---
 # Recommended while developing: format + lint + types. Fast except mypy; catches most issues.

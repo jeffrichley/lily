@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from lily.memory.models import MemoryQuery, MemoryRecord
 from lily.memory.repository import PersonalityMemoryRepository, TaskMemoryRepository
+from lily.observability import memory_metrics
 from lily.prompting import truncate_with_marker
 
 _DOMAIN_PRIORITY: tuple[str, ...] = (
@@ -86,6 +87,7 @@ class PromptMemoryRetrievalService:
             personality_namespaces=personality_namespaces,
             task_namespaces=task_namespaces,
         )
+        memory_metrics.record_retrieval(hit_count=len(selected))
         if not selected:
             return ""
         grouped: dict[str, list[_ScoredRecord]] = defaultdict(list)

@@ -33,6 +33,7 @@ from lily.memory import (
     TaskMemoryRepository,
 )
 from lily.memory.langmem_tools import LangMemToolingAdapter
+from lily.observability import memory_metrics
 from lily.session.models import Session
 
 _PERSONALITY_DOMAINS = {"persona_core", "user_profile", "working_rules"}
@@ -305,6 +306,7 @@ class MemoryCommand:
                 conflict_group=record.conflict_group,
             )
         )
+        memory_metrics.record_last_verified(last_verified=updated.last_verified)
         return CommandResult.ok(
             f"Verified memory record '{memory_id}'.",
             code="memory_verified",
@@ -1079,6 +1081,8 @@ class MemoryCommand:
                 code="memory_empty",
                 data={"count": 0, "query": query},
             )
+        for record in records:
+            memory_metrics.record_last_verified(last_verified=record.last_verified)
         lines = [f"- {record.id}: {record.content}" for record in records]
         return CommandResult.ok(
             "\n".join(lines),
@@ -1186,6 +1190,11 @@ class MemoryCommand:
         skipped = result.skipped
         notes = result.notes
         records = result.records
+        memory_metrics.record_consolidation(
+            proposed=proposed,
+            written=written,
+            skipped=skipped,
+        )
         if status == "disabled":
             return CommandResult.error(
                 "Error: consolidation is disabled by config.",

@@ -25,6 +25,7 @@ from lily.memory.query_filters import (
 )
 from lily.memory.record_factory import create_memory_record, memory_update_fields
 from lily.memory.repository import PersonalityMemoryRepository, TaskMemoryRepository
+from lily.observability import memory_metrics
 from lily.policy import evaluate_memory_write
 
 _PERSONALITY_FILE = "personality_memory.json"
@@ -68,6 +69,7 @@ class _FileMemoryStore:
             )
         decision = evaluate_memory_write(normalized_content)
         if not decision.allowed:
+            memory_metrics.record_denied_write(namespace=normalized_namespace)
             raise MemoryError(
                 MemoryErrorCode.POLICY_DENIED,
                 decision.reason,
@@ -84,6 +86,7 @@ class _FileMemoryStore:
             )
             records[index] = updated
             self._save_records(records)
+            memory_metrics.record_write(namespace=normalized_namespace)
             return updated
 
         created = create_memory_record(
@@ -95,6 +98,7 @@ class _FileMemoryStore:
         )
         records.append(created)
         self._save_records(records)
+        memory_metrics.record_write(namespace=normalized_namespace)
         return created
 
     def forget(self, memory_id: str) -> None:
@@ -142,7 +146,12 @@ class _FileMemoryStore:
             )
         ]
         ordered = sorted(matches, key=lambda record: record.updated_at, reverse=True)
-        return tuple(ordered[: query.limit])
+        selected = tuple(ordered[: query.limit])
+        memory_metrics.record_read(
+            namespace=namespace or "unknown",
+            hit_count=len(selected),
+        )
+        return selected
 
     def _load_records(self) -> list[MemoryRecord]:
         """Load and validate memory records from backing file.

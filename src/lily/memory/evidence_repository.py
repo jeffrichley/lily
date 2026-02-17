@@ -15,6 +15,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from lily.memory.models import MemoryError, MemoryErrorCode
+from lily.observability import memory_metrics
 
 _WORD_PATTERN = re.compile(r"[a-z0-9]{2,}", re.IGNORECASE)
 _EVIDENCE_FILE = "evidence_memory.json"
@@ -96,26 +97,11 @@ class FileBackedEvidenceRepository:
         Raises:
             MemoryError: For invalid input or unreadable payload.
         """
-        normalized_ns = namespace.strip()
-        normalized_ref = path_or_ref.strip()
-        if not normalized_ns or not normalized_ref:
-            raise MemoryError(
-                MemoryErrorCode.INVALID_INPUT,
-                "Evidence ingest requires namespace and path.",
-            )
-        source_path = Path(normalized_ref)
-        if not source_path.exists() or not source_path.is_file():
-            raise MemoryError(
-                MemoryErrorCode.NOT_FOUND,
-                f"Evidence source '{normalized_ref}' was not found.",
-            )
-        try:
-            text = source_path.read_text(encoding="utf-8")
-        except OSError as exc:
-            raise MemoryError(
-                MemoryErrorCode.STORE_UNAVAILABLE,
-                f"Evidence source '{normalized_ref}' is unreadable.",
-            ) from exc
+        normalized_ns, normalized_ref = _normalize_ingest_input(
+            namespace=namespace,
+            path_or_ref=path_or_ref,
+        )
+        text = _read_source_text(path_or_ref=normalized_ref)
         chunks = _chunk_text(text=text, settings=self._chunking)
         if not chunks:
             raise MemoryError(
@@ -123,30 +109,14 @@ class FileBackedEvidenceRepository:
                 f"Evidence source '{normalized_ref}' is empty.",
             )
         all_rows = self._load_rows()
-        existing_ids = {row.id for row in all_rows}
-        now = datetime.now(UTC)
-        written: list[EvidenceChunk] = []
-        for index, chunk in enumerate(chunks):
-            chunk_id = _chunk_id(
-                namespace=normalized_ns,
-                source_ref=normalized_ref,
-                chunk=chunk,
-            )
-            if chunk_id in existing_ids:
-                continue
-            row = EvidenceChunk(
-                id=chunk_id,
-                namespace=normalized_ns,
-                source_ref=normalized_ref,
-                chunk_index=index,
-                content=chunk,
-                created_at=now,
-                updated_at=now,
-            )
-            all_rows.append(row)
-            written.append(row)
-            existing_ids.add(chunk_id)
+        written = _append_new_chunks(
+            rows=all_rows,
+            namespace=normalized_ns,
+            source_ref=normalized_ref,
+            chunks=chunks,
+        )
         self._save_rows(all_rows)
+        _record_written_chunks(namespace=normalized_ns, count=len(written))
         return tuple(written)
 
     def query(
@@ -181,7 +151,7 @@ class FileBackedEvidenceRepository:
         if normalized_query == "*":
             recent_rows = sorted(rows, key=lambda item: item.updated_at, reverse=True)
             selected = recent_rows[:bounded_limit]
-            return tuple(
+            hits = tuple(
                 EvidenceHit(
                     id=row.id,
                     namespace=row.namespace,
@@ -192,6 +162,8 @@ class FileBackedEvidenceRepository:
                 )
                 for row in selected
             )
+            memory_metrics.record_read(namespace=normalized_ns, hit_count=len(hits))
+            return hits
         scored: list[tuple[float, EvidenceChunk]] = []
         for row in rows:
             score = _lexical_score(query=normalized_query, content=row.content)
@@ -203,7 +175,7 @@ class FileBackedEvidenceRepository:
             key=lambda pair: (pair[0], pair[1].updated_at),
             reverse=True,
         )[:bounded_limit]
-        return tuple(
+        hits = tuple(
             EvidenceHit(
                 id=row.id,
                 namespace=row.namespace,
@@ -214,6 +186,8 @@ class FileBackedEvidenceRepository:
             )
             for score, row in ranked
         )
+        memory_metrics.record_read(namespace=normalized_ns, hit_count=len(hits))
+        return hits
 
     def _load_rows(self) -> list[EvidenceChunk]:
         """Load and validate persisted evidence rows.
@@ -330,6 +304,107 @@ def _chunk_id(*, namespace: str, source_ref: str, chunk: str) -> str:
     """
     payload = f"{namespace.strip()}::{source_ref.strip()}::{chunk.strip()}".encode()
     return f"ev_{sha256(payload).hexdigest()}"
+
+
+def _normalize_ingest_input(*, namespace: str, path_or_ref: str) -> tuple[str, str]:
+    """Normalize and validate ingest input parameters.
+
+    Args:
+        namespace: Evidence namespace token.
+        path_or_ref: Source path string.
+
+    Returns:
+        Normalized namespace and path.
+
+    Raises:
+        MemoryError: If required fields are missing.
+    """
+    normalized_ns = namespace.strip()
+    normalized_ref = path_or_ref.strip()
+    if normalized_ns and normalized_ref:
+        return normalized_ns, normalized_ref
+    raise MemoryError(
+        MemoryErrorCode.INVALID_INPUT,
+        "Evidence ingest requires namespace and path.",
+    )
+
+
+def _read_source_text(*, path_or_ref: str) -> str:
+    """Read source text from local file path.
+
+    Args:
+        path_or_ref: Source path string.
+
+    Returns:
+        Decoded source text.
+
+    Raises:
+        MemoryError: If path is missing or unreadable.
+    """
+    source_path = Path(path_or_ref)
+    if not source_path.exists() or not source_path.is_file():
+        raise MemoryError(
+            MemoryErrorCode.NOT_FOUND,
+            f"Evidence source '{path_or_ref}' was not found.",
+        )
+    try:
+        return source_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise MemoryError(
+            MemoryErrorCode.STORE_UNAVAILABLE,
+            f"Evidence source '{path_or_ref}' is unreadable.",
+        ) from exc
+
+
+def _append_new_chunks(
+    *,
+    rows: list[EvidenceChunk],
+    namespace: str,
+    source_ref: str,
+    chunks: tuple[str, ...],
+) -> list[EvidenceChunk]:
+    """Append non-duplicate chunk rows and return newly written rows.
+
+    Args:
+        rows: Existing rows list to mutate.
+        namespace: Evidence namespace token.
+        source_ref: Source reference path.
+        chunks: Normalized chunk tuple.
+
+    Returns:
+        Newly written chunk rows.
+    """
+    existing_ids = {row.id for row in rows}
+    now = datetime.now(UTC)
+    written: list[EvidenceChunk] = []
+    for index, chunk in enumerate(chunks):
+        chunk_id = _chunk_id(namespace=namespace, source_ref=source_ref, chunk=chunk)
+        if chunk_id in existing_ids:
+            continue
+        row = EvidenceChunk(
+            id=chunk_id,
+            namespace=namespace,
+            source_ref=source_ref,
+            chunk_index=index,
+            content=chunk,
+            created_at=now,
+            updated_at=now,
+        )
+        rows.append(row)
+        written.append(row)
+        existing_ids.add(chunk_id)
+    return written
+
+
+def _record_written_chunks(*, namespace: str, count: int) -> None:
+    """Record write metrics for ingested chunks.
+
+    Args:
+        namespace: Evidence namespace token.
+        count: Number of chunk writes.
+    """
+    for _ in range(max(count, 0)):
+        memory_metrics.record_write(namespace=namespace)
 
 
 def _citation(row: EvidenceChunk) -> str:

@@ -1,0 +1,37 @@
+{
+  "consolidation_drift_indicator": 0.0,
+  "consolidation_runs": 1,
+  "denied_writes": 1,
+  "last_verified_freshness_distribution": {
+    "never_verified": 2
+  },
+  "per_subdomain_read_write_rates": {
+    "persona_core": {
+      "read_count": 1,
+      "read_rate": 0.1667,
+      "write_count": 0,
+      "write_rate": 0.0
+    },
+    "task_memory": {
+      "read_count": 1,
+      "read_rate": 0.1667,
+      "write_count": 0,
+      "write_rate": 0.0
+    },
+    "user_profile": {
+      "read_count": 3,
+      "read_rate": 0.5,
+      "write_count": 1,
+      "write_rate": 1.0
+    },
+    "working_rules": {
+      "read_count": 1,
+      "read_rate": 0.1667,
+      "write_count": 0,
+      "write_rate": 0.0
+    }
+  },
+  "retrieval_hit_rate": 1.0,
+  "retrieval_hits": 3,
+  "write_counts": 1
+}

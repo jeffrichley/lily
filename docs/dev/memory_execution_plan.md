@@ -308,44 +308,44 @@ Goal: add semantic retrieval for large artifacts while preserving structured tru
 Goal: operationalize migrated memory system with measurable quality/safety controls.
 
 `User-visible features`
-- [ ] Reliable memory behavior with documented backup/export/restore operations.
+- [x] Reliable memory behavior with documented backup/export/restore operations.
 
 `Internal engineering tasks`
-- [ ] Extend eval suites for migrated stack:
-  - [ ] restart continuity with persistent checkpointer
-  - [ ] store-backed parity
-  - [ ] policy redline memory write denial
-  - [ ] prompt retrieval relevance
-  - [ ] context compaction effectiveness on long transcripts
-- [ ] Split eval governance:
-  - [ ] capability eval lane for new memory behaviors
-  - [ ] regression eval lane for frozen command/runtime contracts
-  - [ ] multi-trial policy for stochastic eval scenarios
-  - [ ] transcript review cadence for grader quality/drift
-- [ ] Add `memory migration` CI gate target.
-- [ ] Add backup/export/restore operational docs.
-- [ ] Add memory schema migration playbook.
-- [ ] Add observability metrics:
-  - [ ] write counts
-  - [ ] denied writes
-  - [ ] retrieval hit rates
-  - [ ] consolidation drift indicators
-  - [ ] per-subdomain read/write rates (`persona_core`, `user_profile`, `working_rules`, `task_memory`)
-  - [ ] `last_verified` freshness distribution
+- [x] Extend eval suites for migrated stack:
+  - [x] restart continuity with persistent checkpointer
+  - [x] store-backed parity
+  - [x] policy redline memory write denial
+  - [x] prompt retrieval relevance
+  - [x] context compaction effectiveness on long transcripts
+- [x] Split eval governance:
+  - [x] capability eval lane for new memory behaviors
+  - [x] regression eval lane for frozen command/runtime contracts
+  - [x] multi-trial policy for stochastic eval scenarios
+  - [x] transcript review cadence for grader quality/drift
+- [x] Add `memory migration` CI gate target.
+- [x] Add backup/export/restore operational docs.
+- [x] Add memory schema migration playbook.
+- [x] Add observability metrics:
+  - [x] write counts
+  - [x] denied writes
+  - [x] retrieval hit rates
+  - [x] consolidation drift indicators
+  - [x] per-subdomain read/write rates (`persona_core`, `user_profile`, `working_rules`, `task_memory`)
+  - [x] `last_verified` freshness distribution
 
 `Acceptance criteria`
-- [ ] CI gates green across supported platforms.
-- [ ] Operational runbook ready and reviewed.
-- [ ] Observability dashboards/metrics available for migration decisions.
+- [x] CI gates green across supported platforms.
+- [x] Operational runbook ready and reviewed.
+- [x] Observability dashboards/metrics available for migration decisions.
 
 `Non-goals`
 - No new product features unrelated to memory migration.
 - No relaxation of deterministic contract requirements.
 
 `Required tests and gates`
-- [ ] Full memory migration CI gate green.
-- [ ] Phase 7 quality suite green.
-- [ ] Baseline-to-post-migration metric comparison report complete.
+- [x] Full memory migration CI gate green.
+- [x] Phase 7 quality suite green.
+- [x] Baseline-to-post-migration metric comparison report complete.
 
 ---
 
@@ -403,3 +403,4 @@ Goal: replace custom rule-based history compaction with LangGraph-native state/c
 - 2026-02-17: Phase 5 started. Added dual-backend consolidation pipeline (`rule_based` + `langmem_manager`), opt-in backend/config toggles, triggered command path (`/memory long consolidate [--dry-run]`), and deterministic backend selection/behavior tests.
 - 2026-02-17: Phase 5 completed. Added lifecycle visibility controls (`include_archived|include_expired|include_conflicted`), `/memory long verify` reverification path, conflict-group reconciliation behavior, scheduled auto-consolidation (`auto_run_every_n_turns`), and corresponding command/repository/consolidation test coverage.
 - 2026-02-17: Phase 6 completed. Replaced evidence placeholder with working semantic evidence layer (`/memory evidence ingest|show`), added evidence repository abstraction, citation-bearing retrieval output, explicit non-canonical policy labeling, contradiction/precedence command tests, and CLI evidence table rendering.
+- 2026-02-17: Phase 7 completed. Added memory migration eval harness/suite (`tests/unit/evals/test_memory_migration_quality.py`), split eval lanes (`eval-regression`, `eval-capability`), `memory-migration-gates` CI target, operational runbooks (`docs/ops/...`), in-process memory observability counters + snapshot artifact generation, and baseline-to-post metrics comparison report.

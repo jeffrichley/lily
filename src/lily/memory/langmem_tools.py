@@ -11,6 +11,7 @@ from langgraph.store.sqlite import SqliteStore
 from langmem import create_manage_memory_tool, create_search_memory_tool
 
 from lily.memory.models import MemoryError, MemoryErrorCode
+from lily.observability import memory_metrics
 from lily.policy import evaluate_memory_write
 
 if TYPE_CHECKING:
@@ -59,7 +60,9 @@ class LangMemToolingAdapter:
                 name=tool_name,
             )
             payload = tool.invoke({"query": query})
-        return _normalize_search_payload(payload)
+        rows = _normalize_search_payload(payload)
+        memory_metrics.record_read(namespace=namespace, hit_count=len(rows))
+        return rows
 
     def remember(
         self,
@@ -89,6 +92,7 @@ class LangMemToolingAdapter:
             )
         decision = evaluate_memory_write(normalized)
         if not decision.allowed:
+            memory_metrics.record_denied_write(namespace=namespace)
             raise MemoryError(MemoryErrorCode.POLICY_DENIED, decision.reason)
         with self._open_store() as store:
             tool = create_manage_memory_tool(
@@ -97,6 +101,7 @@ class LangMemToolingAdapter:
                 name=tool_name,
             )
             payload = tool.invoke({"content": normalized})
+        memory_metrics.record_write(namespace=namespace)
         return _extract_memory_key(payload)
 
     @contextmanager

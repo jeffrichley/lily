@@ -29,6 +29,7 @@ from lily.memory.query_filters import (
 )
 from lily.memory.record_factory import create_memory_record, memory_update_fields
 from lily.memory.repository import PersonalityMemoryRepository, TaskMemoryRepository
+from lily.observability import memory_metrics
 from lily.policy import evaluate_memory_write
 
 if TYPE_CHECKING:
@@ -72,6 +73,7 @@ class _SqliteStoreBackedRepository:
             )
         decision = evaluate_memory_write(content)
         if not decision.allowed:
+            memory_metrics.record_denied_write(namespace=namespace)
             raise MemoryError(MemoryErrorCode.POLICY_DENIED, decision.reason)
 
         key = _fingerprint(namespace, content)
@@ -88,6 +90,7 @@ class _SqliteStoreBackedRepository:
                     store.put(
                         ns_path, key, updated.model_dump(mode="json"), index=False
                     )
+                    memory_metrics.record_write(namespace=namespace)
                     return updated
 
                 created = create_memory_record(
@@ -99,6 +102,7 @@ class _SqliteStoreBackedRepository:
                     record_id=f"mem_{uuid4().hex}",
                 )
                 store.put(ns_path, key, created.model_dump(mode="json"), index=False)
+                memory_metrics.record_write(namespace=namespace)
                 return created
         except MemoryError:
             raise
@@ -173,7 +177,12 @@ class _SqliteStoreBackedRepository:
             if _record_matches(query=query, namespace=namespace, record=record)
         ]
         ordered = sorted(filtered, key=lambda item: item.updated_at, reverse=True)
-        return tuple(ordered[: query.limit])
+        selected = tuple(ordered[: query.limit])
+        memory_metrics.record_read(
+            namespace=namespace or "unknown",
+            hit_count=len(selected),
+        )
+        return selected
 
     def _load_matches(self, *, namespace: str | None) -> tuple[SearchItem, ...]:
         """Load raw store items for one namespace or full domain prefix.
