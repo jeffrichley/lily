@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+import pytest
+
 from lily.runtime.llm_backend import (
     BackendInvalidResponseError,
     BackendUnavailableError,
@@ -142,3 +146,75 @@ def test_extract_text_supports_structured_response_payload() -> None:
     text = _LangChainV1Invoker._extract_text(result)
 
     assert text == "structured hello"
+
+
+def test_invoker_falls_back_when_structured_output_is_unsupported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Invoker should retry without response_format on known vLLM error signature."""
+    calls: list[dict[str, object]] = []
+
+    class _FirstAgent:
+        def invoke(self, payload: object) -> object:
+            del payload
+            message = (
+                'Error code: 400 - tool_choice="required" requires '
+                "--tool-call-parser to be set"
+            )
+            raise RuntimeError(message)
+
+    class _SecondAgent:
+        def invoke(self, payload: object) -> object:
+            del payload
+            return {"messages": [SimpleNamespace(content="fallback-ok")]}
+
+    agents = [_FirstAgent(), _SecondAgent()]
+
+    def _fake_create_agent(**kwargs: object) -> object:
+        calls.append(kwargs)
+        return agents[len(calls) - 1]
+
+    monkeypatch.setattr(
+        "lily.runtime.llm_backend.langchain_adapter.create_agent",
+        _fake_create_agent,
+    )
+    request = LlmRunRequest(
+        session_id="session-test",
+        skill_name="echo",
+        skill_summary="Echo skill",
+        user_text="hello",
+        model_name="openai:Qwen/Qwen2.5-Coder-7B-Instruct-AWQ",
+    )
+
+    result = _LangChainV1Invoker().invoke(request)
+
+    assert result == "fallback-ok"
+    assert len(calls) == 2
+    assert "response_format" in calls[0]
+    assert "response_format" not in calls[1]
+
+
+def test_invoker_does_not_fallback_for_unknown_structured_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Invoker should bubble non-matching exceptions from structured path."""
+
+    class _FailingAgent:
+        def invoke(self, payload: object) -> object:
+            del payload
+            raise RuntimeError("some other provider error")
+
+    monkeypatch.setattr(
+        "lily.runtime.llm_backend.langchain_adapter.create_agent",
+        lambda **_: _FailingAgent(),
+    )
+    request = LlmRunRequest(
+        session_id="session-test",
+        skill_name="echo",
+        skill_summary="Echo skill",
+        user_text="hello",
+        model_name="openai:Qwen/Qwen2.5-Coder-7B-Instruct-AWQ",
+    )
+
+    with pytest.raises(RuntimeError, match="some other provider error"):
+        _LangChainV1Invoker().invoke(request)

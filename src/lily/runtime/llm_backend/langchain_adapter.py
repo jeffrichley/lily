@@ -52,18 +52,78 @@ class _LangChainV1Invoker:
 
         Returns:
             Final text response.
+
+        Raises:
+            Exception: Provider exception when structured fallback does not apply.
         """
         system_prompt = self._build_system_prompt(request)
-        agent = create_agent(
-            model=request.model_name,
-            tools=[],
-            system_prompt=system_prompt,
-            response_format=_StructuredSkillResponse,
-        )
-        result = agent.invoke(
+        try:
+            result = self._invoke_agent(
+                request=request,
+                system_prompt=system_prompt,
+                structured=True,
+            )
+        except Exception as exc:
+            if not self._is_structured_response_unsupported(exc):
+                raise
+            result = self._invoke_agent(
+                request=request,
+                system_prompt=system_prompt,
+                structured=False,
+            )
+        return self._extract_text(result)
+
+    @staticmethod
+    def _invoke_agent(
+        *,
+        request: LlmRunRequest,
+        system_prompt: str,
+        structured: bool,
+    ) -> object:
+        """Invoke LangChain agent with optional structured response contract.
+
+        Args:
+            request: Normalized run request payload.
+            system_prompt: Rendered system prompt text.
+            structured: Whether to request structured response format.
+
+        Returns:
+            Raw invocation payload from LangChain.
+        """
+        if structured:
+            agent = create_agent(
+                model=request.model_name,
+                tools=[],
+                system_prompt=system_prompt,
+                response_format=_StructuredSkillResponse,
+            )
+        else:
+            agent = create_agent(
+                model=request.model_name,
+                tools=[],
+                system_prompt=system_prompt,
+            )
+        return agent.invoke(
             {"messages": [{"role": "user", "content": request.user_text}]}
         )
-        return self._extract_text(result)
+
+    @staticmethod
+    def _is_structured_response_unsupported(exc: Exception) -> bool:
+        """Return whether provider explicitly rejects structured response format.
+
+        Args:
+            exc: Exception raised by provider call.
+
+        Returns:
+            True when failure signature matches known unsupported structured-output
+            behavior and unstructured fallback should be attempted.
+        """
+        text = str(exc)
+        signatures = (
+            'tool_choice="required" requires --tool-call-parser to be set',
+            "tool_choice='required' requires --tool-call-parser to be set",
+        )
+        return any(signature in text for signature in signatures)
 
     @staticmethod
     def _build_system_prompt(request: LlmRunRequest) -> str:
