@@ -137,4 +137,4 @@ def test_invoker_denies_undeclared_tool_capability() -> None:
 
     assert result.status.value == "error"
     assert result.code == "skill_capability_denied"
-    assert "undeclared tool 'add'" in result.message
+    assert "undeclared tool 'builtin:add'" in result.message

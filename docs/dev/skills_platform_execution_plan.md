@@ -95,8 +95,95 @@ Scope contract:
 
 ---
 
+## Gate S1: Phase 2 Alignment (Must Pass Before Provider Refactor)
+
+`User-visible features`
+- None (alignment gate only).
+
+`Internal engineering tasks`
+- [x] Confirm Phase 2 locked scope from spec:
+  - [x] registry-based provider dispatch (`builtin`, `mcp`, `plugin` interface shape)
+  - [x] route existing builtin tools through provider path
+  - [x] MCP adapter contract + deterministic error mapping
+  - [x] preserve Phase 1 capability enforcement guarantees
+- [x] Confirm explicit Phase 2 exclusions:
+  - [x] no containerized plugin runtime execution yet (Phase 3)
+  - [x] no HITL approval workflow yet (Phase 3)
+  - [x] no security hash/provenance persistence runtime yet (Phase 3)
+  - [x] no new autonomous supervisor/subagent behavior (separate feature)
+- [x] Freeze provider error code contract for Phase 2:
+  - [x] `provider_unbound`
+  - [x] `provider_tool_unregistered`
+  - [x] `provider_execution_failed`
+  - [x] `provider_policy_denied`
+
+`Acceptance criteria`
+- [x] S1 checklist completed and referenced in implementation PR.
+- [x] Provider error-code contract documented in code/tests before rollout.
+
+`Non-goals`
+- no plugin container sandbox wiring.
+- no security-hash approval cache implementation.
+- no TUI workflow changes.
+
+`Required tests and gates`
+- [x] `just docs-check` green before and after Phase 2 edits.
+
+---
+
+## Phase 2: Provider Registry (Builtin + MCP) (`P5`)
+
+`User-visible features`
+- [x] Skills continue to run through stable `/skill` UX while provider-backed routing becomes active.
+- [x] Deterministic provider/tool resolution failures show clear, stable user-facing errors.
+
+`Internal engineering tasks`
+- [x] Introduce provider abstraction:
+  - [x] add `ToolProvider` protocol/contract
+  - [x] add provider registry keyed by stable provider id
+  - [x] remove mode/provider branching that conflicts with registry pattern
+- [x] Implement builtin provider:
+  - [x] wrap existing arithmetic tools (`add`, `subtract`, `multiply`) as provider-backed tools
+  - [x] keep typed input/output validation path intact
+  - [x] preserve existing deterministic success/error envelopes where contract requires stability
+- [x] Implement MCP provider contract (adapter scaffold):
+  - [x] resolve declared MCP tool identifiers
+  - [x] map adapter failures to deterministic provider error codes
+  - [x] keep transport/runtime concerns isolated behind provider adapter boundary
+- [x] Update skill metadata integration for provider resolution:
+  - [x] ensure capability declarations are checked against provider+tool resolution
+  - [x] deny undeclared/unregistered provider tools deterministically
+- [x] Add observability/diagnostics:
+  - [x] include provider id + tool id in structured result data where applicable
+  - [x] ensure security-alert rendering triggers for policy-denied provider paths
+
+`Acceptance criteria`
+- [x] Registry-based provider dispatch is active end-to-end for skill tool execution.
+- [x] Existing builtin tools behave compatibly under provider path (no contract regressions).
+- [x] Unresolved provider/tool calls fail with deterministic error codes/messages.
+- [x] MCP adapter path is test-covered (mocked integration level) with deterministic failure mapping.
+
+`Non-goals`
+- no remote plugin code execution.
+- no container runtime hooks.
+- no HITL prompt/grant persistence.
+- no supervisor orchestration logic.
+
+`Required tests and gates`
+- [x] unit tests for provider registry dispatch and provider lookup failures.
+- [x] unit tests for builtin provider tool routing + typed validation parity.
+- [x] unit tests for capability-denied provider scenarios.
+- [x] integration tests for mocked MCP provider success/failure mapping.
+- [x] regression tests for existing `/skill add|subtract|multiply` behavior.
+- [x] `just quality-check`.
+- [x] `just docs-check`.
+
+---
+
 ## Status Log
 
 - 2026-02-17: Plan created. User selected Phase 1-only implementation start with rule-based security governance, SQLite security backend, and terminal-first HITL deferred to later phase.
 - 2026-02-17: Gate S0 completed. Locked decisions and Phase 1 boundaries validated against `docs/specs/agents/skills_platform_v1.md`; scope remains Phase 1-only.
 - 2026-02-17: Phase 1 completed. Added capability contract fields + loader validation, runtime capability denial for undeclared tool use, `/skills` diagnostic rendering, and terminal security-alert Rich panels; targeted unit tests plus `just quality-check` and `just docs-check` passed.
+- 2026-02-17: Phase 2 detailed plan added (Gate S1 + provider-registry execution scope, acceptance criteria, non-goals, and tests/gates).
+- 2026-02-17: Gate S1 and Phase 2 completed. Added provider registry (`builtin` + MCP adapter contract), provider-scoped deterministic errors, provider-aware tool dispatch/runtime metadata, capability checks supporting provider-qualified declarations, and mocked MCP routing/failure tests; `just quality-check` and `just docs-check` passed.

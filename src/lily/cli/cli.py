@@ -61,6 +61,7 @@ _HIDE_DATA_CODES = {
     "memory_evidence_ingested",
 }
 _SECURITY_ALERT_CODES = {
+    "provider_policy_denied",
     "skill_capability_denied",
     "security_policy_denied",
 }

@@ -9,7 +9,10 @@ from pydantic import BaseModel, ConfigDict
 
 from lily.runtime.executors.tool_dispatch import (
     AddTool,
+    BuiltinToolProvider,
+    McpToolProvider,
     MultiplyTool,
+    ProviderPolicyDeniedError,
     SubtractTool,
     ToolContract,
     ToolDispatchExecutor,
@@ -45,7 +48,9 @@ def _entry(
 
 def test_tool_dispatch_executes_registered_add_tool() -> None:
     """Registered add command tool should execute with typed contract output."""
-    executor = ToolDispatchExecutor(tools=(AddTool(),))
+    executor = ToolDispatchExecutor(
+        providers=(BuiltinToolProvider(tools=(AddTool(),)),)
+    )
 
     result = executor.execute(_entry(), _session(), "2+2")
 
@@ -58,7 +63,9 @@ def test_tool_dispatch_executes_registered_add_tool() -> None:
 
 def test_tool_dispatch_requires_command_tool() -> None:
     """Executor should fail clearly when entry lacks command_tool."""
-    executor = ToolDispatchExecutor(tools=(AddTool(),))
+    executor = ToolDispatchExecutor(
+        providers=(BuiltinToolProvider(tools=(AddTool(),)),)
+    )
 
     result = executor.execute(_entry(command_tool=None), _session(), "2+2")
 
@@ -71,20 +78,25 @@ def test_tool_dispatch_requires_command_tool() -> None:
 
 def test_tool_dispatch_fails_for_unknown_tool() -> None:
     """Executor should fail clearly for unregistered tool names."""
-    executor = ToolDispatchExecutor(tools=(AddTool(),))
+    executor = ToolDispatchExecutor(
+        providers=(BuiltinToolProvider(tools=(AddTool(),)),)
+    )
 
     result = executor.execute(_entry(command_tool="missing_tool"), _session(), "2+2")
 
     assert result.status.value == "error"
-    assert (
-        result.message
-        == "Error: command tool 'missing_tool' is not registered for skill 'add'."
+    assert result.message == (
+        "Error: tool 'missing_tool' is not registered for provider "
+        "'builtin' (skill 'add')."
     )
+    assert result.code == "provider_tool_unregistered"
 
 
 def test_tool_dispatch_returns_input_validation_error_deterministically() -> None:
     """Invalid payload should return schema-based deterministic input error."""
-    executor = ToolDispatchExecutor(tools=(AddTool(),))
+    executor = ToolDispatchExecutor(
+        providers=(BuiltinToolProvider(tools=(AddTool(),)),)
+    )
 
     result = executor.execute(_entry(), _session(), "invalid payload")
 
@@ -97,7 +109,11 @@ def test_tool_dispatch_returns_input_validation_error_deterministically() -> Non
 
 def test_tool_dispatch_conformance_for_three_tools() -> None:
     """Typed contract conformance should hold for add/subtract/multiply tools."""
-    executor = ToolDispatchExecutor(tools=(AddTool(), SubtractTool(), MultiplyTool()))
+    executor = ToolDispatchExecutor(
+        providers=(
+            BuiltinToolProvider(tools=(AddTool(), SubtractTool(), MultiplyTool())),
+        )
+    )
 
     add_result = executor.execute(
         _entry(name="add", command_tool="add"),
@@ -173,7 +189,7 @@ class _BadOutputTool:
 def test_tool_dispatch_returns_output_validation_error_deterministically() -> None:
     """Invalid tool output should produce deterministic schema error envelope."""
     bad_tool: ToolContract = _BadOutputTool()
-    executor = ToolDispatchExecutor(tools=(bad_tool,))
+    executor = ToolDispatchExecutor(providers=(BuiltinToolProvider(tools=(bad_tool,)),))
     entry = _entry(name="bad", command_tool="bad_output")
 
     result = executor.execute(entry, _session(), "anything")
@@ -183,3 +199,90 @@ def test_tool_dispatch_returns_output_validation_error_deterministically() -> No
     assert result.data is not None
     assert result.data["tool"] == "bad_output"
     assert result.data["validation_errors"]
+
+
+def test_tool_dispatch_errors_for_unbound_provider() -> None:
+    """Missing provider binding should return deterministic provider_unbound error."""
+    executor = ToolDispatchExecutor(
+        providers=(BuiltinToolProvider(tools=(AddTool(),)),)
+    )
+    entry = _entry(command_tool="add").model_copy(
+        update={"command_tool_provider": "mcp"}
+    )
+
+    result = executor.execute(entry, _session(), "2+2")
+
+    assert result.status.value == "error"
+    assert result.code == "provider_unbound"
+
+
+class _McpAddResolver:
+    """Resolver that exposes one add-like MCP tool."""
+
+    def __init__(self, tool: ToolContract) -> None:
+        self._tool = tool
+
+    def resolve_tool(
+        self,
+        tool_name: str,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> ToolContract | None:
+        del session
+        del skill_name
+        if tool_name == self._tool.name:
+            return self._tool
+        return None
+
+
+def test_tool_dispatch_routes_through_mcp_provider_resolver() -> None:
+    """MCP provider contract should support deterministic tool routing."""
+    executor = ToolDispatchExecutor(
+        providers=(
+            BuiltinToolProvider(tools=(AddTool(),)),
+            McpToolProvider(resolver=_McpAddResolver(AddTool())),
+        )
+    )
+    entry = _entry(command_tool="add").model_copy(
+        update={"command_tool_provider": "mcp"}
+    )
+
+    result = executor.execute(entry, _session(), "2+2")
+
+    assert result.status.value == "ok"
+    assert result.code == "tool_ok"
+    assert result.message == "4"
+    assert result.data is not None
+    assert result.data["provider"] == "mcp"
+
+
+class _PolicyDeniedResolver:
+    """Resolver that always denies by policy."""
+
+    def resolve_tool(
+        self,
+        tool_name: str,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> ToolContract | None:
+        del tool_name
+        del session
+        del skill_name
+        raise ProviderPolicyDeniedError("blocked for test")
+
+
+def test_tool_dispatch_maps_mcp_policy_denied_error() -> None:
+    """Provider policy denials should map to deterministic security code."""
+    executor = ToolDispatchExecutor(
+        providers=(McpToolProvider(resolver=_PolicyDeniedResolver()),)
+    )
+    entry = _entry(command_tool="add").model_copy(
+        update={"command_tool_provider": "mcp"}
+    )
+
+    result = executor.execute(entry, _session(), "2+2")
+
+    assert result.status.value == "error"
+    assert result.code == "provider_policy_denied"

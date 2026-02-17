@@ -49,6 +49,7 @@ class SkillMetadata(BaseModel):
     summary: str = ""
     invocation_mode: InvocationMode = InvocationMode.LLM_ORCHESTRATION
     command: str | None = None
+    command_tool_provider: str = "builtin"
     command_tool: str | None = None
     requires_tools: tuple[str, ...] = ()
     capabilities: SkillCapabilitySpec = Field(default_factory=SkillCapabilitySpec)
@@ -90,6 +91,7 @@ class SkillEntry(BaseModel):
     instructions: str = ""
     invocation_mode: InvocationMode = InvocationMode.LLM_ORCHESTRATION
     command: str | None = None
+    command_tool_provider: str = "builtin"
     command_tool: str | None = None
     requires_tools: tuple[str, ...] = ()
     capabilities: SkillCapabilitySpec = Field(default_factory=SkillCapabilitySpec)

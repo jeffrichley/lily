@@ -38,6 +38,8 @@ from lily.runtime.conversation import (
 from lily.runtime.executors.llm_orchestration import LlmOrchestrationExecutor
 from lily.runtime.executors.tool_dispatch import (
     AddTool,
+    BuiltinToolProvider,
+    McpToolProvider,
     MultiplyTool,
     SubtractTool,
     ToolContract,
@@ -329,9 +331,13 @@ class RuntimeFacade:
                 MultiplyTool(),
             ),
         )
+        providers = (
+            BuiltinToolProvider(tools=tools),
+            McpToolProvider(),
+        )
         executors = (
             LlmOrchestrationExecutor(llm_backend),
-            ToolDispatchExecutor(tools=tools),
+            ToolDispatchExecutor(providers=providers),
         )
         invoker = SkillInvoker(executors=executors)
         return CommandRegistry(

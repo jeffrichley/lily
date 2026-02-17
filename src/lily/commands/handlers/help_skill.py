@@ -39,6 +39,7 @@ def _format_help(entry: SkillEntry) -> str:
         f"- `source`: {entry.source.value}",
         f"- `invocation_mode`: {entry.invocation_mode.value}",
         f"- `command_alias`: {entry.command or '(none)'}",
+        f"- `command_tool_provider`: {entry.command_tool_provider}",
         f"- `command_tool`: {entry.command_tool or '(none)'}",
         f"- `requires_tools`: {_format_list(entry.requires_tools)}",
         "- `eligibility`:",

@@ -143,6 +143,7 @@ def _hash_snapshot(
                 "instructions": entry.instructions,
                 "invocation_mode": entry.invocation_mode.value,
                 "command": entry.command,
+                "command_tool_provider": entry.command_tool_provider,
                 "command_tool": entry.command_tool,
                 "requires_tools": list(entry.requires_tools),
                 "capabilities": {
@@ -301,6 +302,7 @@ def _resolve_candidate(
         instructions=body.strip(),
         invocation_mode=metadata.invocation_mode,
         command=metadata.command,
+        command_tool_provider=metadata.command_tool_provider,
         command_tool=metadata.command_tool,
         requires_tools=metadata.requires_tools,
         capabilities=metadata.capabilities,

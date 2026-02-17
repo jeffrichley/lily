@@ -49,6 +49,148 @@ class ToolContract(Protocol):
         """
 
 
+class ToolProvider(Protocol):
+    """Provider contract for resolving command tools by stable provider id."""
+
+    provider_id: str
+
+    def resolve_tool(
+        self,
+        tool_name: str,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> ToolContract | None:
+        """Resolve tool implementation for one provider-scoped tool id.
+
+        Args:
+            tool_name: Provider-scoped tool identifier.
+            session: Active session context.
+            skill_name: Calling skill name.
+        """
+
+
+class ProviderPolicyDeniedError(RuntimeError):
+    """Raised when provider policy denies tool resolution/execution."""
+
+
+class BuiltinToolProvider:
+    """Builtin in-process tool provider."""
+
+    provider_id = "builtin"
+
+    def __init__(self, tools: tuple[ToolContract, ...]) -> None:
+        """Build deterministic builtin tool map keyed by tool name.
+
+        Args:
+            tools: Registered builtin tools.
+        """
+        self._tools = {tool.name: tool for tool in tools}
+
+    def resolve_tool(
+        self,
+        tool_name: str,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> ToolContract | None:
+        """Resolve builtin tool by name.
+
+        Args:
+            tool_name: Builtin tool identifier.
+            session: Active session context.
+            skill_name: Calling skill name.
+
+        Returns:
+            Matching builtin tool contract, or None when not found.
+        """
+        del session
+        del skill_name
+        return self._tools.get(tool_name)
+
+
+class McpToolResolver(Protocol):
+    """Protocol for MCP adapter used by MCP tool provider."""
+
+    def resolve_tool(
+        self,
+        tool_name: str,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> ToolContract | None:
+        """Resolve MCP tool contract for one skill invocation.
+
+        Args:
+            tool_name: MCP tool identifier.
+            session: Active session context.
+            skill_name: Calling skill name.
+        """
+
+
+class _DefaultMcpResolver:
+    """Default MCP resolver stub (no MCP tools configured)."""
+
+    def resolve_tool(
+        self,
+        tool_name: str,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> ToolContract | None:
+        """Return no tool by default until MCP tools are configured.
+
+        Args:
+            tool_name: MCP tool identifier.
+            session: Active session context.
+            skill_name: Calling skill name.
+
+        Returns:
+            None because default resolver has no MCP tools.
+        """
+        del tool_name
+        del session
+        del skill_name
+        return None
+
+
+class McpToolProvider:
+    """MCP-backed tool provider adapter."""
+
+    provider_id = "mcp"
+
+    def __init__(self, resolver: McpToolResolver | None = None) -> None:
+        """Store MCP resolver adapter.
+
+        Args:
+            resolver: Optional MCP resolver implementation.
+        """
+        self._resolver = resolver or _DefaultMcpResolver()
+
+    def resolve_tool(
+        self,
+        tool_name: str,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> ToolContract | None:
+        """Resolve tool via MCP adapter contract.
+
+        Args:
+            tool_name: MCP tool identifier.
+            session: Active session context.
+            skill_name: Calling skill name.
+
+        Returns:
+            MCP tool contract, or None when unavailable.
+        """
+        return self._resolver.resolve_tool(
+            tool_name,
+            session=session,
+            skill_name=skill_name,
+        )
+
+
 class _BinaryExpressionInput(BaseModel):
     """Validated input payload for binary arithmetic tools."""
 
@@ -225,13 +367,13 @@ class ToolDispatchExecutor:
 
     mode = InvocationMode.TOOL_DISPATCH
 
-    def __init__(self, tools: tuple[ToolContract, ...]) -> None:
-        """Build deterministic tool registry keyed by tool name.
+    def __init__(self, providers: tuple[ToolProvider, ...]) -> None:
+        """Build deterministic provider registry keyed by provider id.
 
         Args:
-            tools: Registered dispatch tools.
+            providers: Registered tool providers.
         """
-        self._tools = {tool.name: tool for tool in tools}
+        self._providers = {provider.provider_id: provider for provider in providers}
 
     def execute(
         self, entry: SkillEntry, session: Session, user_text: str
@@ -246,8 +388,48 @@ class ToolDispatchExecutor:
         Returns:
             Deterministic command-tool execution result.
         """
+        tool, error = self._resolve_tool(entry, session)
+        if error is not None:
+            return error
+        assert tool is not None
+
+        typed_input, error = self._validate_input(tool, entry, user_text)
+        if error is not None:
+            return error
+        assert typed_input is not None
+
+        typed_output, error = self._validate_output(tool, entry, typed_input, session)
+        if error is not None:
+            return error
+        assert typed_output is not None
+
+        return CommandResult.ok(
+            tool.render_output(typed_output),
+            code="tool_ok",
+            data={
+                "skill": entry.name,
+                "provider": entry.command_tool_provider,
+                "tool": tool.name,
+                "output": typed_output.model_dump(),
+            },
+        )
+
+    def _resolve_tool(
+        self,
+        entry: SkillEntry,
+        session: Session,
+    ) -> tuple[ToolContract | None, CommandResult | None]:
+        """Resolve provider + tool for one skill invocation.
+
+        Args:
+            entry: Skill entry selected from snapshot.
+            session: Active session context.
+
+        Returns:
+            Tuple of resolved tool and optional error result.
+        """
         if not entry.command_tool:
-            return CommandResult.error(
+            return None, CommandResult.error(
                 (
                     f"Error: skill '{entry.name}' is missing command_tool "
                     "for tool_dispatch."
@@ -255,32 +437,110 @@ class ToolDispatchExecutor:
                 code="command_tool_missing",
                 data={"skill": entry.name},
             )
-
-        tool = self._tools.get(entry.command_tool)
-        if tool is None:
-            return CommandResult.error(
+        provider = self._providers.get(entry.command_tool_provider)
+        if provider is None:
+            return None, CommandResult.error(
                 (
-                    f"Error: command tool '{entry.command_tool}' is not registered "
-                    f"for skill '{entry.name}'."
+                    f"Error: tool provider '{entry.command_tool_provider}' is not "
+                    f"registered for skill '{entry.name}'."
                 ),
-                code="command_tool_unregistered",
-                data={"skill": entry.name, "tool": entry.command_tool},
+                code="provider_unbound",
+                data={"skill": entry.name, "provider": entry.command_tool_provider},
             )
+        try:
+            tool = provider.resolve_tool(
+                entry.command_tool,
+                session=session,
+                skill_name=entry.name,
+            )
+        except ProviderPolicyDeniedError as exc:
+            return None, CommandResult.error(
+                f"Security alert: provider policy denied '{entry.command_tool}'.",
+                code="provider_policy_denied",
+                data={
+                    "skill": entry.name,
+                    "provider": entry.command_tool_provider,
+                    "tool": entry.command_tool,
+                    "reason": str(exc),
+                },
+            )
+        except Exception as exc:  # pragma: no cover - defensive provider boundary
+            return None, CommandResult.error(
+                f"Error: provider execution failed for '{entry.command_tool}'.",
+                code="provider_execution_failed",
+                data={
+                    "skill": entry.name,
+                    "provider": entry.command_tool_provider,
+                    "tool": entry.command_tool,
+                    "reason": str(exc),
+                },
+            )
+        if tool is None:
+            return None, CommandResult.error(
+                (
+                    f"Error: tool '{entry.command_tool}' is not registered for "
+                    f"provider '{entry.command_tool_provider}' "
+                    f"(skill '{entry.name}')."
+                ),
+                code="provider_tool_unregistered",
+                data={
+                    "skill": entry.name,
+                    "provider": entry.command_tool_provider,
+                    "tool": entry.command_tool,
+                },
+            )
+        return tool, None
 
+    @staticmethod
+    def _validate_input(
+        tool: ToolContract,
+        entry: SkillEntry,
+        user_text: str,
+    ) -> tuple[BaseModel | None, CommandResult | None]:
+        """Validate tool input payload.
+
+        Args:
+            tool: Resolved tool contract.
+            entry: Calling skill entry.
+            user_text: Raw user payload.
+
+        Returns:
+            Tuple of validated input model and optional error result.
+        """
         try:
             raw_input = tool.parse_payload(user_text)
             typed_input = tool.input_schema.model_validate(raw_input)
+            return typed_input, None
         except ValidationError as exc:
-            return CommandResult.error(
+            return None, CommandResult.error(
                 f"Error: invalid input for tool '{tool.name}'.",
                 code="tool_input_invalid",
                 data={
                     "skill": entry.name,
+                    "provider": entry.command_tool_provider,
                     "tool": tool.name,
                     "validation_errors": exc.errors(),
                 },
             )
 
+    @staticmethod
+    def _validate_output(
+        tool: ToolContract,
+        entry: SkillEntry,
+        typed_input: BaseModel,
+        session: Session,
+    ) -> tuple[BaseModel | None, CommandResult | None]:
+        """Validate tool output payload.
+
+        Args:
+            tool: Resolved tool contract.
+            entry: Calling skill entry.
+            typed_input: Validated input payload.
+            session: Active session context.
+
+        Returns:
+            Tuple of validated output model and optional error result.
+        """
         try:
             raw_output = tool.execute_typed(
                 typed_input,
@@ -288,23 +548,15 @@ class ToolDispatchExecutor:
                 skill_name=entry.name,
             )
             typed_output = tool.output_schema.model_validate(raw_output)
+            return typed_output, None
         except ValidationError as exc:
-            return CommandResult.error(
+            return None, CommandResult.error(
                 f"Error: invalid output from tool '{tool.name}'.",
                 code="tool_output_invalid",
                 data={
                     "skill": entry.name,
+                    "provider": entry.command_tool_provider,
                     "tool": tool.name,
                     "validation_errors": exc.errors(),
                 },
             )
-
-        return CommandResult.ok(
-            tool.render_output(typed_output),
-            code="tool_ok",
-            data={
-                "skill": entry.name,
-                "tool": tool.name,
-                "output": typed_output.model_dump(),
-            },
-        )

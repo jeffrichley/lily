@@ -57,16 +57,18 @@ class SkillInvoker:
             return None
 
         declared = set(entry.capabilities.declared_tools)
-        if entry.command_tool in declared:
+        qualified_tool = f"{entry.command_tool_provider}:{entry.command_tool}"
+        if entry.command_tool in declared or qualified_tool in declared:
             return None
         return CommandResult.error(
             (
                 f"Security alert: skill '{entry.name}' attempted undeclared tool "
-                f"'{entry.command_tool}'."
+                f"'{entry.command_tool_provider}:{entry.command_tool}'."
             ),
             code="skill_capability_denied",
             data={
                 "skill": entry.name,
+                "provider": entry.command_tool_provider,
                 "tool": entry.command_tool,
                 "declared_tools": sorted(declared),
             },
