@@ -5,6 +5,7 @@ from lily.config.global_config import (
     CheckpointerSettings,
     GlobalConfigError,
     LilyGlobalConfig,
+    MemoryToolingSettings,
     load_global_config,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "CheckpointerSettings",
     "GlobalConfigError",
     "LilyGlobalConfig",
+    "MemoryToolingSettings",
     "load_global_config",
 ]

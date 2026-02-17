@@ -17,6 +17,8 @@ def test_load_global_config_defaults_when_missing(tmp_path: Path) -> None:
 
     assert config.checkpointer.backend == CheckpointerBackend.SQLITE
     assert config.checkpointer.sqlite_path == ".lily/checkpoints/checkpointer.sqlite"
+    assert config.memory_tooling.enabled is False
+    assert config.memory_tooling.auto_apply is False
 
 
 def test_load_global_config_reads_custom_backend(tmp_path: Path) -> None:
@@ -61,3 +63,22 @@ def test_load_global_config_rejects_invalid_json(tmp_path: Path) -> None:
         assert "Invalid global config JSON" in str(exc)
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected GlobalConfigError")
+
+
+def test_load_global_config_reads_memory_tooling_flags(tmp_path: Path) -> None:
+    """Config loader should parse memory tooling flags."""
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        (
+            "{"
+            '"memory_tooling":{"enabled":true,"auto_apply":true},'
+            '"checkpointer":{"backend":"sqlite","sqlite_path":".lily/checkpoints/checkpointer.sqlite"}'
+            "}"
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_global_config(config_path)
+
+    assert config.memory_tooling.enabled is True
+    assert config.memory_tooling.auto_apply is True

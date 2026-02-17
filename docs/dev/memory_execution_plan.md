@@ -193,31 +193,31 @@ Goal: make prompt memory injection repository-backed, selective, and bounded.
 Goal: reduce custom write/search glue by integrating LangMem tools in controlled paths.
 
 `User-visible features`
-- [ ] Optional command/agent paths backed by LangMem manage/search tools.
-- [ ] No change to deterministic command envelope format.
+- [x] Optional command/agent paths backed by LangMem manage/search tools.
+- [x] No change to deterministic command envelope format.
 
 `Internal engineering tasks`
-- [ ] Introduce manage/search memory tools in experimental mode.
-- [ ] Restrict tool usage to explicit paths first.
-- [ ] Keep deterministic output envelope adapter on top of tool results.
-- [ ] Enforce tool UX quality contract:
-  - [ ] concise/high-signal tool outputs
-  - [ ] stable, namespaced tool naming conventions
-- [ ] Add opt-in config flag for automatic memory tooling.
-- [ ] Add safety/policy interceptors around tool writes.
+- [x] Introduce manage/search memory tools in experimental mode.
+- [x] Restrict tool usage to explicit paths first.
+- [x] Keep deterministic output envelope adapter on top of tool results.
+- [x] Enforce tool UX quality contract:
+  - [x] concise/high-signal tool outputs
+  - [x] stable, namespaced tool naming conventions
+- [x] Add opt-in config flag for automatic memory tooling.
+- [x] Add safety/policy interceptors around tool writes.
 
 `Acceptance criteria`
-- [ ] LangMem tools are usable without breaking deterministic command outputs.
-- [ ] Policy-denied behavior remains unchanged.
+- [x] LangMem tools are usable without breaking deterministic command outputs.
+- [x] Policy-denied behavior remains unchanged.
 
 `Non-goals`
 - No default-on autonomous memory tooling.
 - No replacement of canonical structured memory with tool-native outputs.
 
 `Required tests and gates`
-- [ ] Deterministic envelope regression tests.
-- [ ] Policy redline tests around tool writes.
-- [ ] Opt-in flag behavior tests.
+- [x] Deterministic envelope regression tests.
+- [x] Policy redline tests around tool writes.
+- [x] Opt-in flag behavior tests.
 
 ---
 
@@ -340,6 +340,35 @@ Goal: operationalize migrated memory system with measurable quality/safety contr
 
 ---
 
+## Phase 8: Compaction Backend Migration (`P4`)
+
+Goal: replace custom rule-based history compaction with LangGraph-native state/context compaction once parity is proven.
+
+`User-visible features`
+- [ ] Same or better long-thread response quality with lower maintenance burden.
+
+`Internal engineering tasks`
+- [ ] Add feature-flagged compaction backend (`rule_based` vs `langgraph_native`).
+- [ ] Implement LangGraph-native state/context compaction path.
+- [ ] Run parity + eval comparison (`rule_based` vs `langgraph_native`).
+- [ ] Flip default to `langgraph_native` after quality/eval metrics pass.
+
+`Acceptance criteria`
+- [ ] Deterministic command/runtime contracts are unchanged.
+- [ ] `langgraph_native` compaction matches or improves current quality metrics.
+- [ ] Legacy `rule_based` path remains as fallback until full confidence window passes.
+
+`Non-goals`
+- No command-surface changes.
+- No forced removal of fallback path in first rollout.
+
+`Required tests and gates`
+- [ ] Parity test matrix between both compaction backends.
+- [ ] Long-transcript compaction effectiveness tests for both backends.
+- [ ] Retrieval relevance regression checks under both backends.
+
+---
+
 ## Risks and Mitigations
 
 - [ ] Risk: migration changes behavior unexpectedly.
@@ -360,3 +389,5 @@ Goal: operationalize migrated memory system with measurable quality/safety contr
 - 2026-02-16: Gate M0 completed. Baseline eval/quality gates passed and observability baseline snapshot captured in `docs/dev/memory_m0_baseline_2026-02-16.md`.
 - 2026-02-16: Phase 1 completed. Added global checkpointer config, SQLite-backed persistent checkpointer wiring, profile contract for production backend, and restart/history continuity tests.
 - 2026-02-16: Phase 2 completed. Added store-backed memory repositories, repository-interface command wiring, compatibility command aliases, and initial `/memory short|long|evidence` command-family rollout with parity/isolation tests.
+- 2026-02-17: Phase 3 completed. Added repository-backed retrieval service, deterministic ranking and memory-summary prompt injection, and deterministic context compaction with long-transcript tests.
+- 2026-02-17: Phase 4 completed. Added controlled LangMem manage/search tool routes, global opt-in tooling flags (`enabled`, `auto_apply`), deterministic envelope adapters for tool outputs, and policy/flag regression tests.

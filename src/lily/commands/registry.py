@@ -29,6 +29,8 @@ class CommandRegistry:
         *,
         skill_invoker: SkillInvoker,
         persona_repository: FilePersonaRepository | None = None,
+        memory_tooling_enabled: bool = False,
+        memory_tooling_auto_apply: bool = False,
         handlers: dict[str, CommandHandler] | None = None,
     ) -> None:
         """Construct registry with built-in handlers plus optional overrides.
@@ -36,6 +38,8 @@ class CommandRegistry:
         Args:
             skill_invoker: Invoker dependency for `/skill` command execution.
             persona_repository: Optional persona repository for `/persona` commands.
+            memory_tooling_enabled: Whether memory LangMem tool routes are enabled.
+            memory_tooling_auto_apply: Whether standard memory routes auto-use tools.
             handlers: Optional custom handlers keyed by command name.
         """
         self._skill_invoker = skill_invoker
@@ -53,7 +57,10 @@ class CommandRegistry:
             "style": StyleCommand(),
             "remember": RememberCommand(),
             "forget": ForgetCommand(),
-            "memory": MemoryCommand(),
+            "memory": MemoryCommand(
+                tooling_enabled=memory_tooling_enabled,
+                tooling_auto_apply=memory_tooling_auto_apply,
+            ),
         }
         if handlers:
             self._handlers.update(handlers)

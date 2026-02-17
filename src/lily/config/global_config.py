@@ -27,12 +27,22 @@ class CheckpointerSettings(BaseModel):
     postgres_dsn: str | None = None
 
 
+class MemoryToolingSettings(BaseModel):
+    """Global LangMem tooling feature flags."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    auto_apply: bool = False
+
+
 class LilyGlobalConfig(BaseModel):
     """Root global Lily configuration model."""
 
     model_config = ConfigDict(extra="forbid")
 
     checkpointer: CheckpointerSettings = CheckpointerSettings()
+    memory_tooling: MemoryToolingSettings = MemoryToolingSettings()
 
 
 class GlobalConfigError(RuntimeError):

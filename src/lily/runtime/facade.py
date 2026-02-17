@@ -53,12 +53,14 @@ _PLAYFUL_HINT_PATTERNS: tuple[re.Pattern[str], ...] = (
 class RuntimeFacade:
     """Facade for deterministic command and conversational routing."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         command_registry: CommandRegistry | None = None,
         conversation_executor: ConversationExecutor | None = None,
         persona_repository: FilePersonaRepository | None = None,
         conversation_checkpointer: BaseCheckpointSaver | None = None,
+        memory_tooling_enabled: bool = False,
+        memory_tooling_auto_apply: bool = False,
     ) -> None:
         """Create facade with command and conversation dependencies.
 
@@ -68,11 +70,16 @@ class RuntimeFacade:
             persona_repository: Optional persona profile repository.
             conversation_checkpointer: Optional checkpointer for default conversation
                 executor wiring.
+            memory_tooling_enabled: Whether LangMem command routes are enabled.
+            memory_tooling_auto_apply: Whether standard memory routes auto-use tools.
         """
         self._persona_repository = persona_repository or FilePersonaRepository(
             root_dir=default_persona_root()
         )
-        self._command_registry = command_registry or self._build_default_registry()
+        self._command_registry = command_registry or self._build_default_registry(
+            memory_tooling_enabled=memory_tooling_enabled,
+            memory_tooling_auto_apply=memory_tooling_auto_apply,
+        )
         self._conversation_executor = (
             conversation_executor
             or LangChainConversationExecutor(checkpointer=conversation_checkpointer)
@@ -233,8 +240,17 @@ class RuntimeFacade:
             instructions="Provide clear, accurate, and concise assistance.",
         )
 
-    def _build_default_registry(self) -> CommandRegistry:
+    def _build_default_registry(
+        self,
+        *,
+        memory_tooling_enabled: bool,
+        memory_tooling_auto_apply: bool,
+    ) -> CommandRegistry:
         """Construct default command registry with hidden LLM backend wiring.
+
+        Args:
+            memory_tooling_enabled: Whether LangMem command routes are enabled.
+            memory_tooling_auto_apply: Whether standard memory routes auto-use tools.
 
         Returns:
             Command registry with invoker and executor dependencies.
@@ -256,6 +272,8 @@ class RuntimeFacade:
         return CommandRegistry(
             skill_invoker=invoker,
             persona_repository=self._persona_repository,
+            memory_tooling_enabled=memory_tooling_enabled,
+            memory_tooling_auto_apply=memory_tooling_auto_apply,
         )
 
     @staticmethod

@@ -4,6 +4,7 @@ from lily.memory.file_repository import (
     FileBackedPersonalityMemoryRepository,
     FileBackedTaskMemoryRepository,
 )
+from lily.memory.langmem_tools import LangMemToolingAdapter
 from lily.memory.models import (
     MemoryError,
     MemoryErrorCode,
@@ -23,6 +24,7 @@ from lily.memory.store_repository import (
 __all__ = [
     "FileBackedPersonalityMemoryRepository",
     "FileBackedTaskMemoryRepository",
+    "LangMemToolingAdapter",
     "MemoryError",
     "MemoryErrorCode",
     "MemoryQuery",

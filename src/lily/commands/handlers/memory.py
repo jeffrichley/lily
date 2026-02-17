@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from lily.commands.handlers._memory_support import (
     build_personality_namespace,
     build_personality_repository,
     build_task_namespace,
     build_task_repository,
+    resolve_store_file,
 )
 from lily.commands.parser import CommandCall
 from lily.commands.types import CommandResult
@@ -17,6 +20,7 @@ from lily.memory import (
     PersonalityMemoryRepository,
     TaskMemoryRepository,
 )
+from lily.memory.langmem_tools import LangMemToolingAdapter
 from lily.session.models import Session
 
 _PERSONALITY_DOMAINS = {"persona_core", "user_profile", "working_rules"}
@@ -24,6 +28,21 @@ _PERSONALITY_DOMAINS = {"persona_core", "user_profile", "working_rules"}
 
 class MemoryCommand:
     """Deterministic `/memory` command handler."""
+
+    def __init__(
+        self,
+        *,
+        tooling_enabled: bool = False,
+        tooling_auto_apply: bool = False,
+    ) -> None:
+        """Create memory command handler.
+
+        Args:
+            tooling_enabled: Whether LangMem tooling routes are enabled.
+            tooling_auto_apply: Whether standard long-show paths use LangMem search.
+        """
+        self._tooling_enabled = tooling_enabled
+        self._tooling_auto_apply = tooling_auto_apply
 
     def execute(self, call: CommandCall, session: Session) -> CommandResult:
         """Execute `/memory ...` command family.
@@ -132,7 +151,7 @@ class MemoryCommand:
         """
         if not args:
             return CommandResult.error(
-                "Error: /memory long requires subcommand show|task.",
+                "Error: /memory long requires subcommand show|task|tool.",
                 code="invalid_args",
                 data={"command": "memory", "subcommand": "long"},
             )
@@ -141,6 +160,8 @@ class MemoryCommand:
             return self._run_long_show(session=session, args=args[1:])
         if head == "task":
             return self._run_long_task(session=session, args=args[1:])
+        if head == "tool":
+            return self._run_long_tool(session=session, args=args[1:])
         return CommandResult.error(
             f"Error: unsupported /memory long subcommand '{head}'.",
             code="invalid_args",
@@ -182,6 +203,12 @@ class MemoryCommand:
                 data={"domain": effective_domain},
             )
         query = " ".join(remaining).strip() or "*"
+        if self._tooling_enabled and self._tooling_auto_apply:
+            return self._run_long_tool_show(
+                session=session,
+                domain=effective_domain,
+                query=query,
+            )
         namespace = build_personality_namespace(
             session=session,
             domain=effective_domain,
@@ -221,20 +248,16 @@ class MemoryCommand:
                 "Error: /memory long task is unavailable for this session.",
                 code="memory_unavailable",
             )
-        if not args or args[0] != "show":
-            return CommandResult.error(
-                "Error: /memory long task requires subcommand 'show'.",
-                code="invalid_args",
-                data={"command": "memory", "subcommand": "long task"},
+        parsed = self._parse_long_task_show_args(args=args)
+        if isinstance(parsed, CommandResult):
+            return parsed
+        namespace, query = parsed
+        if self._tooling_enabled and self._tooling_auto_apply:
+            return self._run_long_tool_task_show(
+                session=session,
+                namespace=namespace,
+                query=query,
             )
-        namespace, remaining, error = _parse_required_flag(
-            args=args[1:],
-            flag="--namespace",
-        )
-        if error is not None:
-            return error
-        assert namespace is not None
-        query = " ".join(remaining).strip() or "*"
         records, query_error = self._query_task(
             repository=repository,
             namespace=build_task_namespace(task=namespace),
@@ -248,6 +271,312 @@ class MemoryCommand:
             records=records,
             empty_message="No long-term task memory records found.",
         )
+
+    @staticmethod
+    def _parse_long_task_show_args(
+        *,
+        args: tuple[str, ...],
+    ) -> tuple[str, str] | CommandResult:
+        """Parse `/memory long task show --namespace <task> [query]` args.
+
+        Args:
+            args: Long-task raw args.
+
+        Returns:
+            Parsed namespace+query tuple, or deterministic arg error.
+        """
+        if not args or args[0] != "show":
+            return CommandResult.error(
+                "Error: /memory long task requires subcommand 'show'.",
+                code="invalid_args",
+                data={"command": "memory", "subcommand": "long task"},
+            )
+        namespace, remaining, error = _parse_required_flag(
+            args=args[1:],
+            flag="--namespace",
+        )
+        if error is not None:
+            return error
+        assert namespace is not None
+        return namespace, (" ".join(remaining).strip() or "*")
+
+    def _run_long_tool(
+        self, *, session: Session, args: tuple[str, ...]
+    ) -> CommandResult:
+        """Execute `/memory long tool ...` explicit LangMem tooling routes.
+
+        Args:
+            session: Active session.
+            args: Tool route arguments.
+
+        Returns:
+            Deterministic command result.
+        """
+        if not self._tooling_enabled:
+            return CommandResult.error(
+                "Error: memory tooling is disabled. Enable it in global config.",
+                code="memory_tooling_disabled",
+            )
+        if not args:
+            return CommandResult.error(
+                "Error: /memory long tool requires subcommand show|remember|task.",
+                code="invalid_args",
+                data={"command": "memory", "subcommand": "long tool"},
+            )
+        head = args[0]
+        if head == "show":
+            return self._run_long_tool_show_route(session=session, args=args[1:])
+        if head == "remember":
+            return self._run_long_tool_remember_route(session=session, args=args[1:])
+        if head == "task":
+            return self._run_long_tool_task_route(session=session, args=args[1:])
+        return CommandResult.error(
+            f"Error: unsupported /memory long tool subcommand '{head}'.",
+            code="invalid_args",
+            data={"command": "memory", "subcommand": "long tool"},
+        )
+
+    def _run_long_tool_show_route(
+        self,
+        *,
+        session: Session,
+        args: tuple[str, ...],
+    ) -> CommandResult:
+        """Execute `/memory long tool show [--domain <domain>] [query]`.
+
+        Args:
+            session: Active session.
+            args: Tool-show args.
+
+        Returns:
+            Deterministic command result.
+        """
+        domain, remaining, error = _parse_optional_flag(args=args, flag="--domain")
+        if error is not None:
+            return error
+        effective_domain = domain or "user_profile"
+        if effective_domain not in _PERSONALITY_DOMAINS:
+            return CommandResult.error(
+                (
+                    "Error: /memory long tool show --domain must be one of "
+                    "persona_core|user_profile|working_rules."
+                ),
+                code="invalid_args",
+                data={"domain": effective_domain},
+            )
+        query = " ".join(remaining).strip() or "*"
+        return self._run_long_tool_show(
+            session=session,
+            domain=effective_domain,
+            query=query,
+        )
+
+    def _run_long_tool_remember_route(
+        self,
+        *,
+        session: Session,
+        args: tuple[str, ...],
+    ) -> CommandResult:
+        """Execute `/memory long tool remember [--domain <domain>] <content>`.
+
+        Args:
+            session: Active session.
+            args: Tool-remember args.
+
+        Returns:
+            Deterministic command result.
+        """
+        domain, remaining, error = _parse_optional_flag(args=args, flag="--domain")
+        if error is not None:
+            return error
+        effective_domain = domain or "user_profile"
+        if effective_domain not in _PERSONALITY_DOMAINS:
+            return CommandResult.error(
+                (
+                    "Error: /memory long tool remember --domain must be one of "
+                    "persona_core|user_profile|working_rules."
+                ),
+                code="invalid_args",
+                data={"domain": effective_domain},
+            )
+        content = " ".join(remaining).strip()
+        if not content:
+            return CommandResult.error(
+                "Error: /memory long tool remember requires memory content.",
+                code="invalid_args",
+                data={"command": "memory", "subcommand": "long tool remember"},
+            )
+        return self._run_long_tool_remember(
+            session=session,
+            domain=effective_domain,
+            content=content,
+        )
+
+    def _run_long_tool_task_route(
+        self,
+        *,
+        session: Session,
+        args: tuple[str, ...],
+    ) -> CommandResult:
+        """Execute `/memory long tool task show --namespace <task> [query]`.
+
+        Args:
+            session: Active session.
+            args: Tool-task args.
+
+        Returns:
+            Deterministic command result.
+        """
+        if not args or args[0] != "show":
+            return CommandResult.error(
+                "Error: /memory long tool task requires subcommand 'show'.",
+                code="invalid_args",
+                data={"command": "memory", "subcommand": "long tool task"},
+            )
+        namespace, remaining, error = _parse_required_flag(
+            args=args[1:],
+            flag="--namespace",
+        )
+        if error is not None:
+            return error
+        assert namespace is not None
+        query = " ".join(remaining).strip() or "*"
+        return self._run_long_tool_task_show(
+            session=session,
+            namespace=namespace,
+            query=query,
+        )
+
+    def _run_long_tool_show(
+        self,
+        *,
+        session: Session,
+        domain: str,
+        query: str,
+    ) -> CommandResult:
+        """Search personality memory via LangMem search tool.
+
+        Args:
+            session: Active session.
+            domain: Personality memory domain.
+            query: Query string.
+
+        Returns:
+            Deterministic command result.
+        """
+        adapter, error = self._build_langmem_adapter(session)
+        if error is not None:
+            return error
+        assert adapter is not None
+        namespace = build_personality_namespace(session=session, domain=domain)
+        try:
+            rows = adapter.search(
+                namespace=namespace,
+                query=query,
+                tool_name=f"lily_memory_search_{domain}",
+            )
+        except MemoryError as exc:
+            return CommandResult.error(f"Error: {exc}", code=exc.code.value)
+        return self._render_tool_rows(
+            query=query,
+            rows=rows,
+            route="langmem_search_tool",
+        )
+
+    def _run_long_tool_task_show(
+        self,
+        *,
+        session: Session,
+        namespace: str,
+        query: str,
+    ) -> CommandResult:
+        """Search task memory via LangMem search tool.
+
+        Args:
+            session: Active session.
+            namespace: Task namespace token.
+            query: Query string.
+
+        Returns:
+            Deterministic command result.
+        """
+        adapter, error = self._build_langmem_adapter(session)
+        if error is not None:
+            return error
+        assert adapter is not None
+        try:
+            rows = adapter.search(
+                namespace=build_task_namespace(task=namespace),
+                query=query,
+                tool_name="lily_memory_search_task_memory",
+            )
+        except MemoryError as exc:
+            return CommandResult.error(f"Error: {exc}", code=exc.code.value)
+        return self._render_tool_rows(
+            query=query,
+            rows=rows,
+            route="langmem_search_tool",
+        )
+
+    def _run_long_tool_remember(
+        self,
+        *,
+        session: Session,
+        domain: str,
+        content: str,
+    ) -> CommandResult:
+        """Persist personality memory via LangMem manage tool.
+
+        Args:
+            session: Active session.
+            domain: Personality memory domain.
+            content: Memory content string.
+
+        Returns:
+            Deterministic command result.
+        """
+        adapter, error = self._build_langmem_adapter(session)
+        if error is not None:
+            return error
+        assert adapter is not None
+        namespace = build_personality_namespace(session=session, domain=domain)
+        try:
+            key = adapter.remember(
+                namespace=namespace,
+                content=content,
+                tool_name=f"lily_memory_manage_{domain}",
+            )
+        except MemoryError as exc:
+            return CommandResult.error(f"Error: {exc}", code=exc.code.value)
+        return CommandResult.ok(
+            f"Remembered via tool ({key}): {content}",
+            code="memory_langmem_saved",
+            data={
+                "id": key,
+                "namespace": namespace,
+                "route": "langmem_manage_tool",
+            },
+        )
+
+    @staticmethod
+    def _build_langmem_adapter(
+        session: Session,
+    ) -> tuple[LangMemToolingAdapter | None, CommandResult | None]:
+        """Build LangMem adapter from session memory storage roots.
+
+        Args:
+            session: Active session.
+
+        Returns:
+            Adapter or deterministic error.
+        """
+        store_file = resolve_store_file(session)
+        if store_file is None:
+            return None, CommandResult.error(
+                "Error: memory tooling is unavailable for this session.",
+                code="memory_unavailable",
+            )
+        return LangMemToolingAdapter(store_file=store_file), None
 
     @staticmethod
     def _run_evidence(args: tuple[str, ...]) -> CommandResult:
@@ -360,6 +689,65 @@ class MemoryCommand:
                     }
                     for record in records
                 ],
+            },
+        )
+
+    @staticmethod
+    def _render_tool_rows(
+        *,
+        query: str,
+        rows: tuple[dict[str, Any], ...],
+        route: str,
+    ) -> CommandResult:
+        """Render LangMem tool search rows with deterministic envelope.
+
+        Args:
+            query: Query text.
+            rows: Tool-result rows.
+            route: Stable route identifier.
+
+        Returns:
+            Deterministic command result.
+        """
+        if not rows:
+            return CommandResult.ok(
+                "No memory records found.",
+                code="memory_empty",
+                data={"count": 0, "query": query, "route": route},
+            )
+        normalized: list[dict[str, object]] = []
+        lines: list[str] = []
+        for row in rows:
+            key = str(row.get("key", "")).strip()
+            value = row.get("value", {})
+            content = ""
+            if isinstance(value, dict):
+                content = str(value.get("content", "")).strip()
+            if not content:
+                continue
+            lines.append(f"- {key}: {content}")
+            normalized.append(
+                {
+                    "id": key,
+                    "namespace": row.get("namespace"),
+                    "content": content,
+                    "updated_at": row.get("updated_at"),
+                }
+            )
+        if not normalized:
+            return CommandResult.ok(
+                "No memory records found.",
+                code="memory_empty",
+                data={"count": 0, "query": query, "route": route},
+            )
+        return CommandResult.ok(
+            "\n".join(lines),
+            code="memory_langmem_listed",
+            data={
+                "count": len(normalized),
+                "query": query,
+                "route": route,
+                "records": normalized,
             },
         )
 

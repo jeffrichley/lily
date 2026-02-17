@@ -669,3 +669,122 @@ def test_memory_long_show_domain_isolation(tmp_path: Path) -> None:
     assert profile.status.value == "ok"
     assert "Profile data only" in profile.message
     assert "Core directive only" not in profile.message
+
+
+def test_memory_long_tool_requires_opt_in_flag(tmp_path: Path) -> None:
+    """Tool-backed memory command should fail when tooling flag is disabled."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade(memory_tooling_enabled=False)
+
+    result = runtime.handle_input("/memory long tool show favorite", session)
+
+    assert result.status.value == "error"
+    assert result.code == "memory_tooling_disabled"
+
+
+def test_memory_long_tool_remember_enforces_policy_redline(tmp_path: Path) -> None:
+    """Tool-backed remember should preserve deterministic policy-denied behavior."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade(memory_tooling_enabled=True)
+
+    result = runtime.handle_input(
+        "/memory long tool remember --domain user_profile api_key=sk-123",
+        session,
+    )
+
+    assert result.status.value == "error"
+    assert result.code == "memory_policy_denied"
+
+
+def test_memory_long_tool_show_uses_langmem_adapter_when_enabled(
+    tmp_path: Path,
+) -> None:
+    """Explicit tool route should search via LangMem and keep stable envelope."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade(memory_tooling_enabled=True)
+
+    wrote = runtime.handle_input(
+        "/memory long tool remember --domain user_profile favorite number is 42",
+        session,
+    )
+    assert wrote.status.value == "ok"
+    assert wrote.code == "memory_langmem_saved"
+
+    shown = runtime.handle_input(
+        "/memory long tool show --domain user_profile favorite",
+        session,
+    )
+
+    assert shown.status.value == "ok"
+    assert shown.code == "memory_langmem_listed"
+    assert shown.data is not None
+    assert shown.data.get("route") == "langmem_search_tool"
+    assert "favorite number is 42" in shown.message
+
+
+def test_memory_tooling_auto_apply_switches_standard_show_route(tmp_path: Path) -> None:
+    """Auto-apply flag should route regular long-show through LangMem tooling."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade(
+        memory_tooling_enabled=True,
+        memory_tooling_auto_apply=True,
+    )
+
+    wrote = runtime.handle_input(
+        "/memory long tool remember --domain user_profile favorite color is blue",
+        session,
+    )
+    assert wrote.status.value == "ok"
+
+    shown = runtime.handle_input(
+        "/memory long show --domain user_profile favorite", session
+    )
+
+    assert shown.status.value == "ok"
+    assert shown.code == "memory_langmem_listed"
+    assert shown.data is not None
+    assert shown.data.get("route") == "langmem_search_tool"

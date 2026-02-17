@@ -48,6 +48,8 @@ _HIDE_DATA_CODES = {
     "memory_empty",
     "memory_saved",
     "memory_deleted",
+    "memory_langmem_saved",
+    "memory_langmem_listed",
 }
 
 
@@ -220,7 +222,11 @@ def _build_runtime_for_workspace(
         _CONSOLE.print(f"[yellow]Reason: {exc}[/yellow]")
         config = LilyGlobalConfig()
     result = build_checkpointer(config.checkpointer)
-    return RuntimeFacade(conversation_checkpointer=result.saver)
+    return RuntimeFacade(
+        conversation_checkpointer=result.saver,
+        memory_tooling_enabled=config.memory_tooling.enabled,
+        memory_tooling_auto_apply=config.memory_tooling.auto_apply,
+    )
 
 
 def _render_result(result: CommandResult) -> None:
@@ -286,6 +292,7 @@ def _render_rich_success(result: CommandResult) -> bool:
         "agent_set": _render_agent_set,
         "agent_shown": _render_agent_show,
         "memory_listed": _render_memory_list,
+        "memory_langmem_listed": _render_memory_list,
     }
     renderer = renderers.get(result.code)
     if renderer is None:
