@@ -58,8 +58,13 @@ Headings are matched case-insensitively; small wording variations are allowed. T
 
 Before pushing, run:
 
-- `just quality-check` — same gates as CI (format, lint, types, complexity, etc.).
+- `just quality-check` — same gates as CI (format, lint, types, complexity, docs frontmatter checks, etc.).
 - `just test-cov` — tests with coverage (threshold from `pyproject.toml`).
+
+Docs gate details:
+- `just docs-check` validates frontmatter on all `docs/**/*.md` files.
+- Use `just docs-frontmatter-fix` to auto-add missing frontmatter blocks.
+- The docs gate still fails until required fields contain concrete values.
 
 If both pass locally, CI should pass too.
 

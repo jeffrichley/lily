@@ -101,11 +101,11 @@ pre-commit-install:
 pre-commit:
     uv run pre-commit run --all-files
 
-# Run all quality checks (format, lint, types, complexity, vulture, darglint, audit, bandit, radon)
-quality: format lint types complexity vulture darglint audit bandit radon find-dupes docstr-coverage
+# Run all quality checks (format, lint, types, complexity, vulture, darglint, audit, bandit, radon, docs)
+quality: format lint types complexity vulture darglint audit bandit radon find-dupes docstr-coverage docs-check
 
 # Same gates as quality but check-only (no format write, no lint fix). Use in CI so PR fails if not clean.
-quality-check: format-check lint-check types complexity vulture darglint audit bandit radon find-dupes docstr-coverage
+quality-check: format-check lint-check types complexity vulture darglint audit bandit radon find-dupes docstr-coverage docs-check
 
 # CI-ready aggregate gates: static checks + eval thresholds.
 ci-gates: quality-check eval-gates
@@ -124,3 +124,11 @@ quality-dev: format lint types darglint
 # Run interactive CLI REPL (slash-command testing)
 repl:
     uv run lily repl
+
+# Validate docs frontmatter values and active-doc staleness.
+docs-check:
+    uv run python scripts/validate_docs_frontmatter.py --max-active-age-days 21
+
+# Auto-add placeholder frontmatter to docs missing frontmatter.
+docs-frontmatter-fix:
+    uv run python scripts/validate_docs_frontmatter.py --fix --max-active-age-days 21

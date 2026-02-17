@@ -34,7 +34,7 @@ Use these files as the only source of truth for each concern:
 
 ## Frontmatter Standard
 
-All active docs must start with:
+All docs under `docs/` must start with:
 
 ```yaml
 ---
@@ -54,5 +54,7 @@ Field rules:
 ## Quality Gates
 
 - Links in canonical docs must resolve.
+- Every `docs/**/*.md` file must have frontmatter with non-placeholder values.
+- Docs frontmatter validation runs in CI via `just quality-check` (`docs-check` target).
 - Active status updates happen only in `docs/dev/status.md` and active execution plans.
 - If two active docs claim authority for the same concern, this map must be corrected before merge.

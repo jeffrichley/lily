@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 # Slice 001 LLM Contract
 
 Purpose: define the exact runtime contract for LLM orchestration so implementation can proceed without leaking framework details into the rest of Lily.

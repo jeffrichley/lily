@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 # Skill Specification (V0)
 
 This document defines the **minimal skill format** required for Lily Agent Mode v0.

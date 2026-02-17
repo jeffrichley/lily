@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 # Memory Backup and Restore Runbook
 
 Purpose: deterministic operational steps for backup/export/restore of Lily memory state.

@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 # Memory Eval Governance
 
 Purpose: define eval lanes and review cadence for memory migration quality control.

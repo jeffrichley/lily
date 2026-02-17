@@ -58,12 +58,16 @@ Phase 3 gate note:
 ## Phase 4: Light Automation
 
 `Acceptance criteria`
-- [ ] CI gate validates frontmatter presence on active docs.
-- [ ] CI gate detects stale `last_updated` on active docs.
+- [x] CI gate validates frontmatter presence on all docs markdown files.
+- [x] CI gate detects stale `last_updated` on active docs.
 
 `Non-goals`
 - No docs platform migration.
 
 `Required tests and gates`
-- [ ] CI catches intentionally stale active doc fixture.
-- [ ] Zero false positives on current canonical docs.
+- [x] CI catches intentionally stale active doc fixture.
+- [ ] Zero false positives on current docs tree.
+
+Phase 4 gate note:
+- Frontmatter was auto-added across all docs with placeholders where missing.
+- CI now fails until placeholder values are replaced with concrete `owner` and `last_updated` values.

@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 # Memory Schema Migration Playbook
 
 Purpose: safe, repeatable process for memory schema/version upgrades.

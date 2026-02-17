@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 # LILY MEMORY SYSTEM — FULL SPECIFICATION (V0)
 
 **Status:** Draft Specification

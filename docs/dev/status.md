@@ -25,14 +25,16 @@ Update cadence:
 - [x] Canonical map and frontmatter contract established (`docs/README.md`).
 - [x] Phase 2 docs consolidation delivered and committed (`b81f851`).
 - [x] Phase 3 docs cadence and PR docs-impact workflow delivered.
+- [x] Phase 4 docs automation implemented (`docs-check` + auto-frontmatter fix tooling).
 
 ## In Progress
 
 - [ ] Weekly status cadence follow-through (need two consecutive weekly updates), owner `@team`, target `2026-02-24`.
+- [ ] Fill placeholder frontmatter values added by auto-fix, owner `@team`, target `2026-02-24`.
 
 ## Next Up
 
-- [ ] Phase 4 light automation (frontmatter/staleness CI checks).
+- [ ] Close Phase 4 final gate by clearing all placeholder frontmatter values.
 
 ## Blockers and Risks
 

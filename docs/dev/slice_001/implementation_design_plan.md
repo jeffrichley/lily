@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 # Slice 001 Implementation Design Plan (GoF-Oriented)
 
 ## Purpose

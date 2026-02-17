@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 # Memory Phase 7 Baseline vs Post-Migration Metrics
 
 Date: 2026-02-17  

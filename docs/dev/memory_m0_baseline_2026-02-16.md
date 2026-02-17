@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 # Memory Gate M0 Baseline Snapshot
 
 Date: 2026-02-16  

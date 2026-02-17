@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 # Slice 001 Deviations
 
 Purpose: record where implementation intentionally diverged from the original slice design docs, with rationale.

@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 # Lily Personality Roadmap (Strong + Fun)
 
 Purpose: define how Lily’s personality/agent system should evolve, borrowing proven ideas from OpenClaw and broader agent research while improving reliability, control, and delight.

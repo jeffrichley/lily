@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 # Echo Contract (Slice 001)
 
 Purpose: define deterministic expected behavior for the bundled `echo` skill used in vertical-slice smoke tests.

@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 ```
 docs/specs/agent_mode_v0/skills_loader_contract.md
 ```

@@ -1,3 +1,10 @@
+---
+owner: "TBD"
+last_updated: "TBD"
+status: "reference"
+source_of_truth: false
+---
+
 Phase 1 — Define Lily Agent Mode Scope (1 doc, small)
 
 We create:
