@@ -5,17 +5,36 @@ from __future__ import annotations
 import json
 import math
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import StrEnum
 from hashlib import sha256
 from pathlib import Path
 
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from lily.memory.models import MemoryError, MemoryErrorCode
 
 _WORD_PATTERN = re.compile(r"[a-z0-9]{2,}", re.IGNORECASE)
-_MAX_CHUNK_SIZE = 360
 _EVIDENCE_FILE = "evidence_memory.json"
+
+
+class EvidenceChunkingMode(StrEnum):
+    """Supported evidence chunking strategies."""
+
+    RECURSIVE = "recursive"
+    TOKEN = "token"  # nosec B105 - chunker mode label, not credential data
+
+
+@dataclass(frozen=True)
+class EvidenceChunkingSettings:
+    """Evidence chunking strategy configuration."""
+
+    mode: EvidenceChunkingMode = EvidenceChunkingMode.RECURSIVE
+    chunk_size: int = 360
+    chunk_overlap: int = 40
+    token_encoding_name: str = "cl100k_base"
 
 
 class EvidenceChunk(BaseModel):
@@ -48,14 +67,21 @@ class EvidenceHit(BaseModel):
 class FileBackedEvidenceRepository:
     """File-backed evidence repository with deterministic lexical scoring."""
 
-    def __init__(self, *, root_dir: Path) -> None:
+    def __init__(
+        self,
+        *,
+        root_dir: Path,
+        chunking: EvidenceChunkingSettings | None = None,
+    ) -> None:
         """Create evidence repository.
 
         Args:
             root_dir: Memory root directory.
+            chunking: Chunking configuration for ingestion.
         """
         self._root_dir = root_dir
         self._path = root_dir / _EVIDENCE_FILE
+        self._chunking = chunking or EvidenceChunkingSettings()
 
     def ingest(self, *, namespace: str, path_or_ref: str) -> tuple[EvidenceChunk, ...]:
         """Ingest one local text file into chunked evidence records.
@@ -90,7 +116,7 @@ class FileBackedEvidenceRepository:
                 MemoryErrorCode.STORE_UNAVAILABLE,
                 f"Evidence source '{normalized_ref}' is unreadable.",
             ) from exc
-        chunks = _chunk_text(text)
+        chunks = _chunk_text(text=text, settings=self._chunking)
         if not chunks:
             raise MemoryError(
                 MemoryErrorCode.INVALID_INPUT,
@@ -245,11 +271,16 @@ class FileBackedEvidenceRepository:
             ) from exc
 
 
-def _chunk_text(text: str) -> tuple[str, ...]:
-    """Split text into deterministic sentence-sized chunks.
+def _chunk_text(
+    *,
+    text: str,
+    settings: EvidenceChunkingSettings,
+) -> tuple[str, ...]:
+    """Split text with configured LangChain splitter.
 
     Args:
         text: Raw evidence text.
+        settings: Chunking strategy settings.
 
     Returns:
         Normalized chunk tuple.
@@ -257,42 +288,32 @@ def _chunk_text(text: str) -> tuple[str, ...]:
     normalized = " ".join(text.split())
     if not normalized:
         return ()
-    sentences = re.split(r"(?<=[.!?])\s+", normalized)
-    chunks: list[str] = []
-    current = ""
-    for raw_sentence in sentences:
-        sentence = raw_sentence.strip()
-        if not sentence:
-            continue
-        candidate = sentence if not current else f"{current} {sentence}"
-        if len(candidate) <= _MAX_CHUNK_SIZE:
-            current = candidate
-            continue
-        if current:
-            chunks.append(current)
-        if len(sentence) <= _MAX_CHUNK_SIZE:
-            current = sentence
-            continue
-        chunks.extend(_hard_wrap(sentence))
-        current = ""
-    if current:
-        chunks.append(current)
-    return tuple(chunks)
+    splitter = _build_text_splitter(settings)
+    return tuple(
+        chunk.strip() for chunk in splitter.split_text(normalized) if chunk.strip()
+    )
 
 
-def _hard_wrap(value: str) -> tuple[str, ...]:
-    """Wrap long text into fixed windows when sentence splitting is insufficient.
+def _build_text_splitter(
+    settings: EvidenceChunkingSettings,
+) -> RecursiveCharacterTextSplitter:
+    """Build configured LangChain text splitter.
 
     Args:
-        value: Long sentence string.
+        settings: Chunking strategy settings.
 
     Returns:
-        Wrapped chunk tuple.
+        Configured text splitter.
     """
-    return tuple(
-        value[index : index + _MAX_CHUNK_SIZE].strip()
-        for index in range(0, len(value), _MAX_CHUNK_SIZE)
-        if value[index : index + _MAX_CHUNK_SIZE].strip()
+    if settings.mode == EvidenceChunkingMode.TOKEN:
+        return RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+            encoding_name=settings.token_encoding_name,
+            chunk_size=settings.chunk_size,
+            chunk_overlap=settings.chunk_overlap,
+        )
+    return RecursiveCharacterTextSplitter(
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
     )
 
 

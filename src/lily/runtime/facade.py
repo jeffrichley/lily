@@ -20,6 +20,7 @@ from lily.commands.types import CommandResult
 from lily.memory import (
     ConsolidationBackend,
     ConsolidationRequest,
+    EvidenceChunkingSettings,
     LangMemManagerConsolidationEngine,
     LangMemToolingAdapter,
     PromptMemoryRetrievalService,
@@ -73,6 +74,7 @@ class RuntimeFacade:
         consolidation_backend: ConsolidationBackend = ConsolidationBackend.RULE_BASED,
         consolidation_llm_assisted_enabled: bool = False,
         consolidation_auto_run_every_n_turns: int = 0,
+        evidence_chunking: EvidenceChunkingSettings | None = None,
     ) -> None:
         """Create facade with command and conversation dependencies.
 
@@ -88,6 +90,7 @@ class RuntimeFacade:
             consolidation_backend: Consolidation backend selection.
             consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
             consolidation_auto_run_every_n_turns: Scheduled consolidation interval.
+            evidence_chunking: Evidence chunking settings.
         """
         self._consolidation_enabled = consolidation_enabled
         self._consolidation_backend = consolidation_backend
@@ -104,6 +107,7 @@ class RuntimeFacade:
             consolidation_enabled=consolidation_enabled,
             consolidation_backend=consolidation_backend,
             consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
+            evidence_chunking=evidence_chunking,
         )
         self._conversation_executor = (
             conversation_executor
@@ -266,7 +270,7 @@ class RuntimeFacade:
             instructions="Provide clear, accurate, and concise assistance.",
         )
 
-    def _build_default_registry(
+    def _build_default_registry(  # noqa: PLR0913
         self,
         *,
         memory_tooling_enabled: bool,
@@ -274,6 +278,7 @@ class RuntimeFacade:
         consolidation_enabled: bool,
         consolidation_backend: ConsolidationBackend,
         consolidation_llm_assisted_enabled: bool,
+        evidence_chunking: EvidenceChunkingSettings | None,
     ) -> CommandRegistry:
         """Construct default command registry with hidden LLM backend wiring.
 
@@ -283,6 +288,7 @@ class RuntimeFacade:
             consolidation_enabled: Whether consolidation pipeline is enabled.
             consolidation_backend: Consolidation backend selection.
             consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
+            evidence_chunking: Evidence chunking settings.
 
         Returns:
             Command registry with invoker and executor dependencies.
@@ -309,6 +315,7 @@ class RuntimeFacade:
             consolidation_enabled=consolidation_enabled,
             consolidation_backend=consolidation_backend,
             consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
+            evidence_chunking=evidence_chunking,
         )
 
     def _maybe_run_scheduled_consolidation(self, session: Session) -> None:

@@ -20,6 +20,7 @@ from lily.memory import (
     ConsolidationBackend,
     ConsolidationRequest,
     ConsolidationResult,
+    EvidenceChunkingSettings,
     FileBackedEvidenceRepository,
     LangMemManagerConsolidationEngine,
     MemoryError,
@@ -40,7 +41,7 @@ _PERSONALITY_DOMAINS = {"persona_core", "user_profile", "working_rules"}
 class MemoryCommand:
     """Deterministic `/memory` command handler."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
         tooling_enabled: bool = False,
@@ -48,6 +49,7 @@ class MemoryCommand:
         consolidation_enabled: bool = False,
         consolidation_backend: ConsolidationBackend = ConsolidationBackend.RULE_BASED,
         consolidation_llm_assisted_enabled: bool = False,
+        evidence_chunking: EvidenceChunkingSettings | None = None,
     ) -> None:
         """Create memory command handler.
 
@@ -57,12 +59,14 @@ class MemoryCommand:
             consolidation_enabled: Whether consolidation pipeline is enabled.
             consolidation_backend: Consolidation backend selection.
             consolidation_llm_assisted_enabled: LLM-assisted path toggle.
+            evidence_chunking: Evidence chunking settings.
         """
         self._tooling_enabled = tooling_enabled
         self._tooling_auto_apply = tooling_auto_apply
         self._consolidation_enabled = consolidation_enabled
         self._consolidation_backend = consolidation_backend
         self._consolidation_llm_assisted_enabled = consolidation_llm_assisted_enabled
+        self._evidence_chunking = evidence_chunking or EvidenceChunkingSettings()
 
     def execute(self, call: CommandCall, session: Session) -> CommandResult:
         """Execute `/memory ...` command family.
@@ -838,7 +842,10 @@ class MemoryCommand:
         Returns:
             Deterministic command result.
         """
-        repository = build_evidence_repository(session)
+        repository = build_evidence_repository(
+            session,
+            chunking=self._evidence_chunking,
+        )
         if repository is None:
             return CommandResult.error(
                 "Error: /memory evidence is unavailable for this session.",

@@ -8,6 +8,8 @@ from lily.memory.consolidation import (
     RuleBasedConsolidationEngine,
 )
 from lily.memory.evidence_repository import (
+    EvidenceChunkingMode,
+    EvidenceChunkingSettings,
     EvidenceHit,
     FileBackedEvidenceRepository,
 )
@@ -36,6 +38,8 @@ __all__ = [
     "ConsolidationBackend",
     "ConsolidationRequest",
     "ConsolidationResult",
+    "EvidenceChunkingMode",
+    "EvidenceChunkingSettings",
     "EvidenceHit",
     "FileBackedEvidenceRepository",
     "FileBackedPersonalityMemoryRepository",

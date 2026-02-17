@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from lily.memory import (
+    EvidenceChunkingSettings,
     FileBackedEvidenceRepository,
     FileBackedPersonalityMemoryRepository,
     FileBackedTaskMemoryRepository,
@@ -125,11 +126,16 @@ def build_evidence_namespace(*, session: Session) -> str:
     return "/".join(("evidence", scope))
 
 
-def build_evidence_repository(session: Session) -> FileBackedEvidenceRepository | None:
+def build_evidence_repository(
+    session: Session,
+    *,
+    chunking: EvidenceChunkingSettings,
+) -> FileBackedEvidenceRepository | None:
     """Build file-backed semantic evidence repository.
 
     Args:
         session: Active session.
+        chunking: Evidence chunking configuration.
 
     Returns:
         Evidence repository when session can resolve storage.
@@ -137,7 +143,7 @@ def build_evidence_repository(session: Session) -> FileBackedEvidenceRepository 
     root = resolve_memory_root(session)
     if root is None:
         return None
-    return FileBackedEvidenceRepository(root_dir=root)
+    return FileBackedEvidenceRepository(root_dir=root, chunking=chunking)
 
 
 def _memory_owner_scope(session: Session) -> str:

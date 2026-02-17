@@ -15,7 +15,7 @@ from lily.commands.handlers.skills_list import SkillsListCommand
 from lily.commands.handlers.style import StyleCommand
 from lily.commands.parser import CommandCall
 from lily.commands.types import CommandHandler, CommandResult
-from lily.memory import ConsolidationBackend
+from lily.memory import ConsolidationBackend, EvidenceChunkingSettings
 from lily.persona import FilePersonaRepository, default_persona_root
 from lily.runtime.skill_invoker import SkillInvoker
 from lily.session.models import Session
@@ -35,6 +35,7 @@ class CommandRegistry:
         consolidation_enabled: bool = False,
         consolidation_backend: ConsolidationBackend = ConsolidationBackend.RULE_BASED,
         consolidation_llm_assisted_enabled: bool = False,
+        evidence_chunking: EvidenceChunkingSettings | None = None,
         handlers: dict[str, CommandHandler] | None = None,
     ) -> None:
         """Construct registry with built-in handlers plus optional overrides.
@@ -47,6 +48,7 @@ class CommandRegistry:
             consolidation_enabled: Whether consolidation pipeline is enabled.
             consolidation_backend: Consolidation backend selection.
             consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
+            evidence_chunking: Evidence chunking settings.
             handlers: Optional custom handlers keyed by command name.
         """
         self._skill_invoker = skill_invoker
@@ -70,6 +72,7 @@ class CommandRegistry:
                 consolidation_enabled=consolidation_enabled,
                 consolidation_backend=consolidation_backend,
                 consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
+                evidence_chunking=evidence_chunking,
             ),
         }
         if handlers:

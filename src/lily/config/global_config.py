@@ -36,6 +36,24 @@ class MemoryToolingSettings(BaseModel):
     auto_apply: bool = False
 
 
+class EvidenceChunkingMode(StrEnum):
+    """Supported evidence chunking strategy modes."""
+
+    RECURSIVE = "recursive"
+    TOKEN = "token"  # nosec B105 - chunker mode label, not credential data
+
+
+class EvidenceSettings(BaseModel):
+    """Global semantic evidence configuration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    chunking_mode: EvidenceChunkingMode = EvidenceChunkingMode.RECURSIVE
+    chunk_size: int = Field(default=360, ge=64, le=4000)
+    chunk_overlap: int = Field(default=40, ge=0, le=1000)
+    token_encoding_name: str = "cl100k_base"
+
+
 class ConsolidationBackend(StrEnum):
     """Supported consolidation backend identifiers."""
 
@@ -61,6 +79,7 @@ class LilyGlobalConfig(BaseModel):
 
     checkpointer: CheckpointerSettings = CheckpointerSettings()
     memory_tooling: MemoryToolingSettings = MemoryToolingSettings()
+    evidence: EvidenceSettings = EvidenceSettings()
     consolidation: ConsolidationSettings = ConsolidationSettings()
 
 

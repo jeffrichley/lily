@@ -19,6 +19,12 @@ from rich.table import Table
 from lily.commands.types import CommandResult, CommandStatus
 from lily.config import GlobalConfigError, LilyGlobalConfig, load_global_config
 from lily.memory import ConsolidationBackend as MemoryConsolidationBackend
+from lily.memory import (
+    EvidenceChunkingMode as MemoryEvidenceChunkingMode,
+)
+from lily.memory import (
+    EvidenceChunkingSettings,
+)
 from lily.runtime.checkpointing import CheckpointerBuildError, build_checkpointer
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
@@ -234,6 +240,12 @@ def _build_runtime_for_workspace(
         ),
         consolidation_llm_assisted_enabled=config.consolidation.llm_assisted_enabled,
         consolidation_auto_run_every_n_turns=config.consolidation.auto_run_every_n_turns,
+        evidence_chunking=EvidenceChunkingSettings(
+            mode=MemoryEvidenceChunkingMode(config.evidence.chunking_mode.value),
+            chunk_size=config.evidence.chunk_size,
+            chunk_overlap=config.evidence.chunk_overlap,
+            token_encoding_name=config.evidence.token_encoding_name,
+        ),
     )
 
 

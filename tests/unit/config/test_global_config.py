@@ -7,6 +7,7 @@ from pathlib import Path
 from lily.config import (
     CheckpointerBackend,
     ConsolidationBackend,
+    EvidenceChunkingMode,
     GlobalConfigError,
     load_global_config,
 )
@@ -20,6 +21,10 @@ def test_load_global_config_defaults_when_missing(tmp_path: Path) -> None:
     assert config.checkpointer.sqlite_path == ".lily/checkpoints/checkpointer.sqlite"
     assert config.memory_tooling.enabled is False
     assert config.memory_tooling.auto_apply is False
+    assert config.evidence.chunking_mode == EvidenceChunkingMode.RECURSIVE
+    assert config.evidence.chunk_size == 360
+    assert config.evidence.chunk_overlap == 40
+    assert config.evidence.token_encoding_name == "cl100k_base"
     assert config.consolidation.enabled is False
     assert config.consolidation.backend == ConsolidationBackend.RULE_BASED
     assert config.consolidation.llm_assisted_enabled is False
@@ -108,3 +113,25 @@ def test_load_global_config_reads_consolidation_flags(tmp_path: Path) -> None:
     assert config.consolidation.backend == ConsolidationBackend.LANGMEM_MANAGER
     assert config.consolidation.llm_assisted_enabled is True
     assert config.consolidation.auto_run_every_n_turns == 3
+
+
+def test_load_global_config_reads_evidence_chunking_settings(tmp_path: Path) -> None:
+    """Config loader should parse evidence chunking settings."""
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        (
+            "{"
+            '"evidence":{"chunking_mode":"token","chunk_size":512,'
+            '"chunk_overlap":64,"token_encoding_name":"cl100k_base"},'
+            '"checkpointer":{"backend":"sqlite","sqlite_path":".lily/checkpoints/checkpointer.sqlite"}'
+            "}"
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_global_config(config_path)
+
+    assert config.evidence.chunking_mode == EvidenceChunkingMode.TOKEN
+    assert config.evidence.chunk_size == 512
+    assert config.evidence.chunk_overlap == 64
+    assert config.evidence.token_encoding_name == "cl100k_base"
