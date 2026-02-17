@@ -20,7 +20,13 @@ from lily.runtime.conversation import (
 )
 from lily.runtime.facade import RuntimeFacade
 from lily.session.models import ModelConfig, Session
-from lily.skills.types import InvocationMode, SkillEntry, SkillSnapshot, SkillSource
+from lily.skills.types import (
+    InvocationMode,
+    SkillCapabilitySpec,
+    SkillEntry,
+    SkillSnapshot,
+    SkillSource,
+)
 
 BASELINE_MIN_CASES = 10
 BASELINE_MIN_PASS_RATE = 0.95
@@ -336,4 +342,6 @@ def _tool_skill(name: str, command_tool: str) -> SkillEntry:
         path=Path(f"/skills/{name}/SKILL.md"),
         invocation_mode=InvocationMode.TOOL_DISPATCH,
         command_tool=command_tool,
+        capabilities=SkillCapabilitySpec(declared_tools=(command_tool,)),
+        capabilities_declared=True,
     )

@@ -17,7 +17,13 @@ from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
 from lily.session.models import ModelConfig, Session
 from lily.session.store import load_session, save_session
-from lily.skills.types import InvocationMode, SkillEntry, SkillSnapshot, SkillSource
+from lily.skills.types import (
+    InvocationMode,
+    SkillCapabilitySpec,
+    SkillEntry,
+    SkillSnapshot,
+    SkillSource,
+)
 
 CONSISTENCY_MIN_CASES = 4
 CONSISTENCY_MIN_PASS_RATE = 1.0
@@ -587,6 +593,8 @@ def _session_with_add_skill() -> Session:
                 path=Path("/skills/add/SKILL.md"),
                 invocation_mode=InvocationMode.TOOL_DISPATCH,
                 command_tool="add",
+                capabilities=SkillCapabilitySpec(declared_tools=("add",)),
+                capabilities_declared=True,
             ),
         ),
     )

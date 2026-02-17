@@ -303,29 +303,7 @@ def _resolve_candidate(
         command=metadata.command,
         command_tool=metadata.command_tool,
         requires_tools=metadata.requires_tools,
-        capabilities=metadata.capabilities.model_copy(
-            update={
-                # Legacy skills without explicit capabilities are migrated
-                # with minimal declaration for their command tool.
-                "declared_tools": (
-                    metadata.capabilities.declared_tools
-                    if metadata.capabilities_declared
-                    else tuple(
-                        sorted(
-                            {
-                                *(metadata.capabilities.declared_tools),
-                                *metadata.requires_tools,
-                                *(
-                                    (metadata.command_tool,)
-                                    if metadata.command_tool is not None
-                                    else ()
-                                ),
-                            }
-                        )
-                    )
-                )
-            }
-        ),
+        capabilities=metadata.capabilities,
         capabilities_declared=metadata.capabilities_declared,
         eligibility=metadata.eligibility,
     )

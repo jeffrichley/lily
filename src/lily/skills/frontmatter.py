@@ -94,8 +94,7 @@ def _validate_metadata(
             f"Malformed skill frontmatter{origin}: tool_dispatch requires command_tool",
         )
     if (
-        metadata.capabilities_declared
-        and metadata.invocation_mode == InvocationMode.TOOL_DISPATCH
+        metadata.invocation_mode == InvocationMode.TOOL_DISPATCH
         and metadata.command_tool
         and metadata.command_tool not in metadata.capabilities.declared_tools
     ):

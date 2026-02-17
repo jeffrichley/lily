@@ -16,6 +16,7 @@ from lily.session.factory import SessionFactory, SessionFactoryConfig
 from lily.session.models import Message, MessageRole, ModelConfig, Session
 from lily.skills.types import (
     InvocationMode,
+    SkillCapabilitySpec,
     SkillDiagnostic,
     SkillEntry,
     SkillSnapshot,
@@ -74,6 +75,9 @@ def _make_skill(
     Returns:
         Skill entry fixture.
     """
+    capabilities = SkillCapabilitySpec()
+    if mode == InvocationMode.TOOL_DISPATCH and command_tool is not None:
+        capabilities = SkillCapabilitySpec(declared_tools=(command_tool,))
     return SkillEntry(
         name=name,
         source=SkillSource.BUNDLED,
@@ -82,6 +86,8 @@ def _make_skill(
         invocation_mode=mode,
         command=command,
         command_tool=command_tool,
+        capabilities=capabilities,
+        capabilities_declared=(mode == InvocationMode.TOOL_DISPATCH),
     )
 
 
@@ -258,6 +264,8 @@ def test_reload_skills_refreshes_current_session_snapshot(tmp_path: Path) -> Non
             "summary: Add\n"
             "invocation_mode: tool_dispatch\n"
             "command_tool: add\n"
+            "capabilities:\n"
+            "  declared_tools: [add]\n"
             "---\n"
             "# Add\n"
         ),

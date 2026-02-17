@@ -53,8 +53,6 @@ class SkillInvoker:
         """
         if entry.invocation_mode != InvocationMode.TOOL_DISPATCH:
             return None
-        if not entry.capabilities_declared:
-            return None
         if not entry.command_tool:
             return None
 

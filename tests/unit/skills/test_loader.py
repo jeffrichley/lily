@@ -149,8 +149,8 @@ capabilities:
     )
 
 
-def test_loader_migrates_legacy_tool_dispatch_capabilities(tmp_path: Path) -> None:
-    """Legacy tool_dispatch metadata should auto-populate minimal capabilities."""
+def test_loader_rejects_tool_dispatch_without_capabilities(tmp_path: Path) -> None:
+    """tool_dispatch skill should fail when capabilities are missing."""
     bundled_dir = tmp_path / "bundled"
     workspace_dir = tmp_path / "workspace"
     bundled_dir.mkdir()
@@ -177,6 +177,8 @@ command_tool: add
         )
     )
 
-    assert [entry.name for entry in snapshot.skills] == ["add"]
-    assert snapshot.skills[0].capabilities.declared_tools == ("add",)
-    assert snapshot.skills[0].capabilities_declared is False
+    assert [entry.name for entry in snapshot.skills] == []
+    assert any(
+        diag.code == "malformed_frontmatter" and diag.skill_name == "add"
+        for diag in snapshot.diagnostics
+    )
