@@ -29,7 +29,14 @@ class ValidationConfig:
 
 
 def _all_docs_markdown_files(docs_root: Path) -> list[Path]:
-    """Return sorted markdown files under the docs root."""
+    """Return sorted markdown files under the docs root.
+
+    Args:
+        docs_root: Root docs directory to scan recursively.
+
+    Returns:
+        Sorted list of markdown paths.
+    """
     return sorted(docs_root.rglob(f"*{_MARKDOWN_SUFFIX}"))
 
 
@@ -68,7 +75,15 @@ def _extract_frontmatter(raw: str) -> tuple[dict[str, Any] | None, list[str]]:
 
 
 def _default_frontmatter_block(owner_placeholder: str, date_placeholder: str) -> str:
-    """Build the placeholder frontmatter inserted by auto-fix mode."""
+    """Build the placeholder frontmatter inserted by auto-fix mode.
+
+    Args:
+        owner_placeholder: Placeholder value written for owner.
+        date_placeholder: Placeholder value written for last_updated.
+
+    Returns:
+        Serialized YAML frontmatter block.
+    """
     return (
         "---\n"
         f'owner: "{owner_placeholder}"\n'
@@ -80,14 +95,30 @@ def _default_frontmatter_block(owner_placeholder: str, date_placeholder: str) ->
 
 
 def _is_invalid_text_value(value: object) -> bool:
-    """Return True when the value is not an acceptable non-empty string."""
+    """Return True when the value is not an acceptable non-empty string.
+
+    Args:
+        value: Candidate value from parsed frontmatter.
+
+    Returns:
+        True when the value is non-string, empty, or a placeholder token.
+    """
     return not isinstance(value, str) or value.strip() in _INVALID_TEXT_VALUES
 
 
 def _validate_last_updated(
     last_updated: object, *, today: date, max_age_days: int
 ) -> list[str]:
-    """Validate last_updated format and staleness constraints."""
+    """Validate last_updated format and staleness constraints.
+
+    Args:
+        last_updated: Raw last_updated value from frontmatter.
+        today: Current date used to evaluate staleness.
+        max_age_days: Maximum allowed age for active docs.
+
+    Returns:
+        Deterministic validation error messages for last_updated.
+    """
     if _is_invalid_text_value(last_updated):
         return ["Field 'last_updated' must be a concrete ISO date (YYYY-MM-DD)."]
     assert isinstance(last_updated, str)
@@ -107,7 +138,14 @@ def _validate_last_updated(
 
 
 def _validate_required_fields(frontmatter: dict[str, Any]) -> list[str]:
-    """Validate required frontmatter keys exist."""
+    """Validate required frontmatter keys exist.
+
+    Args:
+        frontmatter: Parsed frontmatter mapping.
+
+    Returns:
+        Missing-field validation errors.
+    """
     return [
         f"Missing required field '{key}'."
         for key in _REQUIRED_FIELDS
@@ -118,7 +156,16 @@ def _validate_required_fields(frontmatter: dict[str, Any]) -> list[str]:
 def _validate_common_values(
     owner: object, status: object, source_of_truth: object
 ) -> list[str]:
-    """Validate owner, status, and source_of_truth fields."""
+    """Validate owner, status, and source_of_truth fields.
+
+    Args:
+        owner: Raw owner field value.
+        status: Raw status field value.
+        source_of_truth: Raw source_of_truth field value.
+
+    Returns:
+        Validation errors for the common non-date fields.
+    """
     errors: list[str] = []
     if _is_invalid_text_value(owner):
         errors.append("Field 'owner' must be a concrete non-placeholder value.")
@@ -130,7 +177,14 @@ def _validate_common_values(
 
 
 def _validate_non_active_last_updated(last_updated: object) -> list[str]:
-    """Validate last_updated for non-active docs."""
+    """Validate last_updated for non-active docs.
+
+    Args:
+        last_updated: Raw last_updated value from frontmatter.
+
+    Returns:
+        Validation errors for date format/presence.
+    """
     if _is_invalid_text_value(last_updated):
         return ["Field 'last_updated' must be a concrete ISO date (YYYY-MM-DD)."]
     try:
@@ -146,7 +200,16 @@ def _validate_frontmatter_values(
     today: date,
     max_age_days: int,
 ) -> list[str]:
-    """Validate required keys and field value semantics."""
+    """Validate required keys and field value semantics.
+
+    Args:
+        frontmatter: Parsed frontmatter mapping.
+        today: Current date used for staleness checks.
+        max_age_days: Maximum age for active docs.
+
+    Returns:
+        Validation errors for required fields and value semantics.
+    """
     errors = _validate_required_fields(frontmatter)
     if errors:
         return errors
@@ -209,5 +272,12 @@ def validate_docs_frontmatter(
 
 
 def default_config(repo_root: Path) -> ValidationConfig:
-    """Return default repository-level docs validation config."""
+    """Return default repository-level docs validation config.
+
+    Args:
+        repo_root: Repository root path.
+
+    Returns:
+        Default validation configuration targeting `docs/`.
+    """
     return ValidationConfig(docs_root=repo_root / _DOCS_ROOT)

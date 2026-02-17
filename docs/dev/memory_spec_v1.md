@@ -1,6 +1,6 @@
 ---
-owner: "TBD"
-last_updated: "TBD"
+owner: "@team"
+last_updated: "2026-02-17"
 status: "reference"
 source_of_truth: false
 ---
