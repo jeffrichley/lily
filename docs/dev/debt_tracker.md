@@ -32,6 +32,19 @@ Priority scale:
     - warning filter entry removed from `pyproject.toml`
     - quality/test runs remain warning-clean
 
+- [ ] Add pre-execution language restriction layer (RestrictedPython or equivalent AST policy)
+  - Owner: `@team`
+  - Target: `2026-03-08`
+  - Current state: V1 security relies on container isolation + hard-deny preflight patterns; no RestrictedPython-style language restriction is enforced before plugin execution.
+  - Why this matters:
+    - container isolation is the primary boundary, but language restriction is valuable defense-in-depth
+    - catches risky constructs earlier with clearer deterministic denials
+    - reduces blast radius of parser/runtime bypass attempts
+  - Exit criteria:
+    - deterministic pre-execution restriction layer is active for plugin code
+    - denial codes/messages are stable and covered by tests
+    - docs explicitly describe layered security model (language restriction + container isolation)
+
 ### P2
 
 - [ ] Add real `/agent <name>` once agent subsystem exists
