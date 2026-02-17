@@ -132,6 +132,47 @@ def test_run_single_shot_renders_error_and_exit_code(
     assert "Error: boom" in result.stdout
 
 
+def test_run_renders_security_alert_panel_for_capability_denied(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    """Security-denied skill errors should render explicit alert panel."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    _write_echo_skill(bundled_dir)
+
+    class _StubRuntime:
+        def handle_input(self, text: str, session: object) -> CommandResult:
+            del text
+            del session
+            return CommandResult.error(
+                "Security alert: denied",
+                code="skill_capability_denied",
+            )
+
+    monkeypatch.setattr(
+        "lily.cli.cli._build_runtime_for_workspace",
+        lambda **_: _StubRuntime(),
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "/skill echo hello",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Code: skill_capability_denied" in result.stdout
+    assert "SECURITY ALERT" in result.stdout
+
+
 def test_repl_exit_parentheses_exits_cleanly(tmp_path: Path) -> None:
     """`lily repl` should treat `exit()` as clean shutdown signal."""
     bundled_dir = tmp_path / "bundled"

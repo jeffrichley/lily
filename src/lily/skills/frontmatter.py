@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ from pydantic import ValidationError
 from lily.skills.types import InvocationMode, SkillMetadata
 
 FRONTMATTER_DELIMITER = "---"
+_PROVIDER_ID_RE = r"^[a-z][a-z0-9_]*$"
 
 
 def _extract_frontmatter(raw: str) -> tuple[str | None, str]:
@@ -79,20 +81,82 @@ def _validate_metadata(
         ValueError: If metadata validation fails.
     """
     origin = f" ({skill_path})" if skill_path else ""
+    payload = dict(metadata_dict)
+    payload["capabilities_declared"] = "capabilities" in metadata_dict
     try:
-        metadata = SkillMetadata.model_validate(metadata_dict)
+        metadata = SkillMetadata.model_validate(payload)
     except ValidationError as exc:
         raise ValueError(f"Malformed skill frontmatter{origin}: {exc}") from exc
 
-    if (
-        metadata.invocation_mode == InvocationMode.TOOL_DISPATCH
-        and not metadata.command_tool
-    ):
+    _validate_tool_dispatch_metadata(metadata, origin)
+
+    return metadata
+
+
+def _validate_tool_dispatch_metadata(metadata: SkillMetadata, origin: str) -> None:
+    """Apply tool_dispatch-specific validation rules.
+
+    Args:
+        metadata: Parsed skill metadata.
+        origin: Optional contextual origin suffix for errors.
+
+    Raises:
+        ValueError: If tool-dispatch metadata is invalid.
+    """
+    if metadata.invocation_mode != InvocationMode.TOOL_DISPATCH:
+        return
+    if not metadata.command_tool:
         raise ValueError(
             f"Malformed skill frontmatter{origin}: tool_dispatch requires command_tool",
         )
+    if re.fullmatch(_PROVIDER_ID_RE, metadata.command_tool_provider) is None:
+        raise ValueError(
+            (
+                f"Malformed skill frontmatter{origin}: invalid command_tool_provider "
+                f"'{metadata.command_tool_provider}'"
+            ),
+        )
+    declared = set(metadata.capabilities.declared_tools)
+    qualified = f"{metadata.command_tool_provider}:{metadata.command_tool}"
+    if metadata.command_tool in declared or qualified in declared:
+        _validate_plugin_metadata(metadata, origin)
+        return
+    raise ValueError(
+        (
+            f"Malformed skill frontmatter{origin}: tool_dispatch command_tool "
+            f"'{metadata.command_tool}' must be declared in "
+            "capabilities.declared_tools"
+        ),
+    )
 
-    return metadata
+
+def _validate_plugin_metadata(metadata: SkillMetadata, origin: str) -> None:
+    """Apply plugin-provider metadata validation rules.
+
+    Args:
+        metadata: Parsed skill metadata.
+        origin: Optional contextual origin suffix for errors.
+
+    Raises:
+        ValueError: If plugin metadata is invalid.
+    """
+    if metadata.command_tool_provider != "plugin":
+        return
+    if metadata.plugin.entrypoint is None:
+        raise ValueError(
+            f"Malformed skill frontmatter{origin}: plugin provider requires "
+            "plugin.entrypoint",
+        )
+    for field_name, values in (
+        ("plugin.source_files", metadata.plugin.source_files),
+        ("plugin.asset_files", metadata.plugin.asset_files),
+        ("plugin.env_allowlist", metadata.plugin.env_allowlist),
+    ):
+        if any(not value.strip() for value in values):
+            raise ValueError(
+                f"Malformed skill frontmatter{origin}: {field_name} contains empty "
+                "value",
+            )
 
 
 def parse_skill_markdown(

@@ -32,17 +32,20 @@ Priority scale:
     - warning filter entry removed from `pyproject.toml`
     - quality/test runs remain warning-clean
 
-### P2
-
-- [ ] Add typed skill/tool contracts (input/output schemas)
+- [ ] Add pre-execution language restriction layer (RestrictedPython or equivalent AST policy)
   - Owner: `@team`
-  - Target: `TBD`
-  - Current state: typed I/O validation is implemented for `tool_dispatch` command tools, but generalized skill-declared I/O contracts are not yet implemented across all skills/modes.
+  - Target: `2026-03-08`
+  - Current state: V1 security relies on container isolation + hard-deny preflight patterns; no RestrictedPython-style language restriction is enforced before plugin execution.
+  - Why this matters:
+    - container isolation is the primary boundary, but language restriction is valuable defense-in-depth
+    - catches risky constructs earlier with clearer deterministic denials
+    - reduces blast radius of parser/runtime bypass attempts
   - Exit criteria:
-    - skill metadata supports optional skill-declared input/output schema fields
-    - runtime validates input pre-execution and output post-execution for both `tool_dispatch` and `llm_orchestration`
-    - deterministic validation errors are stable across both execution modes
-    - at least 2 non-demo skills use skill-declared typed I/O end-to-end
+    - deterministic pre-execution restriction layer is active for plugin code
+    - denial codes/messages are stable and covered by tests
+    - docs explicitly describe layered security model (language restriction + container isolation)
+
+### P2
 
 - [ ] Add real `/agent <name>` once agent subsystem exists
   - Owner: `@team`
@@ -54,6 +57,15 @@ Priority scale:
     - command and REPL coverage added
 
 ### P3
+
+- [ ] Consolidate runtime SQLite locations under `.lily/db/`
+  - Owner: `@team`
+  - Target: `TBD`
+  - Current state: SQLite artifacts are split across directories (for example `.lily/checkpoints/checkpointer.sqlite` and planned `.lily/db/security.sqlite`).
+  - Exit criteria:
+    - canonical runtime DB directory is defined as `.lily/db/`
+    - existing SQLite paths (checkpointer and related runtime DBs) are migrated or compatibility-mapped
+    - docs/config defaults are updated and tested for migration safety
 
 - [ ] Add multi-process persistence safety strategy
   - Owner: `@team`
@@ -73,6 +85,15 @@ Priority scale:
     - `docs/dev/roadmap.md` updated with explicit status ownership and current execution rule
 
 ## Recently Closed Debt
+
+- [x] Add typed skill/tool contracts (input/output schemas)
+  - Closed: `2026-02-17`
+  - Evidence:
+    - phase completion: `docs/dev/skills_platform_execution_plan.md`
+    - base contract defaults: `src/lily/runtime/executors/tool_base.py`
+    - contract conformance lane: `just contract-conformance`
+    - deterministic envelope snapshots: `tests/contracts/contract_envelopes.snapshot.json`
+    - wrapper compatibility coverage: `tests/unit/contracts/test_langchain_wrappers.py`
 
 - [x] Warning-clean test/runtime policy established and enforced
   - Closed: `2026-02-17`

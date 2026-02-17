@@ -1,0 +1,58 @@
+{
+  "envelopes": {
+    "llm_backend_unavailable": {
+      "code": "llm_backend_unavailable",
+      "data": {
+        "backend_code": "backend_unavailable",
+        "skill": "echo"
+      },
+      "message": "Error: LLM backend is unavailable.",
+      "status": "error"
+    },
+    "tool_input_invalid": {
+      "code": "tool_input_invalid",
+      "data": {
+        "provider": "builtin",
+        "skill": "add",
+        "tool": "add",
+        "validation_errors": [
+          {
+            "input": {},
+            "loc": [
+              "left"
+            ],
+            "msg": "Field required",
+            "type": "missing",
+            "url": "https://errors.pydantic.dev/2.12/v/missing"
+          },
+          {
+            "input": {},
+            "loc": [
+              "right"
+            ],
+            "msg": "Field required",
+            "type": "missing",
+            "url": "https://errors.pydantic.dev/2.12/v/missing"
+          }
+        ]
+      },
+      "message": "Error: invalid input for tool 'add'.",
+      "status": "error"
+    },
+    "tool_ok": {
+      "code": "tool_ok",
+      "data": {
+        "output": {
+          "display": "4",
+          "value": 4.0
+        },
+        "provider": "builtin",
+        "skill": "add",
+        "tool": "add"
+      },
+      "message": "4",
+      "status": "ok"
+    }
+  },
+  "version": 1
+}

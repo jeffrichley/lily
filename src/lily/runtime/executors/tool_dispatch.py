@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Protocol
+from pathlib import Path
+from typing import Any, Protocol, cast
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from lily.commands.types import CommandResult
+from lily.runtime.plugin_runner import DockerPluginRunner, PluginRuntimeError
+from lily.runtime.security import (
+    SecurityAuthorizationError,
+    SecurityGate,
+)
 from lily.session.models import Session
 from lily.skills.types import InvocationMode, SkillEntry
 
@@ -47,6 +53,383 @@ class ToolContract(Protocol):
         Args:
             typed_output: Validated tool output payload model.
         """
+
+
+class ToolProvider(Protocol):
+    """Provider contract for resolving command tools by stable provider id."""
+
+    provider_id: str
+
+    def resolve_tool(
+        self,
+        tool_name: str,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> ToolContract | None:
+        """Resolve tool implementation for one provider-scoped tool id.
+
+        Args:
+            tool_name: Provider-scoped tool identifier.
+            session: Active session context.
+            skill_name: Calling skill name.
+        """
+
+
+class ProviderPolicyDeniedError(RuntimeError):
+    """Raised when provider policy denies tool resolution/execution."""
+
+
+class ProviderExecutionError(RuntimeError):
+    """Provider boundary error with deterministic code mapping."""
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        data: dict[str, object] | None = None,
+    ) -> None:
+        """Store deterministic provider error payload.
+
+        Args:
+            code: Deterministic machine-readable error code.
+            message: Human-readable error message.
+            data: Optional structured error payload.
+        """
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.data = data or {}
+
+
+class ToolExecutionError(RuntimeError):
+    """Tool execution error with deterministic code mapping."""
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        data: dict[str, object] | None = None,
+    ) -> None:
+        """Store deterministic tool error payload.
+
+        Args:
+            code: Deterministic machine-readable error code.
+            message: Human-readable error message.
+            data: Optional structured error payload.
+        """
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.data = data or {}
+
+
+class BuiltinToolProvider:
+    """Builtin in-process tool provider."""
+
+    provider_id = "builtin"
+
+    def __init__(self, tools: tuple[ToolContract, ...]) -> None:
+        """Build deterministic builtin tool map keyed by tool name.
+
+        Args:
+            tools: Registered builtin tools.
+        """
+        self._tools = {tool.name: tool for tool in tools}
+
+    def resolve_tool(
+        self,
+        tool_name: str,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> ToolContract | None:
+        """Resolve builtin tool by name.
+
+        Args:
+            tool_name: Builtin tool identifier.
+            session: Active session context.
+            skill_name: Calling skill name.
+
+        Returns:
+            Matching builtin tool contract, or None when not found.
+        """
+        del session
+        del skill_name
+        return self._tools.get(tool_name)
+
+
+class McpToolResolver(Protocol):
+    """Protocol for MCP adapter used by MCP tool provider."""
+
+    def resolve_tool(
+        self,
+        tool_name: str,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> ToolContract | None:
+        """Resolve MCP tool contract for one skill invocation.
+
+        Args:
+            tool_name: MCP tool identifier.
+            session: Active session context.
+            skill_name: Calling skill name.
+        """
+
+
+class _DefaultMcpResolver:
+    """Default MCP resolver stub (no MCP tools configured)."""
+
+    def resolve_tool(
+        self,
+        tool_name: str,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> ToolContract | None:
+        """Return no tool by default until MCP tools are configured.
+
+        Args:
+            tool_name: MCP tool identifier.
+            session: Active session context.
+            skill_name: Calling skill name.
+
+        Returns:
+            None because default resolver has no MCP tools.
+        """
+        del tool_name
+        del session
+        del skill_name
+        return None
+
+
+class McpToolProvider:
+    """MCP-backed tool provider adapter."""
+
+    provider_id = "mcp"
+
+    def __init__(self, resolver: McpToolResolver | None = None) -> None:
+        """Store MCP resolver adapter.
+
+        Args:
+            resolver: Optional MCP resolver implementation.
+        """
+        self._resolver = resolver or _DefaultMcpResolver()
+
+    def resolve_tool(
+        self,
+        tool_name: str,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> ToolContract | None:
+        """Resolve tool via MCP adapter contract.
+
+        Args:
+            tool_name: MCP tool identifier.
+            session: Active session context.
+            skill_name: Calling skill name.
+
+        Returns:
+            MCP tool contract, or None when unavailable.
+        """
+        return self._resolver.resolve_tool(
+            tool_name,
+            session=session,
+            skill_name=skill_name,
+        )
+
+
+class _PluginInput(BaseModel):
+    """Validated input payload for plugin-backed tools."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    payload: str
+
+
+class _PluginOutput(BaseModel):
+    """Validated output payload for plugin-backed tools."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    display: str
+    data: dict[str, Any] | None = None
+
+
+class _PluginTool:
+    """Tool adapter for plugin-backed execution."""
+
+    name: str
+    input_schema = _PluginInput
+    output_schema = _PluginOutput
+
+    def __init__(
+        self,
+        *,
+        tool_name: str,
+        entry: SkillEntry,
+        security_gate: SecurityGate,
+        runner: DockerPluginRunner,
+    ) -> None:
+        """Bind one plugin tool adapter to a skill entry.
+
+        Args:
+            tool_name: Stable tool identifier.
+            entry: Snapshot skill entry.
+            security_gate: Security gate coordinator.
+            runner: Container runtime adapter.
+        """
+        self.name = tool_name
+        self._entry = entry
+        self._security_gate = security_gate
+        self._runner = runner
+
+    def parse_payload(self, payload: str) -> dict[str, Any]:
+        """Wrap raw payload in plugin input envelope.
+
+        Args:
+            payload: Raw user payload string.
+
+        Returns:
+            Plugin input envelope mapping.
+        """
+        return {"payload": payload}
+
+    def execute_typed(
+        self,
+        typed_input: BaseModel,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> dict[str, Any]:
+        """Authorize and execute plugin in sandboxed container.
+
+        Args:
+            typed_input: Validated plugin input payload.
+            session: Active session context.
+            skill_name: Calling skill name.
+
+        Returns:
+            Plugin output payload.
+
+        Raises:
+            ToolExecutionError: If approval/preflight/runtime fails.
+        """
+        del skill_name
+        payload = _PluginInput.model_validate(typed_input)
+        try:
+            security_hash, hash_payload = self._security_gate.authorize(
+                entry=self._entry,
+                agent_id=session.active_agent,
+            )
+            result = self._runner.run(
+                entry=self._entry,
+                user_text=payload.payload,
+                security_hash=security_hash,
+                agent_id=session.active_agent,
+                session_id=session.session_id,
+            )
+            self._security_gate.record_outcome(
+                entry=self._entry,
+                agent_id=session.active_agent,
+                security_hash=security_hash,
+                outcome="plugin_ok",
+                details={"hash_payload": hash_payload},
+            )
+            return result
+        except SecurityAuthorizationError as exc:
+            raise ToolExecutionError(
+                code=exc.code,
+                message=exc.message,
+                data=exc.data,
+            ) from exc
+        except PluginRuntimeError as exc:
+            raise ToolExecutionError(
+                code=exc.code,
+                message=exc.message,
+                data=exc.data,
+            ) from exc
+
+    def render_output(self, typed_output: BaseModel) -> str:
+        """Render plugin output display string.
+
+        Args:
+            typed_output: Validated plugin output payload.
+
+        Returns:
+            User-facing display string.
+        """
+        output = _PluginOutput.model_validate(typed_output)
+        return output.display
+
+
+class PluginToolProvider:
+    """Plugin provider using security gate + Docker container runner."""
+
+    provider_id = "plugin"
+
+    def __init__(
+        self, *, security_gate: SecurityGate, runner: DockerPluginRunner
+    ) -> None:
+        """Create plugin provider with deterministic runtime dependencies.
+
+        Args:
+            security_gate: Security gate coordinator.
+            runner: Container runtime adapter.
+        """
+        self._security_gate = security_gate
+        self._runner = runner
+
+    def resolve_tool(
+        self,
+        tool_name: str,
+        *,
+        session: Session,
+        skill_name: str,
+    ) -> ToolContract | None:
+        """Resolve plugin-backed tool adapter for skill entry.
+
+        Args:
+            tool_name: Provider-scoped tool identifier.
+            session: Active session context.
+            skill_name: Calling skill name.
+
+        Returns:
+            Plugin-backed tool contract.
+
+        Raises:
+            ProviderExecutionError: If plugin contract metadata is invalid.
+        """
+        entry = _find_skill_entry(session=session, skill_name=skill_name)
+        if entry is None:
+            raise ProviderExecutionError(
+                code="plugin_contract_invalid",
+                message=f"Error: plugin skill '{skill_name}' was not found in session.",
+                data={"skill": skill_name},
+            )
+        if entry.plugin.entrypoint is None:
+            raise ProviderExecutionError(
+                code="plugin_contract_invalid",
+                message=(
+                    f"Error: skill '{skill_name}' is missing plugin entrypoint "
+                    "metadata."
+                ),
+                data={"skill": skill_name},
+            )
+        _validate_plugin_paths(entry)
+        return cast(
+            ToolContract,
+            _PluginTool(
+                tool_name=tool_name,
+                entry=entry,
+                security_gate=self._security_gate,
+                runner=self._runner,
+            ),
+        )
 
 
 class _BinaryExpressionInput(BaseModel):
@@ -225,13 +608,13 @@ class ToolDispatchExecutor:
 
     mode = InvocationMode.TOOL_DISPATCH
 
-    def __init__(self, tools: tuple[ToolContract, ...]) -> None:
-        """Build deterministic tool registry keyed by tool name.
+    def __init__(self, providers: tuple[ToolProvider, ...]) -> None:
+        """Build deterministic provider registry keyed by provider id.
 
         Args:
-            tools: Registered dispatch tools.
+            providers: Registered tool providers.
         """
-        self._tools = {tool.name: tool for tool in tools}
+        self._providers = {provider.provider_id: provider for provider in providers}
 
     def execute(
         self, entry: SkillEntry, session: Session, user_text: str
@@ -246,41 +629,197 @@ class ToolDispatchExecutor:
         Returns:
             Deterministic command-tool execution result.
         """
-        if not entry.command_tool:
-            return CommandResult.error(
-                (
-                    f"Error: skill '{entry.name}' is missing command_tool "
-                    "for tool_dispatch."
-                ),
-                code="command_tool_missing",
-                data={"skill": entry.name},
-            )
+        tool, error = self._resolve_tool(entry, session)
+        if error is not None:
+            return error
+        assert tool is not None
 
-        tool = self._tools.get(entry.command_tool)
+        typed_input, error = self._validate_input(tool, entry, user_text)
+        if error is not None:
+            return error
+        assert typed_input is not None
+
+        typed_output, error = self._validate_output(tool, entry, typed_input, session)
+        if error is not None:
+            return error
+        assert typed_output is not None
+
+        return CommandResult.ok(
+            tool.render_output(typed_output),
+            code="tool_ok",
+            data={
+                "skill": entry.name,
+                "provider": entry.command_tool_provider,
+                "tool": tool.name,
+                "output": typed_output.model_dump(),
+            },
+        )
+
+    def _resolve_tool(
+        self,
+        entry: SkillEntry,
+        session: Session,
+    ) -> tuple[ToolContract | None, CommandResult | None]:
+        """Resolve provider + tool for one skill invocation.
+
+        Args:
+            entry: Skill entry selected from snapshot.
+            session: Active session context.
+
+        Returns:
+            Tuple of resolved tool and optional error result.
+        """
+        provider, tool_name, precheck_error = self._resolve_provider_and_tool_name(
+            entry
+        )
+        if precheck_error is not None:
+            return None, precheck_error
+        assert provider is not None
+        assert tool_name is not None
+        try:
+            tool = provider.resolve_tool(
+                tool_name,
+                session=session,
+                skill_name=entry.name,
+            )
+        except ProviderPolicyDeniedError as exc:
+            return None, _error_result(
+                message=f"Security alert: provider policy denied '{tool_name}'.",
+                code="provider_policy_denied",
+                data={
+                    "skill": entry.name,
+                    "provider": entry.command_tool_provider,
+                    "tool": tool_name,
+                    "reason": str(exc),
+                },
+            )
+        except ProviderExecutionError as exc:
+            return None, _error_result(
+                message=exc.message,
+                code=exc.code,
+                data=exc.data,
+            )
+        except Exception as exc:  # pragma: no cover - defensive provider boundary
+            return None, _error_result(
+                message=f"Error: provider execution failed for '{tool_name}'.",
+                code="provider_execution_failed",
+                data={
+                    "skill": entry.name,
+                    "provider": entry.command_tool_provider,
+                    "tool": tool_name,
+                    "reason": str(exc),
+                },
+            )
         if tool is None:
-            return CommandResult.error(
-                (
-                    f"Error: command tool '{entry.command_tool}' is not registered "
-                    f"for skill '{entry.name}'."
+            return None, _error_result(
+                message=(
+                    f"Error: tool '{tool_name}' is not registered for provider "
+                    f"'{entry.command_tool_provider}' (skill '{entry.name}')."
                 ),
-                code="command_tool_unregistered",
-                data={"skill": entry.name, "tool": entry.command_tool},
+                code="provider_tool_unregistered",
+                data={
+                    "skill": entry.name,
+                    "provider": entry.command_tool_provider,
+                    "tool": tool_name,
+                },
             )
+        return tool, None
 
+    def _resolve_provider_and_tool_name(
+        self,
+        entry: SkillEntry,
+    ) -> tuple[ToolProvider | None, str | None, CommandResult | None]:
+        """Resolve provider binding and command tool name.
+
+        Args:
+            entry: Skill entry selected from snapshot.
+
+        Returns:
+            Tuple of provider, tool name, and optional error.
+        """
+        tool_name = entry.command_tool
+        if not tool_name:
+            return (
+                None,
+                None,
+                _error_result(
+                    message=(
+                        f"Error: skill '{entry.name}' is missing command_tool "
+                        "for tool_dispatch."
+                    ),
+                    code="command_tool_missing",
+                    data={"skill": entry.name},
+                ),
+            )
+        provider = self._providers.get(entry.command_tool_provider)
+        if provider is None:
+            return (
+                None,
+                None,
+                _error_result(
+                    message=(
+                        f"Error: tool provider '{entry.command_tool_provider}' is not "
+                        f"registered for skill '{entry.name}'."
+                    ),
+                    code="provider_unbound",
+                    data={
+                        "skill": entry.name,
+                        "provider": entry.command_tool_provider,
+                    },
+                ),
+            )
+        return provider, tool_name, None
+
+    @staticmethod
+    def _validate_input(
+        tool: ToolContract,
+        entry: SkillEntry,
+        user_text: str,
+    ) -> tuple[BaseModel | None, CommandResult | None]:
+        """Validate tool input payload.
+
+        Args:
+            tool: Resolved tool contract.
+            entry: Calling skill entry.
+            user_text: Raw user payload.
+
+        Returns:
+            Tuple of validated input model and optional error result.
+        """
         try:
             raw_input = tool.parse_payload(user_text)
             typed_input = tool.input_schema.model_validate(raw_input)
+            return typed_input, None
         except ValidationError as exc:
-            return CommandResult.error(
+            return None, CommandResult.error(
                 f"Error: invalid input for tool '{tool.name}'.",
                 code="tool_input_invalid",
                 data={
                     "skill": entry.name,
+                    "provider": entry.command_tool_provider,
                     "tool": tool.name,
                     "validation_errors": exc.errors(),
                 },
             )
 
+    @staticmethod
+    def _validate_output(
+        tool: ToolContract,
+        entry: SkillEntry,
+        typed_input: BaseModel,
+        session: Session,
+    ) -> tuple[BaseModel | None, CommandResult | None]:
+        """Validate tool output payload.
+
+        Args:
+            tool: Resolved tool contract.
+            entry: Calling skill entry.
+            typed_input: Validated input payload.
+            session: Active session context.
+
+        Returns:
+            Tuple of validated output model and optional error result.
+        """
         try:
             raw_output = tool.execute_typed(
                 typed_input,
@@ -288,23 +827,102 @@ class ToolDispatchExecutor:
                 skill_name=entry.name,
             )
             typed_output = tool.output_schema.model_validate(raw_output)
+            return typed_output, None
+        except ToolExecutionError as exc:
+            return None, CommandResult.error(
+                exc.message,
+                code=exc.code,
+                data=exc.data,
+            )
         except ValidationError as exc:
-            return CommandResult.error(
+            return None, CommandResult.error(
                 f"Error: invalid output from tool '{tool.name}'.",
                 code="tool_output_invalid",
                 data={
                     "skill": entry.name,
+                    "provider": entry.command_tool_provider,
                     "tool": tool.name,
                     "validation_errors": exc.errors(),
                 },
             )
 
-        return CommandResult.ok(
-            tool.render_output(typed_output),
-            code="tool_ok",
-            data={
-                "skill": entry.name,
-                "tool": tool.name,
-                "output": typed_output.model_dump(),
-            },
+
+def _error_result(
+    *,
+    message: str,
+    code: str,
+    data: dict[str, object],
+) -> CommandResult:
+    """Build deterministic error envelope for tool dispatch failures.
+
+    Args:
+        message: Human-readable error message.
+        code: Deterministic machine-readable error code.
+        data: Structured error payload.
+
+    Returns:
+        CommandResult error envelope.
+    """
+    return CommandResult.error(message, code=code, data=data)
+
+
+def _find_skill_entry(*, session: Session, skill_name: str) -> SkillEntry | None:
+    """Resolve one skill entry by exact name from session snapshot.
+
+    Args:
+        session: Active session context.
+        skill_name: Exact skill name to resolve.
+
+    Returns:
+        Matching skill entry or ``None``.
+    """
+    for entry in session.skill_snapshot.skills:
+        if entry.name == skill_name:
+            return entry
+    return None
+
+
+def _validate_plugin_paths(entry: SkillEntry) -> None:
+    """Validate plugin contract relative paths for one entry.
+
+    Args:
+        entry: Skill entry under validation.
+    """
+    _validate_relative_path(entry, entry.plugin.entrypoint or "", field="entrypoint")
+    for value in entry.plugin.source_files:
+        _validate_relative_path(entry, value, field="source_files")
+    for value in entry.plugin.asset_files:
+        _validate_relative_path(entry, value, field="asset_files")
+
+
+def _validate_relative_path(entry: SkillEntry, value: str, *, field: str) -> None:
+    """Validate one plugin path as in-root relative filesystem path.
+
+    Args:
+        entry: Skill entry under validation.
+        value: Raw relative path value.
+        field: Metadata field containing this path.
+
+    Raises:
+        ProviderExecutionError: If path value is empty, absolute, or escaped.
+    """
+    normalized = value.strip()
+    if not normalized:
+        raise ProviderExecutionError(
+            code="plugin_contract_invalid",
+            message=f"Error: skill '{entry.name}' has empty plugin path value.",
+            data={"skill": entry.name, "field": field},
+        )
+    candidate = Path(normalized)
+    if candidate.is_absolute():
+        raise ProviderExecutionError(
+            code="plugin_contract_invalid",
+            message=f"Error: skill '{entry.name}' has absolute plugin path.",
+            data={"skill": entry.name, "field": field, "path": normalized},
+        )
+    if ".." in candidate.parts:
+        raise ProviderExecutionError(
+            code="plugin_contract_invalid",
+            message=f"Error: skill '{entry.name}' plugin path escapes skill root.",
+            data={"skill": entry.name, "field": field, "path": normalized},
         )

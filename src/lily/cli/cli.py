@@ -28,6 +28,7 @@ from lily.memory import (
 )
 from lily.runtime.checkpointing import CheckpointerBuildError, build_checkpointer
 from lily.runtime.facade import RuntimeFacade
+from lily.runtime.security import ApprovalDecision, ApprovalRequest, SecurityPrompt
 from lily.session.factory import SessionFactory, SessionFactoryConfig
 from lily.session.models import HistoryCompactionBackend, ModelConfig, Session
 from lily.session.store import (
@@ -60,6 +61,62 @@ _HIDE_DATA_CODES = {
     "memory_langmem_listed",
     "memory_evidence_ingested",
 }
+_SECURITY_ALERT_CODES = {
+    "provider_policy_denied",
+    "skill_capability_denied",
+    "security_policy_denied",
+    "plugin_contract_invalid",
+    "plugin_container_unavailable",
+    "plugin_timeout",
+    "plugin_runtime_failed",
+    "security_preflight_denied",
+    "security_hash_mismatch",
+    "approval_required",
+    "approval_denied",
+    "approval_persist_failed",
+}
+
+
+class _TerminalSecurityPrompt(SecurityPrompt):
+    """Terminal HITL prompt for plugin security approvals."""
+
+    def request_approval(self, request: ApprovalRequest) -> ApprovalDecision | None:
+        """Prompt operator for deterministic run_once/always_allow/deny decision.
+
+        Args:
+            request: Security approval context for current invocation.
+
+        Returns:
+            Selected approval decision, or ``None`` when unavailable.
+        """
+        hash_note = "YES" if request.hash_changed else "NO"
+        write_note = "YES" if request.write_access else "NO"
+        _CONSOLE.print(
+            Panel(
+                (
+                    f"Agent: {request.agent_id}\n"
+                    f"Skill: {request.skill_name}\n"
+                    f"Security Hash: {request.security_hash}\n"
+                    f"Hash Changed Since Prior Grant: {hash_note}\n"
+                    f"Write Access Requested: {write_note}\n\n"
+                    "Choose approval mode: run_once | always_allow | deny"
+                ),
+                title="Security Approval Required",
+                border_style="bold yellow",
+                expand=True,
+            )
+        )
+        choice = typer.prompt(
+            "approval",
+            type=click.Choice(
+                ["run_once", "always_allow", "deny"], case_sensitive=False
+            ),
+        ).strip()
+        if choice == "run_once":
+            return ApprovalDecision.RUN_ONCE
+        if choice == "always_allow":
+            return ApprovalDecision.ALWAYS_ALLOW
+        return ApprovalDecision.DENY
 
 
 def _configure_logging() -> None:
@@ -304,6 +361,9 @@ def _build_runtime_for_workspace(
         ),
         compaction_backend=HistoryCompactionBackend(config.compaction.backend.value),
         compaction_max_tokens=config.compaction.max_tokens,
+        security=config.security,
+        security_prompt=_TerminalSecurityPrompt(),
+        project_root=_project_root(),
     )
 
 
@@ -336,9 +396,22 @@ def _render_result(result: CommandResult) -> None:
         return
     _CONSOLE.print(
         Panel(
-            result.message,
-            title=f"Error [{result.code}]",
-            border_style="bold red",
+            (
+                "[bold white on red] SECURITY ALERT [/bold white on red]\n"
+                f"Code: {result.code}\n{result.message}"
+            )
+            if result.code in _SECURITY_ALERT_CODES
+            else result.message,
+            title=(
+                "SECURITY ALERT"
+                if result.code in _SECURITY_ALERT_CODES
+                else f"Error [{result.code}]"
+            ),
+            border_style=(
+                "bold bright_red"
+                if result.code in _SECURITY_ALERT_CODES
+                else "bold red"
+            ),
             expand=True,
         )
     )

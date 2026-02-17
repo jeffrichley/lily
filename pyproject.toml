@@ -17,6 +17,7 @@ dependencies = [
     "langgraph-checkpoint-sqlite>=3.0.3",
     "langmem>=0.0.30",
     "tiktoken>=0.12.0",
+    "docker>=7.1.0",
 ]
 
 [project.scripts]
@@ -112,7 +113,7 @@ packages = ["lily"]
 
 # Third-party modules without stubs: allow untyped so strict mode stays tractable
 [[tool.mypy.overrides]]
-module = ["typer", "filelock", "langmem"]
+module = ["typer", "filelock", "langmem", "docker", "docker.*"]
 ignore_missing_imports = true
 
 [tool.coverage.run]

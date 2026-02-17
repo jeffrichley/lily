@@ -14,7 +14,14 @@ from lily.runtime.conversation import ConversationRequest, ConversationResponse
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
 from lily.session.models import Message, MessageRole, ModelConfig, Session
-from lily.skills.types import InvocationMode, SkillEntry, SkillSnapshot, SkillSource
+from lily.skills.types import (
+    InvocationMode,
+    SkillCapabilitySpec,
+    SkillDiagnostic,
+    SkillEntry,
+    SkillSnapshot,
+    SkillSource,
+)
 
 
 class _ConversationCaptureExecutor:
@@ -68,6 +75,9 @@ def _make_skill(
     Returns:
         Skill entry fixture.
     """
+    capabilities = SkillCapabilitySpec()
+    if mode == InvocationMode.TOOL_DISPATCH and command_tool is not None:
+        capabilities = SkillCapabilitySpec(declared_tools=(command_tool,))
     return SkillEntry(
         name=name,
         source=SkillSource.BUNDLED,
@@ -76,6 +86,8 @@ def _make_skill(
         invocation_mode=mode,
         command=command,
         command_tool=command_tool,
+        capabilities=capabilities,
+        capabilities_declared=(mode == InvocationMode.TOOL_DISPATCH),
     )
 
 
@@ -154,6 +166,39 @@ def test_skills_command_returns_deterministic_sorted_output() -> None:
     ]
 
 
+def test_skills_command_includes_diagnostics_section() -> None:
+    """`/skills` should include snapshot diagnostics deterministically."""
+    runtime = RuntimeFacade()
+    snapshot = SkillSnapshot(
+        version="v-test",
+        skills=(
+            _make_skill("alpha", summary="Alpha summary"),
+            _make_skill("zeta", summary="Zeta summary"),
+        ),
+        diagnostics=(
+            SkillDiagnostic(
+                skill_name="echo",
+                code="malformed_frontmatter",
+                message="Bad frontmatter",
+                source=SkillSource.WORKSPACE,
+                path=Path("/workspace/echo"),
+            ),
+        ),
+    )
+    session = Session(
+        session_id="session-test",
+        active_agent="default",
+        skill_snapshot=snapshot,
+        model_config=ModelConfig(),
+    )
+
+    result = runtime.handle_input("/skills", session)
+
+    assert result.status.value == "ok"
+    assert "Diagnostics:" in result.message
+    assert "- echo [malformed_frontmatter] Bad frontmatter" in result.message
+
+
 def test_skill_command_delegates_to_hidden_llm_adapter_path() -> None:
     """`/skill` should delegate through invoker/executor backend path."""
     runtime = RuntimeFacade()
@@ -219,6 +264,8 @@ def test_reload_skills_refreshes_current_session_snapshot(tmp_path: Path) -> Non
             "summary: Add\n"
             "invocation_mode: tool_dispatch\n"
             "command_tool: add\n"
+            "capabilities:\n"
+            "  declared_tools: [add]\n"
             "---\n"
             "# Add\n"
         ),

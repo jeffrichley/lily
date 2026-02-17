@@ -34,6 +34,8 @@ def test_load_global_config_defaults_when_missing(tmp_path: Path) -> None:
     assert config.consolidation.backend == ConsolidationBackend.RULE_BASED
     assert config.consolidation.llm_assisted_enabled is False
     assert config.consolidation.auto_run_every_n_turns == 0
+    assert config.security.sandbox.sqlite_path == ".lily/db/security.sqlite"
+    assert config.security.sandbox.image.startswith("python:3.13-slim@sha256:")
 
 
 def test_load_global_config_reads_custom_backend(tmp_path: Path) -> None:
@@ -191,5 +193,21 @@ def test_load_global_config_rejects_invalid_yaml(tmp_path: Path) -> None:
         load_global_config(config_path)
     except GlobalConfigError as exc:
         assert "Invalid global config YAML" in str(exc)
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("Expected GlobalConfigError")
+
+
+def test_load_global_config_rejects_unpinned_security_image(tmp_path: Path) -> None:
+    """Security sandbox image must be pinned by sha256 digest."""
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        '{"security":{"sandbox":{"image":"python:3.13-slim"}}}',
+        encoding="utf-8",
+    )
+
+    try:
+        load_global_config(config_path)
+    except GlobalConfigError as exc:
+        assert "pinned by sha256 digest" in str(exc)
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected GlobalConfigError")

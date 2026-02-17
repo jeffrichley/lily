@@ -33,6 +33,27 @@ class SkillEligibilitySpec(BaseModel):
     binaries: tuple[str, ...] = ()
 
 
+class SkillCapabilitySpec(BaseModel):
+    """Capability declarations enforced during skill invocation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    declared_tools: tuple[str, ...] = ()
+
+
+class SkillPluginSpec(BaseModel):
+    """Plugin execution contract for code-backed skills."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    entrypoint: str | None = None
+    source_files: tuple[str, ...] = ()
+    asset_files: tuple[str, ...] = ()
+    profile: str = "safe_eval"
+    write_access: bool = False
+    env_allowlist: tuple[str, ...] = ()
+
+
 class SkillMetadata(BaseModel):
     """Parsed metadata derived from SKILL.md frontmatter."""
 
@@ -41,9 +62,13 @@ class SkillMetadata(BaseModel):
     summary: str = ""
     invocation_mode: InvocationMode = InvocationMode.LLM_ORCHESTRATION
     command: str | None = None
+    command_tool_provider: str = "builtin"
     command_tool: str | None = None
     requires_tools: tuple[str, ...] = ()
+    capabilities: SkillCapabilitySpec = Field(default_factory=SkillCapabilitySpec)
+    capabilities_declared: bool = False
     eligibility: SkillEligibilitySpec = Field(default_factory=SkillEligibilitySpec)
+    plugin: SkillPluginSpec = Field(default_factory=SkillPluginSpec)
 
 
 class SkillDiagnostic(BaseModel):
@@ -80,9 +105,13 @@ class SkillEntry(BaseModel):
     instructions: str = ""
     invocation_mode: InvocationMode = InvocationMode.LLM_ORCHESTRATION
     command: str | None = None
+    command_tool_provider: str = "builtin"
     command_tool: str | None = None
     requires_tools: tuple[str, ...] = ()
+    capabilities: SkillCapabilitySpec = Field(default_factory=SkillCapabilitySpec)
+    capabilities_declared: bool = False
     eligibility: SkillEligibilitySpec = Field(default_factory=SkillEligibilitySpec)
+    plugin: SkillPluginSpec = Field(default_factory=SkillPluginSpec)
 
 
 class SkillSnapshot(BaseModel):

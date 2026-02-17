@@ -32,10 +32,47 @@ class SkillInvoker:
         Returns:
             Command result from resolved executor or explicit error.
         """
+        capability_error = self._validate_capabilities(entry)
+        if capability_error is not None:
+            return capability_error
+
         executor = self._executors.get(entry.invocation_mode)
         if executor is None:
             return self._unknown_mode_result(entry.invocation_mode, entry.name)
         return executor.execute(entry, session, user_text)
+
+    @staticmethod
+    def _validate_capabilities(entry: SkillEntry) -> CommandResult | None:
+        """Validate invocation-time capability declaration requirements.
+
+        Args:
+            entry: Skill selected from snapshot.
+
+        Returns:
+            Error result when capability policy is violated, else ``None``.
+        """
+        if entry.invocation_mode != InvocationMode.TOOL_DISPATCH:
+            return None
+        if not entry.command_tool:
+            return None
+
+        declared = set(entry.capabilities.declared_tools)
+        qualified_tool = f"{entry.command_tool_provider}:{entry.command_tool}"
+        if entry.command_tool in declared or qualified_tool in declared:
+            return None
+        return CommandResult.error(
+            (
+                f"Security alert: skill '{entry.name}' attempted undeclared tool "
+                f"'{entry.command_tool_provider}:{entry.command_tool}'."
+            ),
+            code="skill_capability_denied",
+            data={
+                "skill": entry.name,
+                "provider": entry.command_tool_provider,
+                "tool": entry.command_tool,
+                "declared_tools": sorted(declared),
+            },
+        )
 
     @staticmethod
     def _unknown_mode_result(mode: InvocationMode, skill_name: str) -> CommandResult:

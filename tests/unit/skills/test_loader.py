@@ -110,3 +110,115 @@ eligibility:
         for diag in snapshot.diagnostics
     )
     assert any(diag.code == "precedence_conflict" for diag in snapshot.diagnostics)
+
+
+def test_loader_rejects_underdeclared_tool_capability(tmp_path: Path) -> None:
+    """tool_dispatch skill should fail when command tool is undeclared."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+
+    _write_skill(
+        bundled_dir,
+        "add",
+        """---
+summary: add
+invocation_mode: tool_dispatch
+command_tool: add
+capabilities:
+  declared_tools: [subtract]
+---
+# Add
+""",
+    )
+
+    snapshot = build_skill_snapshot(
+        SkillSnapshotRequest(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            platform="linux",
+            env={},
+        )
+    )
+
+    assert [entry.name for entry in snapshot.skills] == []
+    assert any(
+        diag.code == "malformed_frontmatter" and diag.skill_name == "add"
+        for diag in snapshot.diagnostics
+    )
+
+
+def test_loader_rejects_tool_dispatch_without_capabilities(tmp_path: Path) -> None:
+    """tool_dispatch skill should fail when capabilities are missing."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+
+    _write_skill(
+        bundled_dir,
+        "add",
+        """---
+summary: add
+invocation_mode: tool_dispatch
+command_tool: add
+---
+# Add
+""",
+    )
+
+    snapshot = build_skill_snapshot(
+        SkillSnapshotRequest(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            platform="linux",
+            env={},
+        )
+    )
+
+    assert [entry.name for entry in snapshot.skills] == []
+    assert any(
+        diag.code == "malformed_frontmatter" and diag.skill_name == "add"
+        for diag in snapshot.diagnostics
+    )
+
+
+def test_loader_rejects_plugin_provider_without_entrypoint(tmp_path: Path) -> None:
+    """Plugin provider skills must declare plugin.entrypoint metadata."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+
+    _write_skill(
+        bundled_dir,
+        "echo_plugin",
+        """---
+summary: plugin echo
+invocation_mode: tool_dispatch
+command_tool_provider: plugin
+command_tool: execute
+capabilities:
+  declared_tools: [plugin:execute]
+plugin:
+  source_files: [plugin.py]
+---
+# Echo
+""",
+    )
+
+    snapshot = build_skill_snapshot(
+        SkillSnapshotRequest(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            platform="linux",
+            env={},
+        )
+    )
+
+    assert [entry.name for entry in snapshot.skills] == []
+    assert any(
+        diag.code == "malformed_frontmatter" and diag.skill_name == "echo_plugin"
+        for diag in snapshot.diagnostics
+    )

@@ -108,7 +108,19 @@ quality: format lint types complexity vulture darglint audit bandit radon find-d
 quality-check: format-check lint-check types complexity vulture darglint audit bandit radon find-dupes docstr-coverage docs-check
 
 # CI-ready aggregate gates: static checks + eval thresholds.
-ci-gates: quality-check eval-gates
+ci-gates: quality-check contract-conformance eval-gates
+
+# Contract conformance lane (typed envelopes + wrapper compatibility).
+contract-conformance:
+    uv run pytest tests/unit/contracts
+
+# Regenerate deterministic contract-envelope snapshots.
+contract-snapshots:
+    uv run python scripts/generate_contract_snapshots.py
+
+# Scaffold a minimal tool module; usage: `just scaffold-tool echo_text`
+scaffold-tool name:
+    uv run python scripts/scaffold_tool.py {{name}}
 
 # Memory migration CI gate target.
 memory-migration-gates: quality-check eval-regression eval-capability eval-performance

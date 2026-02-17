@@ -30,6 +30,9 @@ Use these files as the only source of truth for each concern:
 | Open technical debt and cleanup obligations | `docs/dev/debt_tracker.md` |
 | Memory domain phase execution status | `docs/dev/memory_execution_plan.md` |
 | Personality domain phase execution status | `docs/dev/personality_execution_plan.md` |
+| Skills platform phase execution status | `docs/dev/skills_platform_execution_plan.md` |
+| Skills tool authoring workflow | `docs/dev/skills_tool_authoring.md` |
+| Skills platform exercise runbook | `docs/ops/skills_platform_v1_exercise_guide.md` |
 | Process and workflow rules | `docs/process/process.md` |
 | Docs weekly operating cadence | `docs/process/docs_cadence.md` |
 | Active specs index | `docs/specs/README.md` |

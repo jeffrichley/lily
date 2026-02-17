@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import cast
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -17,6 +18,7 @@ from lily.commands.handlers._memory_support import (
 from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
+from lily.config import SecuritySettings
 from lily.memory import (
     ConsolidationBackend,
     ConsolidationRequest,
@@ -38,12 +40,23 @@ from lily.runtime.conversation import (
 from lily.runtime.executors.llm_orchestration import LlmOrchestrationExecutor
 from lily.runtime.executors.tool_dispatch import (
     AddTool,
+    BuiltinToolProvider,
+    McpToolProvider,
     MultiplyTool,
+    PluginToolProvider,
     SubtractTool,
     ToolContract,
     ToolDispatchExecutor,
 )
 from lily.runtime.llm_backend import LangChainBackend
+from lily.runtime.plugin_runner import DockerPluginRunner
+from lily.runtime.security import (
+    SecurityApprovalStore,
+    SecurityGate,
+    SecurityHashService,
+    SecurityPreflightScanner,
+    SecurityPrompt,
+)
 from lily.runtime.session_lanes import run_in_session_lane
 from lily.runtime.skill_invoker import SkillInvoker
 from lily.session.models import (
@@ -85,6 +98,9 @@ class RuntimeFacade:
             HistoryCompactionBackend.LANGGRAPH_NATIVE
         ),
         compaction_max_tokens: int = 1000,
+        security: SecuritySettings | None = None,
+        security_prompt: SecurityPrompt | None = None,
+        project_root: Path | None = None,
     ) -> None:
         """Create facade with command and conversation dependencies.
 
@@ -103,6 +119,9 @@ class RuntimeFacade:
             evidence_chunking: Evidence chunking settings.
             compaction_backend: Conversation compaction backend flag.
             compaction_max_tokens: Token budget for native compaction backend.
+            security: Security settings for plugin-backed tool execution.
+            security_prompt: Optional terminal prompt for HITL approvals.
+            project_root: Optional project root for dependency lock hashing.
         """
         self._consolidation_enabled = consolidation_enabled
         self._consolidation_backend = consolidation_backend
@@ -112,6 +131,9 @@ class RuntimeFacade:
         )
         self._compaction_backend = compaction_backend
         self._compaction_max_tokens = compaction_max_tokens
+        self._security = security or SecuritySettings()
+        self._security_prompt = security_prompt
+        self._project_root = project_root or Path.cwd()
         self._persona_repository = persona_repository or FilePersonaRepository(
             root_dir=default_persona_root()
         )
@@ -122,6 +144,9 @@ class RuntimeFacade:
             consolidation_backend=consolidation_backend,
             consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
             evidence_chunking=evidence_chunking,
+            security=self._security,
+            security_prompt=self._security_prompt,
+            project_root=self._project_root,
         )
         self._conversation_executor = (
             conversation_executor
@@ -306,6 +331,9 @@ class RuntimeFacade:
         consolidation_backend: ConsolidationBackend,
         consolidation_llm_assisted_enabled: bool,
         evidence_chunking: EvidenceChunkingSettings | None,
+        security: SecuritySettings,
+        security_prompt: SecurityPrompt | None,
+        project_root: Path,
     ) -> CommandRegistry:
         """Construct default command registry with hidden LLM backend wiring.
 
@@ -316,6 +344,9 @@ class RuntimeFacade:
             consolidation_backend: Consolidation backend selection.
             consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
             evidence_chunking: Evidence chunking settings.
+            security: Security settings for plugin-backed tools.
+            security_prompt: Optional terminal prompt for approvals.
+            project_root: Project root for dependency lock fingerprint.
 
         Returns:
             Command registry with invoker and executor dependencies.
@@ -329,9 +360,28 @@ class RuntimeFacade:
                 MultiplyTool(),
             ),
         )
+        providers = (
+            BuiltinToolProvider(tools=tools),
+            McpToolProvider(),
+            PluginToolProvider(
+                security_gate=SecurityGate(
+                    hash_service=SecurityHashService(
+                        sandbox=security.sandbox,
+                        project_root=project_root,
+                    ),
+                    preflight=SecurityPreflightScanner(),
+                    store=SecurityApprovalStore(
+                        sqlite_path=Path(security.sandbox.sqlite_path)
+                    ),
+                    prompt=security_prompt,
+                    sandbox=security.sandbox,
+                ),
+                runner=DockerPluginRunner(sandbox=security.sandbox),
+            ),
+        )
         executors = (
             LlmOrchestrationExecutor(llm_backend),
-            ToolDispatchExecutor(tools=tools),
+            ToolDispatchExecutor(providers=providers),
         )
         invoker = SkillInvoker(executors=executors)
         return CommandRegistry(

@@ -12,6 +12,8 @@ from lily.config.global_config import (
     GlobalConfigError,
     LilyGlobalConfig,
     MemoryToolingSettings,
+    SecuritySettings,
+    SkillSandboxSettings,
     load_global_config,
 )
 
@@ -27,5 +29,7 @@ __all__ = [
     "GlobalConfigError",
     "LilyGlobalConfig",
     "MemoryToolingSettings",
+    "SecuritySettings",
+    "SkillSandboxSettings",
     "load_global_config",
 ]
