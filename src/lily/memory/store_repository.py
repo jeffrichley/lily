@@ -28,6 +28,9 @@ from lily.policy import evaluate_memory_write
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+_SEARCH_PAGE_SIZE = 500
+_NAMESPACE_PAGE_SIZE = 200
+
 
 class _SqliteStoreBackedRepository:
     """Internal store adapter for one deterministic memory domain."""
@@ -68,26 +71,36 @@ class _SqliteStoreBackedRepository:
         key = _fingerprint(namespace, content)
         ns_path = _namespace_path(self._store, namespace)
         now = datetime.now(UTC)
-        with self._open_store() as store:
-            existing = store.get(ns_path, key)
-            if existing is not None:
-                existing_record = self._to_record(existing.value)
-                updated = existing_record.model_copy(
-                    update=memory_update_fields(request=request, updated_at=now)
-                )
-                store.put(ns_path, key, updated.model_dump(mode="json"), index=False)
-                return updated
+        try:
+            with self._open_store() as store:
+                existing = store.get(ns_path, key)
+                if existing is not None:
+                    existing_record = self._to_record(existing.value)
+                    updated = existing_record.model_copy(
+                        update=memory_update_fields(request=request, updated_at=now)
+                    )
+                    store.put(
+                        ns_path, key, updated.model_dump(mode="json"), index=False
+                    )
+                    return updated
 
-            created = create_memory_record(
-                store=self._store,
-                namespace=namespace,
-                content=content,
-                request=request,
-                now=now,
-                record_id=f"mem_{uuid4().hex}",
-            )
-            store.put(ns_path, key, created.model_dump(mode="json"), index=False)
-            return created
+                created = create_memory_record(
+                    store=self._store,
+                    namespace=namespace,
+                    content=content,
+                    request=request,
+                    now=now,
+                    record_id=f"mem_{uuid4().hex}",
+                )
+                store.put(ns_path, key, created.model_dump(mode="json"), index=False)
+                return created
+        except MemoryError:
+            raise
+        except Exception as exc:  # pragma: no cover - backend defensive
+            raise MemoryError(
+                MemoryErrorCode.STORE_UNAVAILABLE,
+                f"Memory store '{self._store.value}' is unavailable.",
+            ) from exc
 
     def forget(self, memory_id: str) -> None:
         """Delete one memory record by id.
@@ -101,15 +114,25 @@ class _SqliteStoreBackedRepository:
         normalized = memory_id.strip()
         if not normalized:
             raise MemoryError(MemoryErrorCode.INVALID_INPUT, "Memory id is required.")
-        with self._open_store() as store:
-            for namespace in store.list_namespaces(prefix=_domain_prefix(self._store)):
-                items = store.search(namespace, query=None, limit=1000)
-                for item in items:
-                    record = self._to_record(item.value)
-                    if record.id != normalized:
-                        continue
-                    store.delete(namespace, item.key)
-                    return
+        try:
+            with self._open_store() as store:
+                for namespace in _list_all_namespaces(
+                    store=store,
+                    prefix=_domain_prefix(self._store),
+                ):
+                    for item in _search_all(store=store, namespace=namespace):
+                        record = self._to_record(item.value)
+                        if record.id != normalized:
+                            continue
+                        store.delete(namespace, item.key)
+                        return
+        except MemoryError:
+            raise
+        except Exception as exc:  # pragma: no cover - backend defensive
+            raise MemoryError(
+                MemoryErrorCode.STORE_UNAVAILABLE,
+                f"Memory store '{self._store.value}' is unavailable.",
+            ) from exc
         raise MemoryError(
             MemoryErrorCode.NOT_FOUND,
             f"Memory record '{normalized}' was not found.",
@@ -123,9 +146,20 @@ class _SqliteStoreBackedRepository:
 
         Returns:
             Ordered matching memory records.
+
+        Raises:
+            MemoryError: If backend query execution fails.
         """
         namespace = query.namespace.strip() if query.namespace is not None else None
-        matches = self._load_matches(namespace=namespace)
+        try:
+            matches = self._load_matches(namespace=namespace)
+        except MemoryError:
+            raise
+        except Exception as exc:  # pragma: no cover - backend defensive
+            raise MemoryError(
+                MemoryErrorCode.STORE_UNAVAILABLE,
+                f"Memory store '{self._store.value}' is unavailable.",
+            ) from exc
         records = [self._to_record(item.value) for item in matches]
         filtered = [
             record
@@ -147,12 +181,9 @@ class _SqliteStoreBackedRepository:
         with self._open_store() as store:
             if namespace is None:
                 return _scan_prefix(store=store, prefix=_domain_prefix(self._store))
-            return tuple(
-                store.search(
-                    _namespace_path(self._store, namespace),
-                    query=None,
-                    limit=1000,
-                )
+            return _search_all(
+                store=store,
+                namespace=_namespace_path(self._store, namespace),
             )
 
     @contextmanager
@@ -316,8 +347,8 @@ def _scan_prefix(
         Flat tuple of search items under prefix.
     """
     items: list[SearchItem] = []
-    for namespace in store.list_namespaces(prefix=prefix):
-        items.extend(store.search(namespace, query=None, limit=1000))
+    for namespace in _list_all_namespaces(store=store, prefix=prefix):
+        items.extend(_search_all(store=store, namespace=namespace))
     return tuple(items)
 
 
@@ -371,10 +402,11 @@ def _namespace_path(store: MemoryStore, namespace: str) -> tuple[str, ...]:
     Returns:
         Full namespace tuple.
     """
-    cleaned = namespace.strip()
+    segments = tuple(segment for segment in namespace.strip().split("/") if segment)
+    cleaned = segments or ("default",)
     if store == MemoryStore.PERSONALITY:
-        return ("memory", "personality", cleaned)
-    return ("memory", "task", cleaned)
+        return ("memory", "personality", *cleaned)
+    return ("memory", "task", *cleaned)
 
 
 def _fingerprint(namespace: str, content: str) -> str:
@@ -389,3 +421,64 @@ def _fingerprint(namespace: str, content: str) -> str:
     """
     value = f"{namespace.strip().lower()}::{content.strip().lower()}".encode()
     return hashlib.sha256(value).hexdigest()
+
+
+def _list_all_namespaces(
+    *,
+    store: SqliteStore,
+    prefix: tuple[str, ...],
+) -> tuple[tuple[str, ...], ...]:
+    """List all namespaces under prefix with deterministic pagination.
+
+    Args:
+        store: Open sqlite store.
+        prefix: Namespace prefix.
+
+    Returns:
+        All matching namespaces.
+    """
+    offset = 0
+    namespaces: list[tuple[str, ...]] = []
+    while True:
+        page = store.list_namespaces(
+            prefix=prefix,
+            limit=_NAMESPACE_PAGE_SIZE,
+            offset=offset,
+        )
+        if not page:
+            return tuple(namespaces)
+        namespaces.extend(page)
+        if len(page) < _NAMESPACE_PAGE_SIZE:
+            return tuple(namespaces)
+        offset += _NAMESPACE_PAGE_SIZE
+
+
+def _search_all(
+    *,
+    store: SqliteStore,
+    namespace: tuple[str, ...],
+) -> tuple[SearchItem, ...]:
+    """Search full namespace with deterministic pagination.
+
+    Args:
+        store: Open sqlite store.
+        namespace: Concrete namespace path.
+
+    Returns:
+        All records found in namespace.
+    """
+    offset = 0
+    items: list[SearchItem] = []
+    while True:
+        page = store.search(
+            namespace,
+            query=None,
+            limit=_SEARCH_PAGE_SIZE,
+            offset=offset,
+        )
+        if not page:
+            return tuple(items)
+        items.extend(page)
+        if len(page) < _SEARCH_PAGE_SIZE:
+            return tuple(items)
+        offset += _SEARCH_PAGE_SIZE

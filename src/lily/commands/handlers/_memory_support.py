@@ -94,7 +94,8 @@ def build_personality_namespace(*, session: Session, domain: str) -> str:
         Deterministic namespace token.
     """
     persona = session.active_agent.strip() or "default"
-    return f"{domain}:{persona}"
+    scope = _memory_owner_scope(session)
+    return "/".join((domain, scope, f"persona:{persona}"))
 
 
 def build_task_namespace(*, task: str) -> str:
@@ -106,4 +107,23 @@ def build_task_namespace(*, task: str) -> str:
     Returns:
         Deterministic namespace token.
     """
-    return task.strip()
+    cleaned = task.strip() or "default"
+    return "/".join(("task_memory", f"task:{cleaned}"))
+
+
+def _memory_owner_scope(session: Session) -> str:
+    """Build deterministic memory owner scope token.
+
+    Args:
+        session: Active session.
+
+    Returns:
+        Scope token preferring configured user scope, then workspace scope.
+    """
+    config = session.skill_snapshot_config
+    if config is None:
+        return "workspace:default"
+    if config.user_dir is not None:
+        return f"user:{config.user_dir.name or 'default'}"
+    workspace_name = config.workspace_dir.name or "default"
+    return f"workspace:{workspace_name}"

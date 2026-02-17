@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from _pytest.monkeypatch import MonkeyPatch
+
 from lily.memory import (
     FileBackedPersonalityMemoryRepository,
     MemoryError,
@@ -12,6 +14,7 @@ from lily.memory import (
     MemoryWriteRequest,
     StoreBackedPersonalityMemoryRepository,
     StoreBackedTaskMemoryRepository,
+    store_repository,
 )
 
 
@@ -96,3 +99,34 @@ def test_store_policy_denied_matches_file_behavior(tmp_path: Path) -> None:
             assert exc.code == MemoryErrorCode.POLICY_DENIED
         else:  # pragma: no cover - defensive assertion
             raise AssertionError("Expected MemoryError")
+
+
+def test_store_query_and_forget_paginate_across_large_namespace_set(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Query/forget should traverse full dataset beyond one backend page."""
+    monkeypatch.setattr(store_repository, "_SEARCH_PAGE_SIZE", 2)
+    monkeypatch.setattr(store_repository, "_NAMESPACE_PAGE_SIZE", 1)
+    repo = StoreBackedPersonalityMemoryRepository(
+        store_file=tmp_path / "memory" / "store.sqlite"
+    )
+
+    target_id = ""
+    for index in range(7):
+        record = repo.remember(
+            MemoryWriteRequest(
+                namespace=f"user_profile/lane-{index % 3}/persona:lily",
+                content=f"Fact {index}",
+            )
+        )
+        if index == 6:
+            target_id = record.id
+
+    matches = repo.query(MemoryQuery(query="Fact", limit=20))
+    assert len(matches) == 7
+
+    repo.forget(target_id)
+    after = repo.query(MemoryQuery(query="Fact", limit=20))
+    assert len(after) == 6
+    assert all(record.id != target_id for record in after)

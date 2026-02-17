@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from lily.memory import MemoryWriteRequest, StoreBackedPersonalityMemoryRepository
 from lily.persona import FilePersonaRepository
 from lily.runtime.conversation import ConversationRequest, ConversationResponse
 from lily.runtime.facade import RuntimeFacade
@@ -587,3 +588,56 @@ def test_memory_command_family_long_short_and_evidence_paths(tmp_path: Path) -> 
     evidence_show = runtime.handle_input("/memory evidence show", session)
     assert evidence_show.status.value == "ok"
     assert evidence_show.code == "memory_evidence_unavailable"
+
+
+def test_memory_long_show_domain_isolation(tmp_path: Path) -> None:
+    """`/memory long show --domain` should isolate personality subdomains."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade()
+
+    store_file = workspace_dir.parent / "memory" / "langgraph_store.sqlite"
+    repository = StoreBackedPersonalityMemoryRepository(store_file=store_file)
+    repository.remember(
+        MemoryWriteRequest(
+            namespace="persona_core/workspace:workspace/persona:lily",
+            content="Core directive only",
+        )
+    )
+    repository.remember(
+        MemoryWriteRequest(
+            namespace="working_rules/workspace:workspace/persona:lily",
+            content="Working rule only",
+        )
+    )
+    repository.remember(
+        MemoryWriteRequest(
+            namespace="user_profile/workspace:workspace/persona:lily",
+            content="Profile data only",
+        )
+    )
+
+    core = runtime.handle_input("/memory long show --domain persona_core", session)
+    rules = runtime.handle_input("/memory long show --domain working_rules", session)
+    profile = runtime.handle_input("/memory long show --domain user_profile", session)
+
+    assert core.status.value == "ok"
+    assert "Core directive only" in core.message
+    assert "Working rule only" not in core.message
+    assert "Profile data only" not in core.message
+    assert rules.status.value == "ok"
+    assert "Working rule only" in rules.message
+    assert "Core directive only" not in rules.message
+    assert profile.status.value == "ok"
+    assert "Profile data only" in profile.message
+    assert "Core directive only" not in profile.message
