@@ -1,25 +1,15 @@
-# Lily Punchlist (Archived)
+---
+owner: "@team"
+last_updated: "2026-02-17"
+status: "reference"
+source_of_truth: false
+---
 
-Purpose: preserve the original v0 hardening checklist for historical context.
+# Punchlist Pointer
 
-Status:
-- Core punchlist work is complete.
-- Open follow-on items moved to canonical trackers to avoid duplicate status drift.
+This tracker is archived and no longer updated.
 
-Canonical trackers:
-- Active debt: `docs/dev/debt_tracker.md`
-- Memory migration phases/history: `docs/dev/memory_execution_plan.md`
-- Feature prioritization and user-story direction: `docs/dev/roadmap.md`
-
-Archived completion summary:
-- Removed prototype hardcoding.
-- Implemented real `tool_dispatch`.
-- Expanded command surface (`/reload_skills`, `/help`, aliases).
-- Standardized deterministic command envelope.
-- Added session persistence + reload semantics.
-- Added per-session execution serialization.
-- Added reliability coverage (restart/snapshot/concurrency).
-
-Former open items now tracked in debt:
-- Typed skill/tool contracts.
-- Real `/agent <name>` once agent subsystem exists.
+- Historical record: `docs/archive/dev/punchlist.md`
+- Active debt tracking: `docs/dev/debt_tracker.md`
+- Current roadmap priorities: `docs/dev/roadmap.md`
+- Live execution status: `docs/dev/status.md`

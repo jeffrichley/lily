@@ -22,12 +22,14 @@ Use these files as the only source of truth for each concern:
 | Personality domain phase execution status | `docs/dev/personality_execution_plan.md` |
 | Process and workflow rules | `docs/process/process.md` |
 | This docs governance rollout plan | `docs/dev/docs_organization_plan.md` |
+| Historical docs index | `docs/archive/README.md` |
 
 ## Promotion Rules
 
 - `ideas/` is incubation only; no active status lives there.
 - A document becomes active only when linked from this file.
 - Completed phase reports and obsolete trackers move to `docs/archive/` with a short pointer note.
+- Pointer stubs may remain at the original path, but must clearly link to archived location and canonical active docs.
 
 ## Frontmatter Standard
 

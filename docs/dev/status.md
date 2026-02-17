@@ -16,24 +16,37 @@ Update cadence:
 
 ## Snapshot
 
-- Week of: `YYYY-MM-DD`
-- Editor: `@handle`
+- Week of: `2026-02-17`
+- Editor: `@team`
 
 ## Done This Week
 
-- [ ] Item with link to PR/plan/debt resolution.
+- [x] Phase 1 docs governance delivered and committed (`41871ac`).
+- [x] Canonical map and frontmatter contract established (`docs/README.md`).
 
 ## In Progress
 
-- [ ] Item, owner, and expected completion date.
+- [ ] Phase 2 docs consolidation and archive migration, owner `@team`, target `2026-02-17`.
 
 ## Next Up
 
-- [ ] Item queued to start after current in-progress work.
+- [ ] Phase 3 operating cadence rules (weekly ritual + PR docs-impact checks).
 
 ## Blockers and Risks
 
-- [ ] Blocker or risk, impact, owner, mitigation/next action.
+- [ ] No active blockers.
+- [ ] Risk: stale status updates could reintroduce drift.
+  Mitigation: keep this page as the only weekly status source and enforce update cadence.
+
+## Active Work Traceability
+
+| Work item | Type | Canonical trace |
+|---|---|---|
+| Docs governance rollout | Internal engineering task | `docs/dev/docs_organization_plan.md` |
+| Typed skill/tool contracts | Internal engineering task | `docs/dev/debt_tracker.md` |
+| Memory migration scope/status | User-visible + internal | `docs/dev/memory_execution_plan.md` |
+| Personality subsystem scope/status | User-visible + internal | `docs/dev/personality_execution_plan.md` |
+| Feature priority order | User-visible features + internal engineering tasks | `docs/dev/roadmap.md` |
 
 ## Canonical Links
 
@@ -41,3 +54,4 @@ Update cadence:
 - Debt tracker: `docs/dev/debt_tracker.md`
 - Memory execution plan: `docs/dev/memory_execution_plan.md`
 - Personality execution plan: `docs/dev/personality_execution_plan.md`
+- Archive index: `docs/archive/README.md`

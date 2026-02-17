@@ -28,16 +28,16 @@ Purpose: establish a lean docs operating system with clear ownership and minimal
 ## Phase 2: Consolidate Current State
 
 `Acceptance criteria`
-- [ ] Active work is traceable from `docs/dev/status.md` to execution plan and roadmap/debt.
-- [ ] Outdated status trackers are moved to `docs/archive/` with pointer stubs.
-- [ ] `docs/dev/roadmap.md` retains explicit split between user-visible and internal engineering work.
+- [x] Active work is traceable from `docs/dev/status.md` to execution plan and roadmap/debt.
+- [x] Outdated status trackers are moved to `docs/archive/` with pointer stubs.
+- [x] `docs/dev/roadmap.md` retains explicit split between user-visible and internal engineering work.
 
 `Non-goals`
 - No change to feature priority values unless explicitly requested.
 
 `Required tests and gates`
-- [ ] Three random work items are traceable to a canonical source in under 30 seconds.
-- [ ] Archived docs do not present themselves as active status sources.
+- [x] Three random work items are traceable to a canonical source in under 30 seconds.
+- [x] Archived docs do not present themselves as active status sources.
 
 ## Phase 3: Operating Cadence
 
