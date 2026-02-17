@@ -3,6 +3,8 @@
 from lily.config.global_config import (
     CheckpointerBackend,
     CheckpointerSettings,
+    ConsolidationBackend,
+    ConsolidationSettings,
     GlobalConfigError,
     LilyGlobalConfig,
     MemoryToolingSettings,
@@ -12,6 +14,8 @@ from lily.config.global_config import (
 __all__ = [
     "CheckpointerBackend",
     "CheckpointerSettings",
+    "ConsolidationBackend",
+    "ConsolidationSettings",
     "GlobalConfigError",
     "LilyGlobalConfig",
     "MemoryToolingSettings",

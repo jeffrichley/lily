@@ -36,6 +36,23 @@ class MemoryToolingSettings(BaseModel):
     auto_apply: bool = False
 
 
+class ConsolidationBackend(StrEnum):
+    """Supported consolidation backend identifiers."""
+
+    RULE_BASED = "rule_based"
+    LANGMEM_MANAGER = "langmem_manager"
+
+
+class ConsolidationSettings(BaseModel):
+    """Global memory consolidation feature flags."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    backend: ConsolidationBackend = ConsolidationBackend.RULE_BASED
+    llm_assisted_enabled: bool = False
+
+
 class LilyGlobalConfig(BaseModel):
     """Root global Lily configuration model."""
 
@@ -43,6 +60,7 @@ class LilyGlobalConfig(BaseModel):
 
     checkpointer: CheckpointerSettings = CheckpointerSettings()
     memory_tooling: MemoryToolingSettings = MemoryToolingSettings()
+    consolidation: ConsolidationSettings = ConsolidationSettings()
 
 
 class GlobalConfigError(RuntimeError):

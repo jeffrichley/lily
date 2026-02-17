@@ -18,6 +18,7 @@ from rich.table import Table
 
 from lily.commands.types import CommandResult, CommandStatus
 from lily.config import GlobalConfigError, LilyGlobalConfig, load_global_config
+from lily.memory import ConsolidationBackend as MemoryConsolidationBackend
 from lily.runtime.checkpointing import CheckpointerBuildError, build_checkpointer
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
@@ -226,6 +227,11 @@ def _build_runtime_for_workspace(
         conversation_checkpointer=result.saver,
         memory_tooling_enabled=config.memory_tooling.enabled,
         memory_tooling_auto_apply=config.memory_tooling.auto_apply,
+        consolidation_enabled=config.consolidation.enabled,
+        consolidation_backend=MemoryConsolidationBackend(
+            config.consolidation.backend.value
+        ),
+        consolidation_llm_assisted_enabled=config.consolidation.llm_assisted_enabled,
     )
 
 

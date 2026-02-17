@@ -1,5 +1,12 @@
 """Split memory repositories and models."""
 
+from lily.memory.consolidation import (
+    ConsolidationBackend,
+    ConsolidationRequest,
+    ConsolidationResult,
+    LangMemManagerConsolidationEngine,
+    RuleBasedConsolidationEngine,
+)
 from lily.memory.file_repository import (
     FileBackedPersonalityMemoryRepository,
     FileBackedTaskMemoryRepository,
@@ -22,8 +29,12 @@ from lily.memory.store_repository import (
 )
 
 __all__ = [
+    "ConsolidationBackend",
+    "ConsolidationRequest",
+    "ConsolidationResult",
     "FileBackedPersonalityMemoryRepository",
     "FileBackedTaskMemoryRepository",
+    "LangMemManagerConsolidationEngine",
     "LangMemToolingAdapter",
     "MemoryError",
     "MemoryErrorCode",
@@ -35,6 +46,7 @@ __all__ = [
     "PersonalityMemoryRepository",
     "PromptMemoryRetrievalService",
     "RetrievalPolicy",
+    "RuleBasedConsolidationEngine",
     "StoreBackedPersonalityMemoryRepository",
     "StoreBackedTaskMemoryRepository",
     "TaskMemoryRepository",

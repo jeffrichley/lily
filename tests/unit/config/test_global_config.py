@@ -6,6 +6,7 @@ from pathlib import Path
 
 from lily.config import (
     CheckpointerBackend,
+    ConsolidationBackend,
     GlobalConfigError,
     load_global_config,
 )
@@ -19,6 +20,9 @@ def test_load_global_config_defaults_when_missing(tmp_path: Path) -> None:
     assert config.checkpointer.sqlite_path == ".lily/checkpoints/checkpointer.sqlite"
     assert config.memory_tooling.enabled is False
     assert config.memory_tooling.auto_apply is False
+    assert config.consolidation.enabled is False
+    assert config.consolidation.backend == ConsolidationBackend.RULE_BASED
+    assert config.consolidation.llm_assisted_enabled is False
 
 
 def test_load_global_config_reads_custom_backend(tmp_path: Path) -> None:
@@ -82,3 +86,23 @@ def test_load_global_config_reads_memory_tooling_flags(tmp_path: Path) -> None:
 
     assert config.memory_tooling.enabled is True
     assert config.memory_tooling.auto_apply is True
+
+
+def test_load_global_config_reads_consolidation_flags(tmp_path: Path) -> None:
+    """Config loader should parse consolidation flags and backend mode."""
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        (
+            "{"
+            '"consolidation":{"enabled":true,"backend":"langmem_manager","llm_assisted_enabled":true},'
+            '"checkpointer":{"backend":"sqlite","sqlite_path":".lily/checkpoints/checkpointer.sqlite"}'
+            "}"
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_global_config(config_path)
+
+    assert config.consolidation.enabled is True
+    assert config.consolidation.backend == ConsolidationBackend.LANGMEM_MANAGER
+    assert config.consolidation.llm_assisted_enabled is True

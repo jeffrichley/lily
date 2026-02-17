@@ -32,6 +32,8 @@ def memory_update_fields(
         "session_id": request.session_id,
         "status": request.status,
         "expires_at": request.expires_at,
+        "last_verified": request.last_verified,
+        "conflict_group": request.conflict_group,
     }
 
 
@@ -73,6 +75,8 @@ def create_memory_record(  # noqa: PLR0913
         "session_id": request.session_id,
         "status": request.status,
         "expires_at": request.expires_at,
+        "last_verified": request.last_verified,
+        "conflict_group": request.conflict_group,
     }
     if record_id is not None:
         payload["id"] = record_id

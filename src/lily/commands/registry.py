@@ -15,6 +15,7 @@ from lily.commands.handlers.skills_list import SkillsListCommand
 from lily.commands.handlers.style import StyleCommand
 from lily.commands.parser import CommandCall
 from lily.commands.types import CommandHandler, CommandResult
+from lily.memory import ConsolidationBackend
 from lily.persona import FilePersonaRepository, default_persona_root
 from lily.runtime.skill_invoker import SkillInvoker
 from lily.session.models import Session
@@ -24,13 +25,16 @@ from lily.skills.types import SkillEntry
 class CommandRegistry:
     """Deterministic command handler registry."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
         skill_invoker: SkillInvoker,
         persona_repository: FilePersonaRepository | None = None,
         memory_tooling_enabled: bool = False,
         memory_tooling_auto_apply: bool = False,
+        consolidation_enabled: bool = False,
+        consolidation_backend: ConsolidationBackend = ConsolidationBackend.RULE_BASED,
+        consolidation_llm_assisted_enabled: bool = False,
         handlers: dict[str, CommandHandler] | None = None,
     ) -> None:
         """Construct registry with built-in handlers plus optional overrides.
@@ -40,6 +44,9 @@ class CommandRegistry:
             persona_repository: Optional persona repository for `/persona` commands.
             memory_tooling_enabled: Whether memory LangMem tool routes are enabled.
             memory_tooling_auto_apply: Whether standard memory routes auto-use tools.
+            consolidation_enabled: Whether consolidation pipeline is enabled.
+            consolidation_backend: Consolidation backend selection.
+            consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
             handlers: Optional custom handlers keyed by command name.
         """
         self._skill_invoker = skill_invoker
@@ -60,6 +67,9 @@ class CommandRegistry:
             "memory": MemoryCommand(
                 tooling_enabled=memory_tooling_enabled,
                 tooling_auto_apply=memory_tooling_auto_apply,
+                consolidation_enabled=consolidation_enabled,
+                consolidation_backend=consolidation_backend,
+                consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
             ),
         }
         if handlers:

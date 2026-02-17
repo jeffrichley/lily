@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lily.memory import MemoryWriteRequest, StoreBackedPersonalityMemoryRepository
+from lily.memory import (
+    ConsolidationBackend,
+    MemoryWriteRequest,
+    StoreBackedPersonalityMemoryRepository,
+)
 from lily.persona import FilePersonaRepository
 from lily.runtime.conversation import ConversationRequest, ConversationResponse
 from lily.runtime.facade import RuntimeFacade
 from lily.session.factory import SessionFactory, SessionFactoryConfig
-from lily.session.models import ModelConfig, Session
+from lily.session.models import Message, MessageRole, ModelConfig, Session
 from lily.skills.types import InvocationMode, SkillEntry, SkillSnapshot, SkillSource
 
 
@@ -788,3 +792,92 @@ def test_memory_tooling_auto_apply_switches_standard_show_route(tmp_path: Path) 
     assert shown.code == "memory_langmem_listed"
     assert shown.data is not None
     assert shown.data.get("route") == "langmem_search_tool"
+
+
+def test_memory_long_consolidate_disabled_by_default(tmp_path: Path) -> None:
+    """Consolidation command should fail deterministically when disabled."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    runtime = RuntimeFacade(consolidation_enabled=False)
+
+    result = runtime.handle_input("/memory long consolidate", session)
+
+    assert result.status.value == "error"
+    assert result.code == "memory_consolidation_disabled"
+
+
+def test_memory_long_consolidate_rule_based_writes_candidates(tmp_path: Path) -> None:
+    """Rule-based consolidation should infer and persist candidate memories."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    session.conversation_state.append(
+        Message(role=MessageRole.USER, content="My favorite number is 42")
+    )
+    runtime = RuntimeFacade(consolidation_enabled=True)
+
+    consolidated = runtime.handle_input("/memory long consolidate", session)
+    shown = runtime.handle_input(
+        "/memory long show --domain user_profile favorite", session
+    )
+
+    assert consolidated.status.value == "ok"
+    assert consolidated.code == "memory_consolidation_ran"
+    assert shown.status.value == "ok"
+    assert "favorite number is 42" in shown.message
+
+
+def test_memory_long_consolidate_langmem_manager_backend(tmp_path: Path) -> None:
+    """LangMem-manager consolidation backend should write deterministic memories."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            reserved_commands={"memory"},
+        )
+    )
+    session = factory.create(active_agent="lily")
+    session.conversation_state.append(
+        Message(role=MessageRole.USER, content="My name is Jeff")
+    )
+    runtime = RuntimeFacade(
+        consolidation_enabled=True,
+        consolidation_backend=ConsolidationBackend.LANGMEM_MANAGER,
+        memory_tooling_enabled=True,
+    )
+
+    consolidated = runtime.handle_input("/memory long consolidate", session)
+    shown = runtime.handle_input(
+        "/memory long tool show --domain user_profile name",
+        session,
+    )
+
+    assert consolidated.status.value == "ok"
+    assert consolidated.data is not None
+    assert consolidated.data.get("backend") == "langmem_manager"
+    assert shown.status.value == "ok"
+    assert shown.code == "memory_langmem_listed"
+    assert "name is Jeff" in shown.message

@@ -229,9 +229,12 @@ Goal: add post-run memory consolidation and profile merging.
 - [ ] More coherent long-term profile/task memory over time (when enabled).
 
 `Internal engineering tasks`
-- [ ] Define consolidation input/output schema.
-- [ ] Implement deterministic rule-based extractor (phase 1).
-- [ ] Add optional LLM-assisted extractor (phase 2, guarded).
+- [x] Define consolidation input/output schema.
+- [x] Implement deterministic rule-based consolidation backend.
+- [x] Implement LangMem-manager consolidation backend.
+- [x] Add backend selection config (`consolidation.backend = rule_based|langmem_manager`).
+- [x] Add per-backend opt-in controls (`consolidation.enabled`, `consolidation.llm_assisted_enabled`).
+- [x] Add optional LLM-assisted extraction path (guarded, disabled by default).
 - [ ] Implement lifecycle/retention policy from spec:
   - [ ] `persona_core`: high stability, no expiry by default
   - [ ] `working_rules`: high stability, no expiry by default
@@ -243,10 +246,14 @@ Goal: add post-run memory consolidation and profile merging.
   - [ ] confidence updates controlled
   - [ ] stale/conflicting memory handling
 - [ ] Add scheduled/triggered execution path.
+  - [x] Triggered command path (`/memory long consolidate [--dry-run]`).
+  - [ ] Scheduled/background runner.
 
 `Acceptance criteria`
-- [ ] Consolidation produces stable, auditable profile updates.
+- [x] Consolidation produces stable, auditable profile updates.
 - [ ] No uncontrolled writes without explicit configuration.
+- [x] Rule-based and LangMem-manager backends can each be enabled/disabled by config.
+- [x] Backend selection is deterministic and explicit in runtime metadata/logging.
 - [ ] Expired/archived task memory is excluded from default retrieval unless explicitly requested.
 - [ ] `last_verified` is updated only on explicit confirmation events.
 - [ ] Lifecycle processing performs no automatic hard deletion.
@@ -257,9 +264,11 @@ Goal: add post-run memory consolidation and profile merging.
 - No automatic hard-deletion behavior from lifecycle processing.
 
 `Required tests and gates`
-- [ ] Consolidation determinism tests.
+- [x] Consolidation determinism tests.
 - [ ] Provenance/conflict resolution tests.
 - [ ] Configuration guard tests (disabled means no writes).
+- [x] Backend selection tests (`rule_based` vs `langmem_manager`).
+- [x] Per-backend opt-in/out behavior tests.
 - [ ] Lifecycle policy tests (expiry/archive/reverification behavior, no-delete guarantee).
 
 ---
@@ -391,3 +400,4 @@ Goal: replace custom rule-based history compaction with LangGraph-native state/c
 - 2026-02-16: Phase 2 completed. Added store-backed memory repositories, repository-interface command wiring, compatibility command aliases, and initial `/memory short|long|evidence` command-family rollout with parity/isolation tests.
 - 2026-02-17: Phase 3 completed. Added repository-backed retrieval service, deterministic ranking and memory-summary prompt injection, and deterministic context compaction with long-transcript tests.
 - 2026-02-17: Phase 4 completed. Added controlled LangMem manage/search tool routes, global opt-in tooling flags (`enabled`, `auto_apply`), deterministic envelope adapters for tool outputs, and policy/flag regression tests.
+- 2026-02-17: Phase 5 started. Added dual-backend consolidation pipeline (`rule_based` + `langmem_manager`), opt-in backend/config toggles, triggered command path (`/memory long consolidate [--dry-run]`), and deterministic backend selection/behavior tests.

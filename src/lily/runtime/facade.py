@@ -16,7 +16,7 @@ from lily.commands.handlers._memory_support import (
 from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
-from lily.memory import PromptMemoryRetrievalService
+from lily.memory import ConsolidationBackend, PromptMemoryRetrievalService
 from lily.persona import FilePersonaRepository, PersonaProfile, default_persona_root
 from lily.prompting import PersonaContext, PersonaStyleLevel, PromptMode
 from lily.runtime.conversation import (
@@ -61,6 +61,9 @@ class RuntimeFacade:
         conversation_checkpointer: BaseCheckpointSaver | None = None,
         memory_tooling_enabled: bool = False,
         memory_tooling_auto_apply: bool = False,
+        consolidation_enabled: bool = False,
+        consolidation_backend: ConsolidationBackend = ConsolidationBackend.RULE_BASED,
+        consolidation_llm_assisted_enabled: bool = False,
     ) -> None:
         """Create facade with command and conversation dependencies.
 
@@ -72,6 +75,9 @@ class RuntimeFacade:
                 executor wiring.
             memory_tooling_enabled: Whether LangMem command routes are enabled.
             memory_tooling_auto_apply: Whether standard memory routes auto-use tools.
+            consolidation_enabled: Whether consolidation pipeline is enabled.
+            consolidation_backend: Consolidation backend selection.
+            consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
         """
         self._persona_repository = persona_repository or FilePersonaRepository(
             root_dir=default_persona_root()
@@ -79,6 +85,9 @@ class RuntimeFacade:
         self._command_registry = command_registry or self._build_default_registry(
             memory_tooling_enabled=memory_tooling_enabled,
             memory_tooling_auto_apply=memory_tooling_auto_apply,
+            consolidation_enabled=consolidation_enabled,
+            consolidation_backend=consolidation_backend,
+            consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
         )
         self._conversation_executor = (
             conversation_executor
@@ -245,12 +254,18 @@ class RuntimeFacade:
         *,
         memory_tooling_enabled: bool,
         memory_tooling_auto_apply: bool,
+        consolidation_enabled: bool,
+        consolidation_backend: ConsolidationBackend,
+        consolidation_llm_assisted_enabled: bool,
     ) -> CommandRegistry:
         """Construct default command registry with hidden LLM backend wiring.
 
         Args:
             memory_tooling_enabled: Whether LangMem command routes are enabled.
             memory_tooling_auto_apply: Whether standard memory routes auto-use tools.
+            consolidation_enabled: Whether consolidation pipeline is enabled.
+            consolidation_backend: Consolidation backend selection.
+            consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
 
         Returns:
             Command registry with invoker and executor dependencies.
@@ -274,6 +289,9 @@ class RuntimeFacade:
             persona_repository=self._persona_repository,
             memory_tooling_enabled=memory_tooling_enabled,
             memory_tooling_auto_apply=memory_tooling_auto_apply,
+            consolidation_enabled=consolidation_enabled,
+            consolidation_backend=consolidation_backend,
+            consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
         )
 
     @staticmethod

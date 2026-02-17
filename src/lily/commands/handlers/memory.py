@@ -14,10 +14,15 @@ from lily.commands.handlers._memory_support import (
 from lily.commands.parser import CommandCall
 from lily.commands.types import CommandResult
 from lily.memory import (
+    ConsolidationBackend,
+    ConsolidationRequest,
+    ConsolidationResult,
+    LangMemManagerConsolidationEngine,
     MemoryError,
     MemoryQuery,
     MemoryRecord,
     PersonalityMemoryRepository,
+    RuleBasedConsolidationEngine,
     TaskMemoryRepository,
 )
 from lily.memory.langmem_tools import LangMemToolingAdapter
@@ -34,15 +39,24 @@ class MemoryCommand:
         *,
         tooling_enabled: bool = False,
         tooling_auto_apply: bool = False,
+        consolidation_enabled: bool = False,
+        consolidation_backend: ConsolidationBackend = ConsolidationBackend.RULE_BASED,
+        consolidation_llm_assisted_enabled: bool = False,
     ) -> None:
         """Create memory command handler.
 
         Args:
             tooling_enabled: Whether LangMem tooling routes are enabled.
             tooling_auto_apply: Whether standard long-show paths use LangMem search.
+            consolidation_enabled: Whether consolidation pipeline is enabled.
+            consolidation_backend: Consolidation backend selection.
+            consolidation_llm_assisted_enabled: LLM-assisted path toggle.
         """
         self._tooling_enabled = tooling_enabled
         self._tooling_auto_apply = tooling_auto_apply
+        self._consolidation_enabled = consolidation_enabled
+        self._consolidation_backend = consolidation_backend
+        self._consolidation_llm_assisted_enabled = consolidation_llm_assisted_enabled
 
     def execute(self, call: CommandCall, session: Session) -> CommandResult:
         """Execute `/memory ...` command family.
@@ -151,7 +165,7 @@ class MemoryCommand:
         """
         if not args:
             return CommandResult.error(
-                "Error: /memory long requires subcommand show|task|tool.",
+                "Error: /memory long requires subcommand show|task|tool|consolidate.",
                 code="invalid_args",
                 data={"command": "memory", "subcommand": "long"},
             )
@@ -162,11 +176,61 @@ class MemoryCommand:
             return self._run_long_task(session=session, args=args[1:])
         if head == "tool":
             return self._run_long_tool(session=session, args=args[1:])
+        if head == "consolidate":
+            return self._run_long_consolidate(session=session, args=args[1:])
         return CommandResult.error(
             f"Error: unsupported /memory long subcommand '{head}'.",
             code="invalid_args",
             data={"command": "memory", "subcommand": "long"},
         )
+
+    def _run_long_consolidate(
+        self,
+        *,
+        session: Session,
+        args: tuple[str, ...],
+    ) -> CommandResult:
+        """Execute `/memory long consolidate [--dry-run]`.
+
+        Args:
+            session: Active session.
+            args: Consolidation args.
+
+        Returns:
+            Deterministic command result.
+        """
+        dry_run = "--dry-run" in args
+        namespace = build_personality_namespace(session=session, domain="user_profile")
+        request = ConsolidationRequest(
+            session_id=session.session_id,
+            history=tuple(session.conversation_state),
+            personality_namespace=namespace,
+            enabled=self._consolidation_enabled,
+            backend=self._consolidation_backend,
+            llm_assisted_enabled=self._consolidation_llm_assisted_enabled,
+            dry_run=dry_run,
+        )
+        if self._consolidation_backend == ConsolidationBackend.RULE_BASED:
+            repository = build_personality_repository(session)
+            if repository is None:
+                return CommandResult.error(
+                    "Error: memory consolidation is unavailable for this session.",
+                    code="memory_unavailable",
+                )
+            result = RuleBasedConsolidationEngine(
+                personality_repository=repository
+            ).run(request)
+            return self._render_consolidation_result(result)
+        store_file = resolve_store_file(session)
+        if store_file is None:
+            return CommandResult.error(
+                "Error: memory consolidation is unavailable for this session.",
+                code="memory_unavailable",
+            )
+        result = LangMemManagerConsolidationEngine(
+            tooling_adapter=LangMemToolingAdapter(store_file=store_file)
+        ).run(request)
+        return self._render_consolidation_result(result)
 
     def _run_long_show(
         self,
@@ -748,6 +812,47 @@ class MemoryCommand:
                 "query": query,
                 "route": route,
                 "records": normalized,
+            },
+        )
+
+    @staticmethod
+    def _render_consolidation_result(result: ConsolidationResult) -> CommandResult:
+        """Render consolidation engine result into command envelope.
+
+        Args:
+            result: Consolidation result object.
+
+        Returns:
+            Deterministic command output.
+        """
+        status = result.status
+        backend = result.backend.value
+        proposed = result.proposed
+        written = result.written
+        skipped = result.skipped
+        notes = result.notes
+        records = result.records
+        if status == "disabled":
+            return CommandResult.error(
+                "Error: consolidation is disabled by config.",
+                code="memory_consolidation_disabled",
+                data={"backend": backend},
+            )
+        summary = (
+            f"Consolidation [{backend}] status={status} "
+            f"proposed={proposed} written={written} skipped={skipped}"
+        )
+        return CommandResult.ok(
+            summary,
+            code="memory_consolidation_ran",
+            data={
+                "backend": backend,
+                "status": status,
+                "proposed": proposed,
+                "written": written,
+                "skipped": skipped,
+                "notes": notes,
+                "records": records,
             },
         )
 
