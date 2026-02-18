@@ -17,14 +17,14 @@ Job scheduling/triggering is tracked separately in `docs/dev/jobs_execution_plan
 ## Phase B0: Blueprint Runtime Contract
 
 Phase checklist:
-- [ ] define `Blueprint` interface and registry contract
-- [ ] implement deterministic blueprint resolution by id
-- [ ] implement typed bindings/input/output schema contract hooks
-- [ ] add stable blueprint error mapping
-- [ ] add registry resolution unit tests
-- [ ] add bindings schema validation unit tests
-- [ ] add deterministic error envelope tests
-- [ ] pass `just quality-check`
+- [x] define `Blueprint` interface and registry contract
+- [x] implement deterministic blueprint resolution by id
+- [x] implement typed bindings/input/output schema contract hooks
+- [x] add stable blueprint error mapping
+- [x] add registry resolution unit tests
+- [x] add bindings schema validation unit tests
+- [x] add deterministic error envelope tests
+- [x] pass `just quality-check`
 
 User-visible features:
 - none (internal foundation).
@@ -116,7 +116,7 @@ Required tests and gates:
 
 ## Milestone Checklist
 
-- [ ] B0 complete
+- [x] B0 complete
 - [ ] B1 complete
 - [ ] B2 complete
 
@@ -124,3 +124,4 @@ Required tests and gates:
 
 - 2026-02-18: locked code-defined blueprints for V0 (no blueprint DSL/templates in execution truth).
 - 2026-02-18: locked initial blueprint family to `council.v1` for first shipped slice.
+- 2026-02-18: B0 completed with `Blueprint` contract, deterministic registry, binding validation, unit coverage, and green quality gate.
