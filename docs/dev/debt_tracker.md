@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-17"
+last_updated: "2026-02-18"
 status: "active"
 source_of_truth: true
 ---
@@ -57,6 +57,15 @@ Priority scale:
     - command and REPL coverage added
 
 ### P3
+
+- [ ] Add scheduled jobs for run-artifact cleanup and self-learning pipelines
+  - Owner: `@team`
+  - Target: `TBD`
+  - Current state: V0 jobs retain all artifacts by default; no periodic cleanup/self-learning orchestration jobs are defined.
+  - Exit criteria:
+    - explicit cleanup job spec and retention policy are implemented
+    - explicit self-learning job cadence and safety gates are defined
+    - runbook covers enabling/disabling and observing these scheduled jobs
 
 - [ ] Consolidate runtime SQLite locations under `.lily/db/`
   - Owner: `@team`

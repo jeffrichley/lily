@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-17"
+last_updated: "2026-02-18"
 status: "active"
 source_of_truth: true
 ---
@@ -34,11 +34,12 @@ Update cadence:
 
 ## In Progress
 
-- [ ] None.
+- [ ] Blueprint + jobs planning docs published (specs, architecture, execution plans, runbook).
 
 ## Next Up
 
-- [ ] Start supervisor/sub-agent feature planning and execution.
+- [ ] Execute Blueprints Phase B0 (`docs/dev/blueprints_execution_plan.md`).
+- [ ] Execute Jobs Phase J0 (`docs/dev/jobs_execution_plan.md`).
 
 ## Blockers and Risks
 
@@ -54,6 +55,9 @@ Update cadence:
 | Skills platform execution (closed) | User-visible + internal | `docs/dev/skills_platform_execution_plan.md` |
 | Skills authoring workflow | Internal engineering task | `docs/dev/skills_tool_authoring.md` |
 | Skills platform exercise runbook | Internal engineering task | `docs/ops/skills_platform_v1_exercise_guide.md` |
+| Blueprints execution plan | User-visible + internal | `docs/dev/blueprints_execution_plan.md` |
+| Jobs execution plan | User-visible + internal | `docs/dev/jobs_execution_plan.md` |
+| Blueprints + jobs runbook | Internal engineering task | `docs/ops/blueprints_jobs_runbook_v0.md` |
 | Memory migration scope/status | User-visible + internal | `docs/dev/memory_execution_plan.md` |
 | Personality subsystem scope/status | User-visible + internal | `docs/dev/personality_execution_plan.md` |
 | Feature priority order | User-visible features + internal engineering tasks | `docs/dev/roadmap.md` |
@@ -65,6 +69,9 @@ Update cadence:
 - Skills platform execution plan: `docs/dev/skills_platform_execution_plan.md`
 - Skills tool authoring: `docs/dev/skills_tool_authoring.md`
 - Skills exercise runbook: `docs/ops/skills_platform_v1_exercise_guide.md`
+- Blueprints execution plan: `docs/dev/blueprints_execution_plan.md`
+- Jobs execution plan: `docs/dev/jobs_execution_plan.md`
+- Blueprints + jobs runbook: `docs/ops/blueprints_jobs_runbook_v0.md`
 - Memory execution plan: `docs/dev/memory_execution_plan.md`
 - Personality execution plan: `docs/dev/personality_execution_plan.md`
 - Archive index: `docs/archive/README.md`
