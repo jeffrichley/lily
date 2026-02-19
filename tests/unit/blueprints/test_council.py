@@ -42,6 +42,31 @@ class _SecuritySpecialist:
         )
 
 
+class _OperationsSpecialist:
+    """Specialist fixture with a distinct implementation path."""
+
+    def __init__(self, *, specialist_id: str, confidence: float) -> None:
+        """Store fixture id and confidence value."""
+        self._specialist_id = specialist_id
+        self._confidence = confidence
+
+    def run(self, request: CouncilInputModel) -> CouncilSpecialistReport:
+        """Return deterministic specialist report payload with different wording."""
+        return CouncilSpecialistReport(
+            specialist_id=self._specialist_id,
+            status=CouncilSpecialistStatus.OK,
+            findings=(
+                CouncilFinding(
+                    title=f"{self._specialist_id} operations finding",
+                    recommendation=f"operationalize controls for {request.topic}",
+                    confidence=self._confidence,
+                    source_specialist=self._specialist_id,
+                ),
+            ),
+            notes="ops-review",
+        )
+
+
 class _FailingSpecialist:
     """Specialist fixture that raises to test containment."""
 
@@ -68,7 +93,7 @@ def test_council_compile_and_execute_returns_deterministic_envelope() -> None:
                 specialist_id="offense.v1",
                 confidence=0.9,
             ),
-            "defense.v1": _SecuritySpecialist(
+            "defense.v1": _OperationsSpecialist(
                 specialist_id="defense.v1",
                 confidence=0.7,
             ),
@@ -87,6 +112,7 @@ def test_council_compile_and_execute_returns_deterministic_envelope() -> None:
     assert isinstance(findings, list)
     assert findings[0]["source_specialist"] == "offense.v1"
     assert findings[1]["source_specialist"] == "defense.v1"
+    assert findings[1]["title"] == "defense.v1 operations finding"
 
 
 def test_council_compile_fails_with_unresolved_specialist() -> None:
