@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-18"
+last_updated: "2026-02-19"
 status: "active"
 source_of_truth: true
 ---
@@ -31,14 +31,16 @@ Update cadence:
 - [x] Skills Platform V1 completed through Phase 4 (`77eb4df`).
 - [x] Contract conformance gate added and wired into CI (`just contract-conformance`, `ci-gates`).
 - [x] Skills runbook and authoring workflow docs added and promoted to canonical docs map.
+- [x] Blueprints + jobs planning docs published (specs, architecture, execution plans, runbook).
+- [x] Blueprints Phase B0 and B1 completed (`council.v1` compile/execute + typed contracts + tests + gates).
 
 ## In Progress
 
-- [ ] Blueprint + jobs planning docs published (specs, architecture, execution plans, runbook).
+- [ ] Execute Jobs Phase J0 (`docs/dev/jobs_execution_plan.md`).
 
 ## Next Up
 
-- [ ] Execute Blueprints Phase B0 (`docs/dev/blueprints_execution_plan.md`).
+- [ ] Execute Blueprints Phase B2 (`docs/dev/blueprints_execution_plan.md`).
 - [ ] Execute Jobs Phase J0 (`docs/dev/jobs_execution_plan.md`).
 
 ## Blockers and Risks
@@ -57,6 +59,7 @@ Update cadence:
 | Skills platform exercise runbook | Internal engineering task | `docs/ops/skills_platform_v1_exercise_guide.md` |
 | Blueprints execution plan | User-visible + internal | `docs/dev/blueprints_execution_plan.md` |
 | Jobs execution plan | User-visible + internal | `docs/dev/jobs_execution_plan.md` |
+| Blueprints/jobs implementation patterns (GoF + framework mapping) | Internal engineering task | `docs/dev/blueprints_jobs_langgraph_langchain_patterns.md` |
 | Blueprints + jobs runbook | Internal engineering task | `docs/ops/blueprints_jobs_runbook_v0.md` |
 | Memory migration scope/status | User-visible + internal | `docs/dev/memory_execution_plan.md` |
 | Personality subsystem scope/status | User-visible + internal | `docs/dev/personality_execution_plan.md` |
@@ -71,6 +74,7 @@ Update cadence:
 - Skills exercise runbook: `docs/ops/skills_platform_v1_exercise_guide.md`
 - Blueprints execution plan: `docs/dev/blueprints_execution_plan.md`
 - Jobs execution plan: `docs/dev/jobs_execution_plan.md`
+- Blueprints/jobs implementation patterns: `docs/dev/blueprints_jobs_langgraph_langchain_patterns.md`
 - Blueprints + jobs runbook: `docs/ops/blueprints_jobs_runbook_v0.md`
 - Memory execution plan: `docs/dev/memory_execution_plan.md`
 - Personality execution plan: `docs/dev/personality_execution_plan.md`

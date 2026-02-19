@@ -53,14 +53,14 @@ Required tests and gates:
 ## Phase B1: Council Blueprint V1
 
 Phase checklist:
-- [ ] implement `council.v1` compile path (map/reduce)
-- [ ] enforce typed specialist outputs for synthesizer input
-- [ ] add deterministic summary payload contract for council output
-- [ ] add council compile/execute integration tests
-- [ ] add failure containment tests
-- [ ] add envelope snapshot tests
-- [ ] pass `just quality-check`
-- [ ] pass `just contract-conformance`
+- [x] implement `council.v1` compile path (map/reduce)
+- [x] enforce typed specialist outputs for synthesizer input
+- [x] add deterministic summary payload contract for council output
+- [x] add council compile/execute integration tests
+- [x] add failure containment tests
+- [x] add envelope snapshot tests
+- [x] pass `just quality-check`
+- [x] pass `just contract-conformance`
 
 User-visible features:
 - one reusable council blueprint execution path is available.
@@ -117,7 +117,7 @@ Required tests and gates:
 ## Milestone Checklist
 
 - [x] B0 complete
-- [ ] B1 complete
+- [x] B1 complete
 - [ ] B2 complete
 
 ## Decision Log
@@ -125,3 +125,4 @@ Required tests and gates:
 - 2026-02-18: locked code-defined blueprints for V0 (no blueprint DSL/templates in execution truth).
 - 2026-02-18: locked initial blueprint family to `council.v1` for first shipped slice.
 - 2026-02-18: B0 completed with `Blueprint` contract, deterministic registry, binding validation, unit coverage, and green quality gate.
+- 2026-02-19: B1 completed with `council.v1` compile/execute map-reduce path, typed specialist/synthesis contracts, deterministic run envelope output, failure containment tests, and green `quality-check` + `contract-conformance` gates.

@@ -39,6 +39,7 @@ Use these files as the only source of truth for each concern:
 | Blueprints phase execution status | `docs/dev/blueprints_execution_plan.md` |
 | Jobs phase execution status | `docs/dev/jobs_execution_plan.md` |
 | Blueprints + jobs operations runbook | `docs/ops/blueprints_jobs_runbook_v0.md` |
+| Blueprints/jobs GoF + LangChain/LangGraph implementation guide | `docs/dev/blueprints_jobs_langgraph_langchain_patterns.md` |
 | Process and workflow rules | `docs/process/process.md` |
 | Docs weekly operating cadence | `docs/process/docs_cadence.md` |
 | Active specs index | `docs/specs/README.md` |

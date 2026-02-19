@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from enum import StrEnum
 from typing import Any, Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class BlueprintErrorCode(StrEnum):
@@ -14,6 +14,8 @@ class BlueprintErrorCode(StrEnum):
 
     NOT_FOUND = "blueprint_not_found"
     BINDINGS_INVALID = "blueprint_bindings_invalid"
+    COMPILE_FAILED = "blueprint_compile_failed"
+    EXECUTION_FAILED = "blueprint_execution_failed"
     CONTRACT_INVALID = "blueprint_contract_invalid"
 
 
@@ -37,6 +39,25 @@ class BlueprintError(RuntimeError):
         super().__init__(message)
         self.code = code
         self.data = data or {}
+
+
+class BlueprintRunStatus(StrEnum):
+    """Deterministic run status values for blueprint executions."""
+
+    OK = "ok"
+    ERROR = "error"
+
+
+class BlueprintRunEnvelope(BaseModel):
+    """Shared Run Contract R0 envelope for blueprint execution results."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    status: BlueprintRunStatus
+    artifacts: tuple[str, ...] = ()
+    approvals_requested: tuple[str, ...] = ()
+    references: tuple[str, ...] = ()
+    payload: dict[str, object] = {}
 
 
 class Blueprint(Protocol):
