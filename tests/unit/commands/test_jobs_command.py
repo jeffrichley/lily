@@ -41,6 +41,38 @@ def _build_command(workspace_root: Path) -> JobsCommand:
     )
 
 
+class _StubSchedulerControl:
+    """Minimal scheduler control stub for jobs command tests."""
+
+    def __init__(self) -> None:
+        self.actions: list[tuple[str, str]] = []
+
+    def pause_job(self, job_id: str) -> None:
+        self.actions.append(("pause", job_id))
+
+    def resume_job(self, job_id: str) -> None:
+        self.actions.append(("resume", job_id))
+
+    def disable_job(self, job_id: str) -> None:
+        self.actions.append(("disable", job_id))
+
+    def status(self) -> dict[str, object]:
+        return {
+            "started": True,
+            "sqlite_path": ".lily/db/jobs_scheduler.sqlite3",
+            "registered_jobs": 1,
+            "state_rows": 1,
+            "states": [
+                {
+                    "job_id": "nightly_security_council",
+                    "state": "active",
+                    "spec_hash": "abc",
+                    "updated_at": "2026-02-19T23:00:00Z",
+                }
+            ],
+        }
+
+
 def test_jobs_list_and_run_paths_work_in_handler(tmp_path: Path) -> None:
     """`/jobs list` and `/jobs run` should succeed for valid job spec."""
     workspace_root = tmp_path / ".lily"
@@ -153,3 +185,110 @@ def test_jobs_tail_returns_latest_events(tmp_path: Path) -> None:
     assert tailed.data["job_id"] == "nightly_security_council"
     assert tailed.data["run_id"]
     assert tailed.data["line_count"] >= 1
+
+
+def test_jobs_history_returns_run_entries(tmp_path: Path) -> None:
+    """`/jobs history` should return newest-first history payload."""
+    workspace_root = tmp_path / ".lily"
+    _write(
+        workspace_root / "jobs" / "nightly.job.yaml",
+        (
+            "id: nightly_security_council\n"
+            "title: Nightly security council\n"
+            "target:\n"
+            "  kind: blueprint\n"
+            "  id: council.v1\n"
+            "  input:\n"
+            "    topic: service perimeter\n"
+            "bindings:\n"
+            "  specialists: [security.v1, operations.v1]\n"
+            "  synthesizer: default.v1\n"
+            "  synth_strategy: deterministic\n"
+            "  max_findings: 5\n"
+            "trigger:\n"
+            "  type: manual\n"
+        ),
+    )
+    command = _build_command(workspace_root)
+    session = _session()
+    _ = command.execute(
+        CommandCall(
+            name="jobs",
+            args=("run", "nightly_security_council"),
+            raw="/jobs run nightly_security_council",
+        ),
+        session,
+    )
+
+    result = command.execute(
+        CommandCall(
+            name="jobs",
+            args=("history", "nightly_security_council", "--limit", "1"),
+            raw="/jobs history nightly_security_council --limit 1",
+        ),
+        session,
+    )
+
+    assert result.status.value == "ok"
+    assert result.code == "jobs_history"
+    assert result.data is not None
+    entries = result.data["entries"]
+    assert isinstance(entries, list)
+    assert entries
+    assert len(entries) == 1
+
+
+def test_jobs_scheduler_controls_and_status(tmp_path: Path) -> None:
+    """Scheduler control subcommands should route to control port."""
+    workspace_root = tmp_path / ".lily"
+    scheduler_control = _StubSchedulerControl()
+    executor = JobExecutor(
+        repository=JobRepository(jobs_dir=workspace_root / "jobs"),
+        blueprint_registry=build_default_blueprint_registry(),
+        runs_root=workspace_root / "runs",
+    )
+    command = JobsCommand(
+        executor,
+        runs_root=workspace_root / "runs",
+        scheduler_control=scheduler_control,
+    )
+    session = _session()
+
+    paused = command.execute(
+        CommandCall(
+            name="jobs",
+            args=("pause", "nightly_security_council"),
+            raw="/jobs pause nightly_security_council",
+        ),
+        session,
+    )
+    resumed = command.execute(
+        CommandCall(
+            name="jobs",
+            args=("resume", "nightly_security_council"),
+            raw="/jobs resume nightly_security_council",
+        ),
+        session,
+    )
+    disabled = command.execute(
+        CommandCall(
+            name="jobs",
+            args=("disable", "nightly_security_council"),
+            raw="/jobs disable nightly_security_council",
+        ),
+        session,
+    )
+    status = command.execute(
+        CommandCall(name="jobs", args=("status",), raw="/jobs status"),
+        session,
+    )
+
+    assert paused.code == "jobs_paused"
+    assert resumed.code == "jobs_resumed"
+    assert disabled.code == "jobs_disabled"
+    assert status.code == "jobs_scheduler_status"
+    assert scheduler_control.actions == [
+        ("pause", "nightly_security_council"),
+        ("resume", "nightly_security_council"),
+        ("disable", "nightly_security_council"),
+    ]

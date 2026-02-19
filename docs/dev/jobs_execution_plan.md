@@ -139,11 +139,56 @@ Required tests and gates:
 - [x] `just quality-check`.
 - [x] `just contract-conformance`.
 
+## Phase J3: Durable Scheduler State + Recovery Controls
+
+Phase checklist:
+- [x] add SQLite-backed APScheduler job store under `db/`
+- [x] persist scheduler runtime metadata for deterministic restart reconciliation
+- [x] implement startup reconciliation for misfires/drift after process downtime
+- [x] add operator lifecycle commands (`jobs pause`, `jobs resume`, `jobs disable`)
+- [x] add run-history command (`jobs history <job_id>`) with stable ordering/limits
+- [x] implement scheduler health diagnostics surfaced to CLI
+- [x] document operational recovery runbook for restart/drift incidents
+- [x] add restart/reconciliation integration tests
+- [x] add pause/resume/disable command integration tests
+- [x] add history query tests
+- [x] pass `just quality-check`
+- [x] pass `just contract-conformance`
+
+User-visible features:
+- durable schedules across restarts.
+- pause/resume/disable lifecycle controls.
+- run history inspection per job.
+
+Internal engineering tasks:
+- migrate scheduler/job store state to SQLite in `db/`.
+- add deterministic startup reconciliation logic for missed windows.
+- expose scheduler health/diagnostics for operations.
+
+Acceptance criteria:
+- [x] scheduled jobs survive restart with no duplicate execution from one scheduler owner.
+- [x] downtime recovery behavior is deterministic and audit-visible in artifacts/events.
+- [x] operators can pause/resume/disable jobs without editing spec files.
+- [x] operators can inspect recent run history with deterministic sort and limit semantics.
+
+Non-goals:
+- no distributed multi-node scheduler leadership.
+- no external message-bus trigger system.
+- no retention pruning automation yet (remains deferred).
+
+Required tests and gates:
+- [x] restart/reconciliation integration tests.
+- [x] pause/resume/disable command integration tests.
+- [x] history query tests.
+- [x] `just quality-check`.
+- [x] `just contract-conformance`.
+
 ## Milestone Checklist
 
 - [x] J0 complete
 - [x] J1 complete
 - [x] J2 complete
+- [x] J3 complete
 
 ## Decision Log
 

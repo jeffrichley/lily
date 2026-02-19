@@ -41,6 +41,12 @@ Validation checklist:
   - executes job once immediately.
 - `lily jobs tail <job_id>`
   - tails structured events for active/recent runs.
+- `lily jobs history <job_id>`
+  - lists recent run receipts in deterministic order.
+- `lily jobs pause <job_id>` / `lily jobs resume <job_id>` / `lily jobs disable <job_id>`
+  - applies scheduler lifecycle state without editing job yaml files.
+- `lily jobs status`
+  - shows scheduler runtime health and persisted lifecycle states.
 
 ## 3.1 Scheduler Runtime Standard (J1)
 
@@ -60,6 +66,20 @@ Required implementation signals:
   - `EVENT_JOB_MISSED`
 - listener events are reflected in Lily `events.jsonl`/receipts.
 - only one scheduler process owns a given APScheduler job store.
+
+## 3.2 Durable Operations Standard (J3)
+
+Operators should treat scheduler state as durable runtime data, not ephemeral process memory.
+
+Required implementation signals:
+- scheduler state persists in SQLite under `db/`.
+- startup performs reconciliation for downtime windows with deterministic lifecycle events.
+- lifecycle controls are available without spec edits:
+  - `lily jobs pause <job_id>`
+  - `lily jobs resume <job_id>`
+  - `lily jobs disable <job_id>`
+- run history can be queried:
+  - `lily jobs history <job_id> --limit <n>`
 
 ## 4. Artifact Inspection
 
@@ -123,6 +143,9 @@ Use receipt as source of truth for:
 - verify APScheduler runtime registration for cron jobs (stable ids).
 - verify `coalesce/max_instances/misfire_grace_time` config is explicitly set.
 - verify listener-driven lifecycle events (`executed/error/missed`) appear in artifacts.
+- verify restart reconciliation emits deterministic events after simulated downtime.
+- verify pause/resume/disable commands update scheduler behavior deterministically.
+- verify history output ordering and limit semantics.
 - validate required artifact set exists.
 - confirm deterministic failure behavior for at least one invalid job.
 - run `just quality-check`.

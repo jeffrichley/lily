@@ -19,6 +19,7 @@ from lily.commands.handlers.style import StyleCommand
 from lily.commands.parser import CommandCall
 from lily.commands.types import CommandHandler, CommandResult
 from lily.jobs import JobExecutor
+from lily.jobs.scheduler_runtime import JobSchedulerRuntime
 from lily.memory import ConsolidationBackend, EvidenceChunkingSettings
 from lily.persona import FilePersonaRepository, default_persona_root
 from lily.runtime.skill_invoker import SkillInvoker
@@ -42,6 +43,7 @@ class CommandRegistry:
         evidence_chunking: EvidenceChunkingSettings | None = None,
         jobs_executor: JobExecutor | None = None,
         jobs_runs_root: Path | None = None,
+        jobs_scheduler_control: JobSchedulerRuntime | None = None,
         handlers: dict[str, CommandHandler] | None = None,
     ) -> None:
         """Construct registry with built-in handlers plus optional overrides.
@@ -57,6 +59,7 @@ class CommandRegistry:
             evidence_chunking: Evidence chunking settings.
             jobs_executor: Optional jobs executor for `/jobs`.
             jobs_runs_root: Optional run artifact root path for `/jobs`.
+            jobs_scheduler_control: Optional scheduler controls for `/jobs`.
             handlers: Optional custom handlers keyed by command name.
         """
         self._skill_invoker = skill_invoker
@@ -87,6 +90,7 @@ class CommandRegistry:
             self._handlers["jobs"] = JobsCommand(
                 jobs_executor,
                 runs_root=jobs_runs_root,
+                scheduler_control=jobs_scheduler_control,
             )
         if handlers:
             self._handlers.update(handlers)

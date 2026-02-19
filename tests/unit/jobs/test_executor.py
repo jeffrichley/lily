@@ -389,3 +389,48 @@ def test_job_executor_retain_all_policy_keeps_prior_runs(tmp_path: Path) -> None
     assert len(run_dirs) == 2
     assert {path.name for path in run_dirs} == {first.run_id, second.run_id}
     assert all((path / "run_receipt.json").exists() for path in run_dirs)
+
+
+def test_job_executor_history_returns_newest_first(tmp_path: Path) -> None:
+    """History should return deterministically ordered entries."""
+    jobs_dir = tmp_path / ".lily" / "jobs"
+    runs_root = tmp_path / ".lily" / "runs"
+    _write(
+        jobs_dir / "history.job.yaml",
+        (
+            "id: history_job\n"
+            "title: History job\n"
+            "target:\n"
+            "  kind: blueprint\n"
+            "  id: council.v1\n"
+            "  input:\n"
+            "    topic: service perimeter\n"
+            "bindings:\n"
+            "  specialists: [security.v1, operations.v1]\n"
+            "  synthesizer: default.v1\n"
+            "  synth_strategy: deterministic\n"
+            "  max_findings: 5\n"
+            "trigger:\n"
+            "  type: manual\n"
+        ),
+    )
+    executor = JobExecutor(
+        repository=JobRepository(jobs_dir=jobs_dir),
+        blueprint_registry=build_default_blueprint_registry(),
+        runs_root=runs_root,
+    )
+    first = executor.run("history_job")
+    second = executor.run("history_job")
+
+    history = executor.history("history_job", limit=10)
+
+    assert history.job_id == "history_job"
+    assert len(history.entries) == 2
+    run_ids = {entry.run_id for entry in history.entries}
+    assert run_ids == {first.run_id, second.run_id}
+    assert list(history.entries) == sorted(
+        history.entries,
+        key=lambda item: (item.started_at, item.ended_at, item.run_id),
+        reverse=True,
+    )
+    assert history.entries[0].attempt_count >= 1

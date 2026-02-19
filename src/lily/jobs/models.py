@@ -146,3 +146,25 @@ class JobTailResult(BaseModel):
     job_id: str
     run_id: str | None = None
     lines: tuple[str, ...] = ()
+
+
+class JobHistoryEntry(BaseModel):
+    """One historical run entry for a job."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    run_id: str
+    status: str
+    started_at: str
+    ended_at: str
+    path: str
+    attempt_count: int = 1
+
+
+class JobHistoryResult(BaseModel):
+    """Historical run list payload for one job."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    job_id: str
+    entries: tuple[JobHistoryEntry, ...] = ()

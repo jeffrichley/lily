@@ -11,8 +11,7 @@ from _pytest.monkeypatch import MonkeyPatch
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, JobExecutionEvent
 from apscheduler.triggers.interval import IntervalTrigger
 
-from lily.blueprints import build_default_blueprint_registry
-from lily.jobs import JobExecutor, JobRepository, JobSchedulerRuntime
+from lily.jobs import JobRepository, JobSchedulerRuntime
 
 
 def _write(path: Path, content: str) -> None:
@@ -24,15 +23,11 @@ def _write(path: Path, content: str) -> None:
 def _build_runtime(workspace_root: Path) -> JobSchedulerRuntime:
     """Build scheduler runtime fixture."""
     repository = JobRepository(jobs_dir=workspace_root / "jobs")
-    executor = JobExecutor(
-        repository=repository,
-        blueprint_registry=build_default_blueprint_registry(),
-        runs_root=workspace_root / "runs",
-    )
     return JobSchedulerRuntime(
         repository=repository,
-        executor=executor,
+        jobs_dir=workspace_root / "jobs",
         runs_root=workspace_root / "runs",
+        sqlite_path=workspace_root / "db" / "jobs_scheduler.sqlite3",
     )
 
 
@@ -161,3 +156,100 @@ def test_scheduler_executes_registered_job_via_aps_runtime(
         else []
     )
     assert run_dirs
+
+
+def test_scheduler_pause_resume_disable_persist_state(tmp_path: Path) -> None:
+    """Lifecycle controls should persist state and apply to APS jobs."""
+    workspace = tmp_path / ".lily"
+    _write(
+        workspace / "jobs" / "nightly.job.yaml",
+        (
+            "id: nightly_security_council\n"
+            "title: Nightly security council\n"
+            "target:\n"
+            "  kind: blueprint\n"
+            "  id: council.v1\n"
+            "  input:\n"
+            "    topic: service perimeter\n"
+            "bindings:\n"
+            "  specialists: [security.v1, operations.v1]\n"
+            "  synthesizer: default.v1\n"
+            "  synth_strategy: deterministic\n"
+            "  max_findings: 5\n"
+            "trigger:\n"
+            "  type: cron\n"
+            '  cron: "*/5 * * * *"\n'
+            "  timezone: UTC\n"
+        ),
+    )
+    runtime = _build_runtime(workspace)
+
+    runtime.start()
+    try:
+        runtime.pause_job("nightly_security_council")
+        paused = runtime._scheduler.get_job("job:nightly_security_council")
+        assert paused is not None
+        assert paused.next_run_time is None
+
+        runtime.resume_job("nightly_security_council")
+        resumed = runtime._scheduler.get_job("job:nightly_security_council")
+        assert resumed is not None
+        assert resumed.next_run_time is not None
+
+        runtime.disable_job("nightly_security_council")
+        assert runtime._scheduler.get_job("job:nightly_security_council") is None
+        status = runtime.status()
+        states = status["states"]
+        assert isinstance(states, list)
+        assert states
+        first = states[0]
+        assert isinstance(first, dict)
+        assert first["state"] == "disabled"
+    finally:
+        runtime.shutdown()
+
+
+def test_scheduler_persisted_pause_state_survives_restart(tmp_path: Path) -> None:
+    """Paused scheduler state should persist and be re-applied on restart."""
+    workspace = tmp_path / ".lily"
+    _write(
+        workspace / "jobs" / "nightly.job.yaml",
+        (
+            "id: nightly_security_council\n"
+            "title: Nightly security council\n"
+            "target:\n"
+            "  kind: blueprint\n"
+            "  id: council.v1\n"
+            "  input:\n"
+            "    topic: service perimeter\n"
+            "bindings:\n"
+            "  specialists: [security.v1, operations.v1]\n"
+            "  synthesizer: default.v1\n"
+            "  synth_strategy: deterministic\n"
+            "  max_findings: 5\n"
+            "trigger:\n"
+            "  type: cron\n"
+            '  cron: "*/5 * * * *"\n'
+            "  timezone: UTC\n"
+        ),
+    )
+    runtime = _build_runtime(workspace)
+    runtime.start()
+    runtime.pause_job("nightly_security_council")
+    runtime.shutdown()
+
+    restarted = _build_runtime(workspace)
+    restarted.start()
+    try:
+        paused = restarted._scheduler.get_job("job:nightly_security_council")
+        assert paused is not None
+        assert paused.next_run_time is None
+        status = restarted.status()
+        states = status["states"]
+        assert isinstance(states, list)
+        assert states
+        row = states[0]
+        assert isinstance(row, dict)
+        assert row["state"] == "paused"
+    finally:
+        restarted.shutdown()

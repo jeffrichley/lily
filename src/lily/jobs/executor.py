@@ -19,6 +19,8 @@ from lily.blueprints import (
 )
 from lily.jobs.errors import JobError, JobErrorCode
 from lily.jobs.models import (
+    JobHistoryEntry,
+    JobHistoryResult,
     JobRepositoryScan,
     JobRunEnvelope,
     JobSpec,
@@ -174,6 +176,85 @@ class JobExecutor:
         lines = events_file.read_text(encoding="utf-8").splitlines()
         trimmed = tuple(lines[-max(1, limit) :])
         return JobTailResult(job_id=spec.id, run_id=latest.name, lines=trimmed)
+
+    def history(self, job_id: str, *, limit: int = 20) -> JobHistoryResult:
+        """Return recent run receipt entries for one job.
+
+        Args:
+            job_id: Target job identifier.
+            limit: Maximum number of run entries to return.
+
+        Returns:
+            Historical run entries ordered newest-first.
+        """
+        spec = self._repository.load(job_id)
+        run_root = self._runs_root / spec.id
+        if not run_root.exists():
+            return JobHistoryResult(job_id=spec.id, entries=())
+        run_dirs = sorted(
+            (
+                path
+                for path in run_root.iterdir()
+                if path.is_dir() and path.name.startswith("run_")
+            ),
+            key=lambda path: path.stat().st_mtime_ns,
+            reverse=True,
+        )
+        entries = [
+            entry
+            for run_dir in run_dirs
+            if (entry := self._history_entry_from_run_dir(run_dir)) is not None
+        ]
+        entries_sorted = sorted(
+            entries,
+            key=lambda item: (item.started_at, item.ended_at, item.run_id),
+            reverse=True,
+        )
+        bounded = tuple(entries_sorted[: max(1, limit)])
+        return JobHistoryResult(job_id=spec.id, entries=bounded)
+
+    @staticmethod
+    def _history_entry_from_run_dir(run_dir: Path) -> JobHistoryEntry | None:
+        """Parse one run directory receipt into history entry payload.
+
+        Args:
+            run_dir: Run directory path.
+
+        Returns:
+            Parsed history entry, or ``None`` when receipt is invalid.
+        """
+        receipt = run_dir / "run_receipt.json"
+        if not receipt.exists():
+            return None
+        try:
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        run_id = payload.get("run_id")
+        status = payload.get("status")
+        started_at = payload.get("started_at")
+        ended_at = payload.get("ended_at")
+        if not (
+            isinstance(run_id, str)
+            and isinstance(status, str)
+            and isinstance(started_at, str)
+            and isinstance(ended_at, str)
+        ):
+            return None
+        attempt_count = 1
+        nested_payload = payload.get("payload")
+        if isinstance(nested_payload, dict):
+            raw_attempt_count = nested_payload.get("attempt_count")
+            if isinstance(raw_attempt_count, int) and raw_attempt_count > 0:
+                attempt_count = raw_attempt_count
+        return JobHistoryEntry(
+            run_id=run_id,
+            status=status,
+            started_at=started_at,
+            ended_at=ended_at,
+            path=str(run_dir),
+            attempt_count=attempt_count,
+        )
 
     def _execute_blueprint_target(
         self,

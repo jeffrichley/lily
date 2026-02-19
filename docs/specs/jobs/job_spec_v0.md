@@ -96,6 +96,23 @@ Disallowed as primary scheduler behavior:
 - [ ] custom scheduler loop that reimplements APScheduler due-run evaluation.
 - [ ] multi-process schedulers sharing the same APScheduler job store.
 
+## 3.7 Durable State and Recovery Contract (J3)
+
+Required:
+- [x] use SQLite-backed APScheduler job store persisted under `db/`.
+- [x] scheduler startup performs deterministic reconciliation for missed windows.
+- [x] recovery emits stable lifecycle events into `events.jsonl` for auditability.
+- [x] operator lifecycle controls exist for scheduled jobs:
+  - [x] `jobs pause <job_id>`
+  - [x] `jobs resume <job_id>`
+  - [x] `jobs disable <job_id>`
+- [x] run history query exists with deterministic ordering and bounded output:
+  - [x] `jobs history <job_id> [--limit N]`
+
+Disallowed:
+- [ ] manual editing of scheduler internals as the only pause/disable mechanism.
+- [ ] implicit replay that bypasses deterministic event emission.
+
 ## 3.4 Shared Output Envelope
 
 Every job run returns:
@@ -145,6 +162,8 @@ V0 must support:
 - [x] Every run writes mandatory artifacts and a stable receipt.
 - [x] Failures remain contained and return stable error codes.
 - [x] J1 cron behavior is driven by APScheduler runtime APIs, not trigger-only usage.
+- [x] J3 durable scheduler state survives restart and reconciles deterministically.
+- [x] J3 operator lifecycle controls (pause/resume/disable/history) are command-complete.
 
 ## 7. Non-Goals (V0)
 
@@ -161,6 +180,9 @@ V0 must support:
 - [x] Failure/retry boundary tests.
 - [x] CLI integration tests for list/run/tail.
 - [x] APScheduler integration tests (job registration + listeners + misfire/coalesce).
+- [x] restart/reconciliation integration tests.
+- [x] pause/resume/disable command integration tests.
+- [x] history query tests.
 - [x] `just quality-check`
 - [x] `just contract-conformance`
 

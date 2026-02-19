@@ -144,22 +144,26 @@ class RuntimeFacade:
         self._persona_repository = persona_repository or FilePersonaRepository(
             root_dir=default_persona_root()
         )
-        self._command_registry = command_registry or self._build_default_registry(
-            memory_tooling_enabled=memory_tooling_enabled,
-            memory_tooling_auto_apply=memory_tooling_auto_apply,
-            consolidation_enabled=consolidation_enabled,
-            consolidation_backend=consolidation_backend,
-            consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
-            evidence_chunking=evidence_chunking,
-            security=self._security,
-            security_prompt=self._security_prompt,
-            project_root=self._project_root,
-            workspace_root=self._workspace_root,
-        )
         self._jobs_scheduler_runtime: JobSchedulerRuntime | None = None
-        if command_registry is None and jobs_scheduler_enabled:
-            self._jobs_scheduler_runtime = self._build_jobs_scheduler_runtime()
-            self._jobs_scheduler_runtime.start()
+        if command_registry is None:
+            if jobs_scheduler_enabled:
+                self._jobs_scheduler_runtime = self._build_jobs_scheduler_runtime()
+                self._jobs_scheduler_runtime.start()
+            self._command_registry = self._build_default_registry(
+                memory_tooling_enabled=memory_tooling_enabled,
+                memory_tooling_auto_apply=memory_tooling_auto_apply,
+                consolidation_enabled=consolidation_enabled,
+                consolidation_backend=consolidation_backend,
+                consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
+                evidence_chunking=evidence_chunking,
+                security=self._security,
+                security_prompt=self._security_prompt,
+                project_root=self._project_root,
+                workspace_root=self._workspace_root,
+                jobs_scheduler_control=self._jobs_scheduler_runtime,
+            )
+        else:
+            self._command_registry = command_registry
         self._conversation_executor = (
             conversation_executor
             or LangChainConversationExecutor(checkpointer=conversation_checkpointer)
@@ -349,6 +353,7 @@ class RuntimeFacade:
         security_prompt: SecurityPrompt | None,
         project_root: Path,
         workspace_root: Path,
+        jobs_scheduler_control: JobSchedulerRuntime | None,
     ) -> CommandRegistry:
         """Construct default command registry with hidden LLM backend wiring.
 
@@ -363,6 +368,7 @@ class RuntimeFacade:
             security_prompt: Optional terminal prompt for approvals.
             project_root: Project root for dependency lock fingerprint.
             workspace_root: Workspace root for jobs and run artifacts.
+            jobs_scheduler_control: Optional scheduler controls for `/jobs`.
 
         Returns:
             Command registry with invoker and executor dependencies.
@@ -418,6 +424,7 @@ class RuntimeFacade:
             evidence_chunking=evidence_chunking,
             jobs_executor=jobs_executor,
             jobs_runs_root=runs_root,
+            jobs_scheduler_control=jobs_scheduler_control,
         )
 
     def _build_jobs_scheduler_runtime(self) -> JobSchedulerRuntime:
@@ -428,15 +435,12 @@ class RuntimeFacade:
         """
         jobs_dir = self._workspace_root / "jobs"
         runs_root = self._workspace_root / "runs"
-        executor = JobExecutor(
-            repository=JobRepository(jobs_dir=jobs_dir),
-            blueprint_registry=build_default_blueprint_registry(),
-            runs_root=runs_root,
-        )
+        scheduler_db_path = self._workspace_root / "db" / "jobs_scheduler.sqlite3"
         return JobSchedulerRuntime(
             repository=JobRepository(jobs_dir=jobs_dir),
-            executor=executor,
+            jobs_dir=jobs_dir,
             runs_root=runs_root,
+            sqlite_path=scheduler_db_path,
         )
 
     def _maybe_run_scheduled_consolidation(self, session: Session) -> None:
