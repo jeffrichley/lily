@@ -146,6 +146,7 @@ def _bindings() -> BaseModel:
     return CouncilBindingModel(
         specialists=("offense.v1", "defense.v1"),
         synthesizer="default.v1",
+        synth_strategy=CouncilSynthStrategy.DETERMINISTIC,
         max_findings=5,
     )
 
@@ -193,6 +194,7 @@ def test_council_compile_fails_with_unresolved_specialist() -> None:
     bindings = CouncilBindingModel(
         specialists=("offense.v1", "missing.v1"),
         synthesizer="default.v1",
+        synth_strategy=CouncilSynthStrategy.DETERMINISTIC,
         max_findings=5,
     )
 
@@ -222,6 +224,7 @@ def test_council_execution_contains_specialist_failure() -> None:
     bindings = CouncilBindingModel(
         specialists=("offense.v1", "defense.v1"),
         synthesizer="default.v1",
+        synth_strategy=CouncilSynthStrategy.DETERMINISTIC,
         max_findings=5,
     )
     compiled = blueprint.compile(bindings)
@@ -309,7 +312,7 @@ def test_council_llm_strategy_falls_back_deterministically_on_failure() -> None:
     bindings = CouncilBindingModel(
         specialists=("offense.v1", "defense.v1"),
         synthesizer="llm.default.v1",
-        synth_strategy=CouncilSynthStrategy.LLM,
+        synth_strategy=CouncilSynthStrategy.LLM_WITH_FALLBACK,
         max_findings=5,
     )
 
@@ -340,7 +343,7 @@ def test_council_llm_strategy_maps_failure_when_fallback_also_fails() -> None:
     bindings = CouncilBindingModel(
         specialists=("offense.v1", "defense.v1"),
         synthesizer="llm.default.v1",
-        synth_strategy=CouncilSynthStrategy.LLM,
+        synth_strategy=CouncilSynthStrategy.LLM_WITH_FALLBACK,
         max_findings=5,
     )
     compiled = blueprint.compile(bindings)
@@ -352,3 +355,46 @@ def test_council_llm_strategy_maps_failure_when_fallback_also_fails() -> None:
         assert exc.data["synth_error_code"] == "llm_synth_fallback_failed"
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected BlueprintError for failed llm synth fallback.")
+
+
+def test_council_binding_default_strategy_is_llm() -> None:
+    """Default council strategy should be strict LLM synthesis mode."""
+    bindings = CouncilBindingModel(
+        specialists=("offense.v1", "defense.v1"),
+        synthesizer="llm.default.v1",
+        max_findings=5,
+    )
+
+    assert bindings.synth_strategy == CouncilSynthStrategy.LLM
+
+
+def test_council_llm_maps_primary_failure_without_fallback() -> None:
+    """Default llm strategy should fail deterministically without fallback."""
+    blueprint = CouncilBlueprint(
+        specialists={
+            "offense.v1": _SecuritySpecialist(
+                specialist_id="offense.v1",
+                confidence=0.9,
+            ),
+            "defense.v1": _OperationsSpecialist(
+                specialist_id="defense.v1",
+                confidence=0.7,
+            ),
+        },
+        llm_synthesizers={"llm.default.v1": _FailingLlmsynthesizer()},
+    )
+    bindings = CouncilBindingModel(
+        specialists=("offense.v1", "defense.v1"),
+        synthesizer="llm.default.v1",
+        synth_strategy=CouncilSynthStrategy.LLM,
+        max_findings=5,
+    )
+    compiled = blueprint.compile(bindings)
+    try:
+        compiled.invoke({"topic": "network posture"})
+    except BlueprintError as exc:
+        assert exc.code == BlueprintErrorCode.EXECUTION_FAILED
+        assert str(exc) == "Error: council synthesis failed."
+        assert exc.data["synth_error_code"] == "llm_synth_failed"
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("Expected BlueprintError for strict llm synth failure.")

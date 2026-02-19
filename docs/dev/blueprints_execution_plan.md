@@ -167,3 +167,4 @@ Required tests and gates:
 - 2026-02-19: B1 completed with `council.v1` compile/execute map-reduce path, typed specialist/synthesis contracts, deterministic run envelope output, failure containment tests, and green `quality-check` + `contract-conformance` gates.
 - 2026-02-19: B2 completed with blueprint authoring constraints doc, high-visibility CLI blueprint diagnostics, runbook and canonical-doc links, and green docs/quality gates.
 - 2026-02-19: B3 completed with `synth_strategy` selection (`deterministic`/`llm`), optional `LLMSynthesizer`, deterministic fallback path, stable synthesis error mapping, expanded council tests, and green `quality-check` + `contract-conformance` gates.
+- 2026-02-19: Strategy default updated by owner request: `synth_strategy` now defaults to strict `llm`; fallback-enabled behavior remains explicit under `llm_with_fallback`.

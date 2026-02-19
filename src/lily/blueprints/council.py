@@ -32,6 +32,7 @@ class CouncilSynthStrategy(StrEnum):
 
     DETERMINISTIC = "deterministic"
     LLM = "llm"
+    LLM_WITH_FALLBACK = "llm_with_fallback"
 
 
 class CouncilBindingModel(BaseModel):
@@ -41,7 +42,7 @@ class CouncilBindingModel(BaseModel):
 
     specialists: tuple[str, ...] = Field(min_length=2)
     synthesizer: str = Field(min_length=1)
-    synth_strategy: CouncilSynthStrategy = CouncilSynthStrategy.DETERMINISTIC
+    synth_strategy: CouncilSynthStrategy = CouncilSynthStrategy.LLM
     max_findings: int = Field(default=8, ge=1, le=20)
 
 
@@ -187,16 +188,19 @@ class LLMSynthesizer:
         self,
         *,
         primary: CouncilSynthesizer,
-        fallback: CouncilSynthesizer,
+        fallback: CouncilSynthesizer | None = None,
+        strict: bool = False,
     ) -> None:
         """Store strategy chain for LLM synthesis.
 
         Args:
             primary: LLM-backed synthesis strategy.
-            fallback: Deterministic fallback synthesis strategy.
+            fallback: Optional deterministic fallback synthesis strategy.
+            strict: Whether to fail without fallback behavior.
         """
         self._primary = primary
         self._fallback = fallback
+        self._strict = strict
 
     def run(
         self,
@@ -226,6 +230,11 @@ class LLMSynthesizer:
             )
             return CouncilOutputModel.model_validate(primary_output)
         except Exception as primary_exc:
+            if self._strict or self._fallback is None:
+                raise CouncilSynthesisError(
+                    code="llm_synth_failed",
+                    message="Error: council llm synthesis failed.",
+                ) from primary_exc
             try:
                 fallback_output = CouncilOutputModel.model_validate(
                     self._fallback.run(
@@ -472,14 +481,35 @@ class CouncilBlueprint:
 
         Returns:
             Compiled runnable.
-
-        Raises:
-            BlueprintError: If dependencies referenced by bindings cannot resolve.
         """
         parsed = CouncilBindingModel.model_validate(bindings)
+        resolved = self._resolve_specialists(parsed)
+        synthesizer = self._resolve_synthesizer(parsed)
+        return CouncilCompiledRunnable(
+            blueprint_id=self.id,
+            specialists=resolved,
+            synthesizer=synthesizer,
+            max_findings=parsed.max_findings,
+        )
+
+    def _resolve_specialists(
+        self,
+        bindings: CouncilBindingModel,
+    ) -> dict[str, CouncilSpecialist]:
+        """Resolve specialist ids from bindings into runnable specialist map.
+
+        Args:
+            bindings: Validated council bindings payload.
+
+        Returns:
+            Mapping of specialist ids to specialist implementations.
+
+        Raises:
+            BlueprintError: If any specialist id is unresolved.
+        """
         unresolved = tuple(
             specialist_id
-            for specialist_id in parsed.specialists
+            for specialist_id in bindings.specialists
             if specialist_id not in self._specialists
         )
         if unresolved:
@@ -488,47 +518,82 @@ class CouncilBlueprint:
                 "Error: council compile failed due to unresolved specialists.",
                 data={"blueprint": self.id, "unresolved_specialists": unresolved},
             )
-        synth_strategy = parsed.synth_strategy
-        if synth_strategy == CouncilSynthStrategy.DETERMINISTIC:
-            synthesizer = self._synthesizers.get(parsed.synthesizer)
-            if synthesizer is None:
-                raise BlueprintError(
-                    BlueprintErrorCode.COMPILE_FAILED,
-                    "Error: council compile failed due to unresolved synthesizer.",
-                    data={
-                        "blueprint": self.id,
-                        "unresolved_synthesizer": parsed.synthesizer,
-                    },
-                )
-        else:
-            primary = self._llm_synthesizers.get(parsed.synthesizer)
-            if primary is None:
-                raise BlueprintError(
-                    BlueprintErrorCode.COMPILE_FAILED,
-                    "Error: council compile failed due to unresolved llm synthesizer.",
-                    data={
-                        "blueprint": self.id,
-                        "unresolved_llm_synthesizer": parsed.synthesizer,
-                    },
-                )
-            fallback = self._synthesizers.get("default.v1")
-            if fallback is None:
-                raise BlueprintError(
-                    BlueprintErrorCode.COMPILE_FAILED,
-                    (
-                        "Error: council compile failed due to missing deterministic "
-                        "fallback synthesizer."
-                    ),
-                    data={"blueprint": self.id},
-                )
-            synthesizer = LLMSynthesizer(primary=primary, fallback=fallback)
-        resolved = {
+        return {
             specialist_id: self._specialists[specialist_id]
-            for specialist_id in parsed.specialists
+            for specialist_id in bindings.specialists
         }
-        return CouncilCompiledRunnable(
-            blueprint_id=self.id,
-            specialists=resolved,
-            synthesizer=synthesizer,
-            max_findings=parsed.max_findings,
-        )
+
+    def _resolve_synthesizer(
+        self,
+        bindings: CouncilBindingModel,
+    ) -> CouncilSynthesizer:
+        """Resolve synth strategy and synthesizer implementation from bindings.
+
+        Args:
+            bindings: Validated council bindings payload.
+
+        Returns:
+            Synthesizer implementation for compiled runnable.
+        """
+        if bindings.synth_strategy == CouncilSynthStrategy.DETERMINISTIC:
+            return self._resolve_deterministic_synth(bindings.synthesizer)
+        if bindings.synth_strategy == CouncilSynthStrategy.LLM_WITH_FALLBACK:
+            primary = self._resolve_llm_synth(bindings.synthesizer)
+            fallback = self._resolve_deterministic_synth("default.v1")
+            return LLMSynthesizer(primary=primary, fallback=fallback, strict=False)
+        primary = self._resolve_llm_synth(bindings.synthesizer)
+        return LLMSynthesizer(primary=primary, strict=True)
+
+    def _resolve_deterministic_synth(
+        self,
+        synth_id: str,
+    ) -> CouncilSynthesizer:
+        """Resolve deterministic synthesizer by id.
+
+        Args:
+            synth_id: Deterministic synthesizer id.
+
+        Returns:
+            Deterministic synthesizer implementation.
+
+        Raises:
+            BlueprintError: If deterministic synthesizer id is unresolved.
+        """
+        synthesizer = self._synthesizers.get(synth_id)
+        if synthesizer is None:
+            raise BlueprintError(
+                BlueprintErrorCode.COMPILE_FAILED,
+                "Error: council compile failed due to unresolved synthesizer.",
+                data={
+                    "blueprint": self.id,
+                    "unresolved_synthesizer": synth_id,
+                },
+            )
+        return synthesizer
+
+    def _resolve_llm_synth(
+        self,
+        synth_id: str,
+    ) -> CouncilSynthesizer:
+        """Resolve llm synthesizer by id.
+
+        Args:
+            synth_id: LLM synthesizer id.
+
+        Returns:
+            LLM synthesizer implementation.
+
+        Raises:
+            BlueprintError: If llm synthesizer id is unresolved.
+        """
+        synthesizer = self._llm_synthesizers.get(synth_id)
+        if synthesizer is None:
+            raise BlueprintError(
+                BlueprintErrorCode.COMPILE_FAILED,
+                "Error: council compile failed due to unresolved llm synthesizer.",
+                data={
+                    "blueprint": self.id,
+                    "unresolved_llm_synthesizer": synth_id,
+                },
+            )
+        return synthesizer
