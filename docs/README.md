@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-17"
+last_updated: "2026-02-19"
 status: "active"
 source_of_truth: true
 ---
@@ -33,6 +33,14 @@ Use these files as the only source of truth for each concern:
 | Skills platform phase execution status | `docs/dev/skills_platform_execution_plan.md` |
 | Skills tool authoring workflow | `docs/dev/skills_tool_authoring.md` |
 | Skills platform exercise runbook | `docs/ops/skills_platform_v1_exercise_guide.md` |
+| Blueprints contract (V0) | `docs/specs/blueprints/blueprint_spec_v0.md` |
+| Jobs contract (V0) | `docs/specs/jobs/job_spec_v0.md` |
+| Blueprints + jobs architecture (V0) | `docs/specs/blueprints/blueprints_jobs_architecture_v0.md` |
+| Blueprints phase execution status | `docs/dev/blueprints_execution_plan.md` |
+| Blueprint authoring constraints | `docs/dev/blueprint_authoring_constraints.md` |
+| Jobs phase execution status | `docs/dev/jobs_execution_plan.md` |
+| Blueprints + jobs operations runbook | `docs/ops/blueprints_jobs_runbook_v0.md` |
+| Blueprints/jobs GoF + LangChain/LangGraph implementation guide | `docs/dev/blueprints_jobs_langgraph_langchain_patterns.md` |
 | Process and workflow rules | `docs/process/process.md` |
 | Docs weekly operating cadence | `docs/process/docs_cadence.md` |
 | Active specs index | `docs/specs/README.md` |
