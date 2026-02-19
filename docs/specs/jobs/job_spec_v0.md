@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-18"
+last_updated: "2026-02-19"
 status: "active"
 source_of_truth: true
 ---
@@ -28,38 +28,38 @@ Jobs unify manual runs, scheduled runs, and trigger-based runs under one contrac
 ## 3. Job Contract
 
 Locked decisions (V0):
-- Blueprint metadata mode: code-only blueprints (execution truth in code).
-- Job spec location: concrete executable jobs live under `.lily/jobs/*.job.yaml`.
-- Cron timezone: explicit per-job IANA timezone is required.
-- Retention default: retain all run artifacts in V0.
+- [x] Blueprint metadata mode: code-only blueprints (execution truth in code).
+- [x] Job spec location: concrete executable jobs live under `.lily/jobs/*.job.yaml`.
+- [x] Cron timezone: explicit per-job IANA timezone is required.
+- [x] Retention default: retain all run artifacts in V0.
 
 ## 3.1 Job Schema (Conceptual)
 
 Required fields:
-- `id`
-- `title`
-- `target.kind` (`blueprint` in V0)
-- `target.id` (for example `council.v1`)
-- `bindings`
-- `trigger`
-- `runtime` (timeout/retry/parallelism caps)
-- `output` (artifact and render settings)
-- `timezone` (IANA timezone name, required when `trigger.type=cron`)
+- [ ] `id`
+- [ ] `title`
+- [ ] `target.kind` (`blueprint` in V0)
+- [ ] `target.id` (for example `council.v1`)
+- [ ] `bindings`
+- [ ] `trigger`
+- [ ] `runtime` (timeout/retry/parallelism caps)
+- [ ] `output` (artifact and render settings)
+- [ ] `timezone` (IANA timezone name, required when `trigger.type=cron`)
 
 ## 3.2 Trigger Model (V0)
 
 Supported:
-- `manual`
-- `cron`
+- [x] `manual`
+- [x] `cron`
 
 Deferred:
-- webhook/event triggers
-- queue/topic triggers
+- [ ] webhook/event triggers
+- [ ] queue/topic triggers
 
 Timezone contract:
-- cron jobs must declare explicit IANA timezone.
-- missing or invalid timezone fails with `job_trigger_invalid`.
-- run receipts store timestamps in UTC for stable audit semantics.
+- [x] cron jobs must declare explicit IANA timezone.
+- [x] missing or invalid timezone fails with `job_trigger_invalid`.
+- [x] run receipts store timestamps in UTC for stable audit semantics.
 
 ## 3.3 Execution Contract
 
@@ -116,10 +116,10 @@ V0 must support:
 
 ## 6. Acceptance Criteria
 
-- `jobs list`, `jobs run <job_id>`, and `jobs tail <job_id>` work for V0 job types.
-- Cron-triggered jobs execute with deterministic runtime boundaries.
-- Every run writes mandatory artifacts and a stable receipt.
-- Failures remain contained and return stable error codes.
+- [ ] `jobs list`, `jobs run <job_id>`, and `jobs tail <job_id>` work for V0 job types.
+- [ ] Cron-triggered jobs execute with deterministic runtime boundaries.
+- [ ] Every run writes mandatory artifacts and a stable receipt.
+- [ ] Failures remain contained and return stable error codes.
 
 ## 7. Non-Goals (V0)
 
@@ -130,13 +130,13 @@ V0 must support:
 
 ## 8. Required Tests and Gates
 
-- Job schema validation tests.
-- Trigger parsing/evaluation tests.
-- Artifact persistence tests.
-- Failure/retry boundary tests.
-- CLI integration tests for list/run/tail.
-- `just quality-check`
-- `just contract-conformance`
+- [ ] Job schema validation tests.
+- [ ] Trigger parsing/evaluation tests.
+- [ ] Artifact persistence tests.
+- [ ] Failure/retry boundary tests.
+- [ ] CLI integration tests for list/run/tail.
+- [ ] `just quality-check`
+- [ ] `just contract-conformance`
 
 ## 9. Open Questions
 

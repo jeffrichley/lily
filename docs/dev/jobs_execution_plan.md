@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-18"
+last_updated: "2026-02-19"
 status: "active"
 source_of_truth: true
 ---
@@ -36,19 +36,19 @@ Internal engineering tasks:
 - persist required artifacts (`run_receipt.json`, `summary.md`, `events.jsonl`).
 
 Acceptance criteria:
-- valid job specs run deterministically through target execution path.
-- invalid specs fail with `job_invalid_spec`.
-- missing jobs fail with `job_not_found`.
+- [ ] valid job specs run deterministically through target execution path.
+- [ ] invalid specs fail with `job_invalid_spec`.
+- [ ] missing jobs fail with `job_not_found`.
 
 Non-goals:
 - no scheduler loop yet.
 - no tail streaming yet.
 
 Required tests and gates:
-- job schema validation tests.
-- manual execution integration tests.
-- artifact write tests.
-- `just quality-check`.
+- [ ] job schema validation tests.
+- [ ] manual execution integration tests.
+- [ ] artifact write tests.
+- [ ] `just quality-check`.
 
 ## Phase J1: Cron Scheduling + Tailing
 
@@ -72,19 +72,19 @@ Internal engineering tasks:
 - implement event tailer for structured run stream output.
 
 Acceptance criteria:
-- cron jobs execute according to configured schedule.
-- concurrent scheduler ticks do not duplicate the same intended run.
-- tail command displays ordered structured events.
+- [ ] cron jobs execute according to configured schedule.
+- [ ] concurrent scheduler ticks do not duplicate the same intended run.
+- [ ] tail command displays ordered structured events.
 
 Non-goals:
 - no distributed scheduler.
 - no webhook/event triggers yet.
 
 Required tests and gates:
-- scheduler tick tests.
-- cron parsing and timezone behavior tests.
-- tail streaming tests.
-- `just quality-check`.
+- [ ] scheduler tick tests.
+- [ ] cron parsing and timezone behavior tests.
+- [ ] tail streaming tests.
+- [ ] `just quality-check`.
 
 ## Phase J2: Retry/Failure Policy + Ops Hardening
 
@@ -110,20 +110,20 @@ Internal engineering tasks:
 - document runbook procedures for failures and replay.
 
 Acceptance criteria:
-- retry policy behavior is deterministic and test-covered.
-- timeout and policy denials produce stable error envelopes.
-- retention policy can be applied without corrupting active runs.
+- [ ] retry policy behavior is deterministic and test-covered.
+- [ ] timeout and policy denials produce stable error envelopes.
+- [ ] retention policy can be applied without corrupting active runs.
 
 Non-goals:
 - no cross-host failover.
 - no advanced SLA monitoring stack.
 
 Required tests and gates:
-- retry boundary tests.
-- timeout/failure mapping tests.
-- retention lifecycle tests.
-- `just quality-check`.
-- `just contract-conformance`.
+- [ ] retry boundary tests.
+- [ ] timeout/failure mapping tests.
+- [ ] retention lifecycle tests.
+- [ ] `just quality-check`.
+- [ ] `just contract-conformance`.
 
 ## Milestone Checklist
 
