@@ -36,19 +36,19 @@ Internal engineering tasks:
 - add stable blueprint error mapping.
 
 Acceptance criteria:
-- blueprint registry resolves known ids deterministically.
-- unknown ids fail with `blueprint_not_found`.
-- invalid bindings fail with `blueprint_bindings_invalid`.
+- [x] blueprint registry resolves known ids deterministically.
+- [x] unknown ids fail with `blueprint_not_found`.
+- [x] invalid bindings fail with `blueprint_bindings_invalid`.
 
 Non-goals:
 - no job integration yet.
 - no blueprint DSL/template loading.
 
 Required tests and gates:
-- registry resolution unit tests.
-- bindings schema validation unit tests.
-- deterministic error envelope tests.
-- `just quality-check`.
+- [x] registry resolution unit tests.
+- [x] bindings schema validation unit tests.
+- [x] deterministic error envelope tests.
+- [x] `just quality-check`.
 
 ## Phase B1: Council Blueprint V1
 
@@ -71,29 +71,29 @@ Internal engineering tasks:
 - add deterministic summary payload contract for council output.
 
 Acceptance criteria:
-- `council.v1` executes with 2+ specialists and synthesizer.
-- specialist failure containment is deterministic and surfaced.
-- output envelope remains contract-conformant.
+- [x] `council.v1` executes with 2+ specialists and synthesizer.
+- [x] specialist failure containment is deterministic and surfaced.
+- [x] output envelope remains contract-conformant.
 
 Non-goals:
 - no additional blueprint families.
 - no autonomous recursive councils.
 
 Required tests and gates:
-- council compile/execute integration tests.
-- failure containment tests.
-- envelope snapshot tests.
-- `just quality-check`.
-- `just contract-conformance`.
+- [x] council compile/execute integration tests.
+- [x] failure containment tests.
+- [x] envelope snapshot tests.
+- [x] `just quality-check`.
+- [x] `just contract-conformance`.
 
 ## Phase B2: Blueprint Governance and Docs
 
 Phase checklist:
-- [ ] document blueprint authoring constraints
-- [ ] add `/skills`-style operator diagnostics patterns for blueprint failures
-- [ ] publish blueprint runbook references and troubleshooting paths
-- [ ] add CLI diagnostics rendering tests
-- [ ] pass docs validation via `just quality-check`
+- [x] document blueprint authoring constraints
+- [x] add `/skills`-style operator diagnostics patterns for blueprint failures
+- [x] publish blueprint runbook references and troubleshooting paths
+- [x] add CLI diagnostics rendering tests
+- [x] pass docs validation via `just quality-check`
 
 User-visible features:
 - clear operator diagnostics for blueprint validation and execution failures.
@@ -104,21 +104,60 @@ Internal engineering tasks:
 - publish blueprint runbook references and troubleshooting paths.
 
 Acceptance criteria:
-- blueprint failures render deterministic operator-facing diagnostics.
-- docs and examples are discoverable via canonical docs map.
+- [x] blueprint failures render deterministic operator-facing diagnostics.
+- [x] docs and examples are discoverable via canonical docs map.
 
 Non-goals:
 - no new blueprint types beyond council.
 
 Required tests and gates:
-- CLI diagnostics rendering tests.
-- docs validation (`just docs-check` through `just quality-check`).
+- [x] CLI diagnostics rendering tests.
+- [x] docs validation (`just docs-check` through `just quality-check`).
+
+## Phase B3: Synth Strategy Expansion (Deterministic + LLM)
+
+Phase checklist:
+- [ ] add optional `LLMSynthesizer` implementation behind `CouncilSynthesizer` protocol
+- [ ] enforce deterministic fallback to baseline synthesizer on LLM unavailability/invalid output
+- [ ] define stable config switch for synth strategy selection
+- [ ] add deterministic error mapping for LLM synth failures
+- [ ] add strategy selection unit tests
+- [ ] add fallback-path integration tests
+- [ ] add output-envelope conformance tests for both synth strategies
+- [ ] pass `just quality-check`
+- [ ] pass `just contract-conformance`
+
+User-visible features:
+- optional higher-quality synthesis mode while preserving deterministic reliability fallback.
+
+Internal engineering tasks:
+- implement strategy wiring for deterministic and LLM synth runners.
+- preserve existing deterministic synthesis as the default baseline.
+- enforce typed output validation for LLM synth path before envelope emission.
+
+Acceptance criteria:
+- [ ] deterministic synthesizer remains default behavior.
+- [ ] LLM synthesizer can be enabled explicitly via stable config.
+- [ ] LLM synth failure or invalid output automatically falls back deterministically.
+- [ ] output envelope remains contract-conformant for both strategy paths.
+
+Non-goals:
+- no autonomous self-modifying synthesis prompts.
+- no silent strategy switching without explicit config.
+
+Required tests and gates:
+- [ ] synth strategy selection tests.
+- [ ] LLM failure fallback tests.
+- [ ] envelope conformance tests across both synth paths.
+- [ ] `just quality-check`.
+- [ ] `just contract-conformance`.
 
 ## Milestone Checklist
 
 - [x] B0 complete
 - [x] B1 complete
-- [ ] B2 complete
+- [x] B2 complete
+- [ ] B3 complete
 
 ## Decision Log
 
@@ -126,3 +165,4 @@ Required tests and gates:
 - 2026-02-18: locked initial blueprint family to `council.v1` for first shipped slice.
 - 2026-02-18: B0 completed with `Blueprint` contract, deterministic registry, binding validation, unit coverage, and green quality gate.
 - 2026-02-19: B1 completed with `council.v1` compile/execute map-reduce path, typed specialist/synthesis contracts, deterministic run envelope output, failure containment tests, and green `quality-check` + `contract-conformance` gates.
+- 2026-02-19: B2 completed with blueprint authoring constraints doc, high-visibility CLI blueprint diagnostics, runbook and canonical-doc links, and green docs/quality gates.

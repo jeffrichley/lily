@@ -173,6 +173,93 @@ def test_run_renders_security_alert_panel_for_capability_denied(
     assert "SECURITY ALERT" in result.stdout
 
 
+def test_run_renders_blueprint_diagnostic_panel_for_compile_failure(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    """Blueprint compile errors should render explicit diagnostic panel."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    _write_echo_skill(bundled_dir)
+
+    class _StubRuntime:
+        def handle_input(self, text: str, session: object) -> CommandResult:
+            del text
+            del session
+            return CommandResult.error(
+                "Error: council compile failed due to unresolved specialists.",
+                code="blueprint_compile_failed",
+                data={"blueprint": "council.v1"},
+            )
+
+    monkeypatch.setattr(
+        "lily.cli.cli._build_runtime_for_workspace",
+        lambda **_: _StubRuntime(),
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "/jobs run nightly_security_council",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "BLUEPRINT DIAGNOSTIC" in result.stdout
+    assert "Blueprint Diagnostic" in result.stdout
+    assert "Code: blueprint_compile_failed" in result.stdout
+    assert "registered dependencies" in result.stdout
+
+
+def test_run_renders_blueprint_diagnostic_panel_for_execution_failure(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    """Blueprint execution errors should render explicit diagnostic panel."""
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    _write_echo_skill(bundled_dir)
+
+    class _StubRuntime:
+        def handle_input(self, text: str, session: object) -> CommandResult:
+            del text
+            del session
+            return CommandResult.error(
+                "Error: council execution input is invalid.",
+                code="blueprint_execution_failed",
+                data={"blueprint": "council.v1"},
+            )
+
+    monkeypatch.setattr(
+        "lily.cli.cli._build_runtime_for_workspace",
+        lambda **_: _StubRuntime(),
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "run",
+            "/jobs run nightly_security_council",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "BLUEPRINT DIAGNOSTIC" in result.stdout
+    assert "Code: blueprint_execution_failed" in result.stdout
+    assert "Review compile/execute logs" in result.stdout
+
+
 def test_repl_exit_parentheses_exits_cleanly(tmp_path: Path) -> None:
     """`lily repl` should treat `exit()` as clean shutdown signal."""
     bundled_dir = tmp_path / "bundled"

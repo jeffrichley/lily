@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-18"
+last_updated: "2026-02-19"
 status: "active"
 source_of_truth: true
 ---
@@ -37,6 +37,7 @@ Use these files as the only source of truth for each concern:
 | Jobs contract (V0) | `docs/specs/jobs/job_spec_v0.md` |
 | Blueprints + jobs architecture (V0) | `docs/specs/blueprints/blueprints_jobs_architecture_v0.md` |
 | Blueprints phase execution status | `docs/dev/blueprints_execution_plan.md` |
+| Blueprint authoring constraints | `docs/dev/blueprint_authoring_constraints.md` |
 | Jobs phase execution status | `docs/dev/jobs_execution_plan.md` |
 | Blueprints + jobs operations runbook | `docs/ops/blueprints_jobs_runbook_v0.md` |
 | Blueprints/jobs GoF + LangChain/LangGraph implementation guide | `docs/dev/blueprints_jobs_langgraph_langchain_patterns.md` |

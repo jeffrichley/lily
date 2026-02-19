@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-18"
+last_updated: "2026-02-19"
 status: "active"
 source_of_truth: true
 ---
@@ -14,6 +14,7 @@ Purpose: operator runbook for creating, running, and troubleshooting blueprint-b
 - Lily environment initialized.
 - Skills platform security policy configured.
 - Job specs stored at configured jobs path.
+- Blueprint implementations follow `docs/dev/blueprint_authoring_constraints.md`.
 
 ## 2. Define a Job (Blueprint-Backed)
 
@@ -68,6 +69,14 @@ Use receipt as source of truth for:
   - inspect capability and approval requirements.
 - `job_execution_failed`
   - inspect `events.jsonl` and target-specific artifacts.
+- `blueprint_not_found`
+  - confirm blueprint id is registered in blueprint registry.
+- `blueprint_bindings_invalid`
+  - validate bindings against blueprint `bindings_schema`.
+- `blueprint_compile_failed`
+  - inspect unresolved dependency ids and authoring constraints.
+- `blueprint_execution_failed`
+  - inspect runtime input shape and step-level failure diagnostics.
 
 ## 6. Incident Response Steps
 
@@ -90,3 +99,8 @@ Use receipt as source of truth for:
 - webhook/event-trigger runbook.
 - external notifier operations (telegram/slack).
 
+## 9. Related Docs
+
+- Authoring constraints: `docs/dev/blueprint_authoring_constraints.md`
+- Blueprint execution plan: `docs/dev/blueprints_execution_plan.md`
+- Jobs execution plan: `docs/dev/jobs_execution_plan.md`

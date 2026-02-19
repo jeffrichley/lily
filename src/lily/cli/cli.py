@@ -75,6 +75,13 @@ _SECURITY_ALERT_CODES = {
     "approval_denied",
     "approval_persist_failed",
 }
+_BLUEPRINT_DIAGNOSTIC_CODES = {
+    "blueprint_not_found",
+    "blueprint_bindings_invalid",
+    "blueprint_compile_failed",
+    "blueprint_execution_failed",
+    "blueprint_contract_invalid",
+}
 
 
 class _TerminalSecurityPrompt(SecurityPrompt):
@@ -394,6 +401,8 @@ def _render_result(result: CommandResult) -> None:
                 )
             )
         return
+    if _render_blueprint_diagnostic(result):
+        return
     _CONSOLE.print(
         Panel(
             (
@@ -424,6 +433,46 @@ def _render_result(result: CommandResult) -> None:
                 expand=True,
             )
         )
+
+
+def _render_blueprint_diagnostic(result: CommandResult) -> bool:
+    """Render high-visibility diagnostics for blueprint runtime failures.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when blueprint diagnostic panel was rendered.
+    """
+    if result.code not in _BLUEPRINT_DIAGNOSTIC_CODES:
+        return False
+    guidance = (
+        "Check blueprint id, bindings schema, and registered dependencies.\n"
+        "Review compile/execute logs and re-run after contract fixes."
+    )
+    _CONSOLE.print(
+        Panel(
+            (
+                "[bold black on yellow] BLUEPRINT DIAGNOSTIC [/bold black on yellow]\n"
+                f"Code: {result.code}\n"
+                f"{result.message}\n\n"
+                f"{guidance}"
+            ),
+            title="Blueprint Diagnostic",
+            border_style="bold yellow",
+            expand=True,
+        )
+    )
+    if result.data:
+        _CONSOLE.print(
+            Panel(
+                JSON.from_data(result.data),
+                title="Data",
+                border_style="cyan",
+                expand=True,
+            )
+        )
+    return True
 
 
 def _render_rich_success(result: CommandResult) -> bool:
