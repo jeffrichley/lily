@@ -60,6 +60,17 @@ _HIDE_DATA_CODES = {
     "memory_langmem_saved",
     "memory_langmem_listed",
     "memory_evidence_ingested",
+    "jobs_listed",
+    "jobs_empty",
+    "job_run_completed",
+    "jobs_tailed",
+    "jobs_tail_empty",
+    "jobs_history",
+    "jobs_history_empty",
+    "jobs_scheduler_status",
+    "jobs_paused",
+    "jobs_resumed",
+    "jobs_disabled",
 }
 _SECURITY_ALERT_CODES = {
     "provider_policy_denied",
@@ -284,6 +295,7 @@ def _build_session(
                 "remember",
                 "forget",
                 "memory",
+                "jobs",
             },
         )
     )
@@ -371,6 +383,8 @@ def _build_runtime_for_workspace(
         security=config.security,
         security_prompt=_TerminalSecurityPrompt(),
         project_root=_project_root(),
+        workspace_root=workspace_dir.parent,
+        jobs_scheduler_enabled=True,
     )
 
 
@@ -494,6 +508,17 @@ def _render_rich_success(result: CommandResult) -> bool:
         "memory_listed": _render_memory_list,
         "memory_langmem_listed": _render_memory_list,
         "memory_evidence_listed": _render_evidence_list,
+        "jobs_listed": _render_jobs_list,
+        "jobs_empty": _render_jobs_list,
+        "job_run_completed": _render_job_run,
+        "jobs_tailed": _render_jobs_tail,
+        "jobs_tail_empty": _render_jobs_tail,
+        "jobs_history": _render_jobs_history,
+        "jobs_history_empty": _render_jobs_history,
+        "jobs_scheduler_status": _render_jobs_scheduler_status,
+        "jobs_paused": _render_jobs_scheduler_action,
+        "jobs_resumed": _render_jobs_scheduler_action,
+        "jobs_disabled": _render_jobs_scheduler_action,
     }
     renderer = renderers.get(result.code)
     if renderer is None:
@@ -752,6 +777,286 @@ def _render_agent_show(result: CommandResult) -> bool:
         Panel(
             f"Agent: [bold]{agent}[/bold]\nSummary: {summary}",
             title="Agent",
+            border_style="green",
+            expand=True,
+        )
+    )
+    return True
+
+
+def _render_jobs_list(result: CommandResult) -> bool:
+    """Render `/jobs list` output as table with optional diagnostics panel.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when rich render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    raw_jobs = data.get("jobs") if data is not None else None
+    if not isinstance(raw_jobs, list):
+        return False
+    _render_jobs_table(raw_jobs)
+    _render_job_diagnostics(data)
+    return True
+
+
+def _render_jobs_table(raw_jobs: list[object]) -> None:
+    """Render jobs list table or empty-state panel.
+
+    Args:
+        raw_jobs: Raw jobs list payload from command result data.
+    """
+    if not raw_jobs:
+        _CONSOLE.print(
+            Panel(
+                "No jobs found in `.lily/jobs`.",
+                title="Jobs",
+                border_style="yellow",
+                expand=True,
+            )
+        )
+        return
+    table = Table(title="Jobs", show_header=True, header_style="bold cyan")
+    table.add_column("Job ID", style="bold")
+    table.add_column("Title")
+    table.add_column("Target", style="magenta")
+    table.add_column("Trigger", style="green")
+    for row in raw_jobs:
+        if not isinstance(row, dict):
+            continue
+        table.add_row(
+            str(row.get("id", "")),
+            str(row.get("title", "")),
+            str(row.get("target_id", "")),
+            str(row.get("trigger", "")),
+        )
+    _CONSOLE.print(table)
+
+
+def _render_job_diagnostics(data: dict[str, object] | None) -> None:
+    """Render diagnostics panel for job repository scan results.
+
+    Args:
+        data: Command result data payload.
+    """
+    raw_diagnostics = data.get("diagnostics") if data is not None else None
+    if not isinstance(raw_diagnostics, list) or not raw_diagnostics:
+        return
+    lines = []
+    for diag in raw_diagnostics:
+        if not isinstance(diag, dict):
+            continue
+        lines.append(
+            f"- {diag.get('path', '')} [{diag.get('code', '')}] "
+            f"{diag.get('message', '')}"
+        )
+    _CONSOLE.print(
+        Panel(
+            "\n".join(lines) if lines else "No diagnostics.",
+            title="Job Diagnostics",
+            border_style="yellow",
+            expand=True,
+        )
+    )
+
+
+def _render_job_run(result: CommandResult) -> bool:
+    """Render `/jobs run` success payload in concise panel.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when panel render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    job_id = str(data.get("job_id", "")).strip()
+    run_id = str(data.get("run_id", "")).strip()
+    status = str(data.get("status", "")).strip()
+    run_path = str(data.get("run_path", "")).strip()
+    if not job_id or not run_id:
+        return False
+    _CONSOLE.print(
+        Panel(
+            (
+                f"Job: [bold]{job_id}[/bold]\n"
+                f"Run: [bold]{run_id}[/bold]\n"
+                f"Status: [bold]{status}[/bold]\n"
+                f"Artifacts: {run_path}"
+            ),
+            title="Job Run",
+            border_style="green",
+            expand=True,
+        )
+    )
+    return True
+
+
+def _render_jobs_tail(result: CommandResult) -> bool:
+    """Render `/jobs tail` output in structured panel form.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when panel render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    job_id = str(data.get("job_id", "")).strip()
+    run_id = data.get("run_id")
+    lines = data.get("lines")
+    if not job_id:
+        return False
+    if run_id is None:
+        _CONSOLE.print(
+            Panel(
+                f"Job: [bold]{job_id}[/bold]\nNo runs found yet.",
+                title="Job Tail",
+                border_style="yellow",
+                expand=True,
+            )
+        )
+        return True
+    if not isinstance(lines, list):
+        return False
+    text = (
+        "\n".join(str(line) for line in lines) if lines else "(events.jsonl is empty)"
+    )
+    _CONSOLE.print(
+        Panel(
+            f"Job: [bold]{job_id}[/bold]\nRun: [bold]{run_id}[/bold]\n\n{text}",
+            title="Job Tail",
+            border_style="cyan",
+            expand=True,
+        )
+    )
+    return True
+
+
+def _render_jobs_history(result: CommandResult) -> bool:
+    """Render `/jobs history` output in table form.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    job_id = str(data.get("job_id", "")).strip()
+    raw_entries = data.get("entries")
+    if not job_id or not isinstance(raw_entries, list):
+        return False
+    if not raw_entries:
+        _CONSOLE.print(
+            Panel(
+                f"Job: [bold]{job_id}[/bold]\nNo runs found yet.",
+                title="Job History",
+                border_style="yellow",
+                expand=True,
+            )
+        )
+        return True
+    table = Table(
+        title=f"Job History: {job_id}",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Run ID", style="bold")
+    table.add_column("Status", style="green")
+    table.add_column("Attempts", style="magenta", no_wrap=True)
+    table.add_column("Started (UTC)")
+    table.add_column("Ended (UTC)")
+    for entry in raw_entries:
+        if not isinstance(entry, dict):
+            continue
+        table.add_row(
+            str(entry.get("run_id", "")),
+            str(entry.get("status", "")),
+            str(entry.get("attempt_count", "")),
+            str(entry.get("started_at", "")),
+            str(entry.get("ended_at", "")),
+        )
+    _CONSOLE.print(table)
+    return True
+
+
+def _render_jobs_scheduler_status(result: CommandResult) -> bool:
+    """Render `/jobs status` diagnostics in table/panel form.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    started = "yes" if bool(data.get("started")) else "no"
+    registered_jobs = str(data.get("registered_jobs", "0"))
+    sqlite_path = str(data.get("sqlite_path", ""))
+    _CONSOLE.print(
+        Panel(
+            (
+                f"Started: [bold]{started}[/bold]\n"
+                f"Registered Jobs: [bold]{registered_jobs}[/bold]\n"
+                f"State DB: [bold]{sqlite_path}[/bold]"
+            ),
+            title="Scheduler Status",
+            border_style="cyan",
+            expand=True,
+        )
+    )
+    raw_states = data.get("states")
+    if not isinstance(raw_states, list) or not raw_states:
+        return True
+    table = Table(
+        title="Scheduler Job States", show_header=True, header_style="bold cyan"
+    )
+    table.add_column("Job ID", style="bold")
+    table.add_column("State", style="green")
+    table.add_column("Updated (UTC)")
+    for row in raw_states:
+        if not isinstance(row, dict):
+            continue
+        table.add_row(
+            str(row.get("job_id", "")),
+            str(row.get("state", "")),
+            str(row.get("updated_at", "")),
+        )
+    _CONSOLE.print(table)
+    return True
+
+
+def _render_jobs_scheduler_action(result: CommandResult) -> bool:
+    """Render scheduler lifecycle action confirmation panel.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    job_id = str(data.get("job_id", "")).strip()
+    action = str(data.get("action", "")).strip()
+    if not job_id or not action:
+        return False
+    _CONSOLE.print(
+        Panel(
+            f"Job: [bold]{job_id}[/bold]\nAction: [bold]{action}[/bold]",
+            title="Scheduler Updated",
             border_style="green",
             expand=True,
         )

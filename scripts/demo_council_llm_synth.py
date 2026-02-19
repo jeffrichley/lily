@@ -169,7 +169,9 @@ def main() -> None:
         "--strategy",
         choices=("llm", "llm_with_fallback"),
         default="llm",
-        help="Synthesis strategy. 'llm' is strict; 'llm_with_fallback' enables fallback.",
+        help=(
+            "Synthesis strategy. 'llm' is strict; 'llm_with_fallback' enables fallback."
+        ),
     )
     args = parser.parse_args()
 

@@ -8,6 +8,7 @@ from typing import cast
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
+from lily.blueprints import build_default_blueprint_registry
 from lily.commands.handlers._memory_support import (
     build_personality_namespace,
     build_personality_repository,
@@ -19,6 +20,7 @@ from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
 from lily.config import SecuritySettings
+from lily.jobs import JobExecutor, JobRepository, JobSchedulerRuntime
 from lily.memory import (
     ConsolidationBackend,
     ConsolidationRequest,
@@ -101,6 +103,8 @@ class RuntimeFacade:
         security: SecuritySettings | None = None,
         security_prompt: SecurityPrompt | None = None,
         project_root: Path | None = None,
+        workspace_root: Path | None = None,
+        jobs_scheduler_enabled: bool = False,
     ) -> None:
         """Create facade with command and conversation dependencies.
 
@@ -122,6 +126,8 @@ class RuntimeFacade:
             security: Security settings for plugin-backed tool execution.
             security_prompt: Optional terminal prompt for HITL approvals.
             project_root: Optional project root for dependency lock hashing.
+            workspace_root: Optional `.lily` workspace root for jobs/runs storage.
+            jobs_scheduler_enabled: Whether cron scheduler runtime should start.
         """
         self._consolidation_enabled = consolidation_enabled
         self._consolidation_backend = consolidation_backend
@@ -134,20 +140,30 @@ class RuntimeFacade:
         self._security = security or SecuritySettings()
         self._security_prompt = security_prompt
         self._project_root = project_root or Path.cwd()
+        self._workspace_root = workspace_root or Path.cwd() / ".lily"
         self._persona_repository = persona_repository or FilePersonaRepository(
             root_dir=default_persona_root()
         )
-        self._command_registry = command_registry or self._build_default_registry(
-            memory_tooling_enabled=memory_tooling_enabled,
-            memory_tooling_auto_apply=memory_tooling_auto_apply,
-            consolidation_enabled=consolidation_enabled,
-            consolidation_backend=consolidation_backend,
-            consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
-            evidence_chunking=evidence_chunking,
-            security=self._security,
-            security_prompt=self._security_prompt,
-            project_root=self._project_root,
-        )
+        self._jobs_scheduler_runtime: JobSchedulerRuntime | None = None
+        if command_registry is None:
+            if jobs_scheduler_enabled:
+                self._jobs_scheduler_runtime = self._build_jobs_scheduler_runtime()
+                self._jobs_scheduler_runtime.start()
+            self._command_registry = self._build_default_registry(
+                memory_tooling_enabled=memory_tooling_enabled,
+                memory_tooling_auto_apply=memory_tooling_auto_apply,
+                consolidation_enabled=consolidation_enabled,
+                consolidation_backend=consolidation_backend,
+                consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
+                evidence_chunking=evidence_chunking,
+                security=self._security,
+                security_prompt=self._security_prompt,
+                project_root=self._project_root,
+                workspace_root=self._workspace_root,
+                jobs_scheduler_control=self._jobs_scheduler_runtime,
+            )
+        else:
+            self._command_registry = command_registry
         self._conversation_executor = (
             conversation_executor
             or LangChainConversationExecutor(checkpointer=conversation_checkpointer)
@@ -170,6 +186,8 @@ class RuntimeFacade:
 
     def close(self) -> None:
         """Release runtime resources (for example sqlite-backed checkpointers)."""
+        if self._jobs_scheduler_runtime is not None:
+            self._jobs_scheduler_runtime.shutdown()
         maybe_close = getattr(self._conversation_executor, "close", None)
         if callable(maybe_close):
             maybe_close()
@@ -334,6 +352,8 @@ class RuntimeFacade:
         security: SecuritySettings,
         security_prompt: SecurityPrompt | None,
         project_root: Path,
+        workspace_root: Path,
+        jobs_scheduler_control: JobSchedulerRuntime | None,
     ) -> CommandRegistry:
         """Construct default command registry with hidden LLM backend wiring.
 
@@ -347,6 +367,8 @@ class RuntimeFacade:
             security: Security settings for plugin-backed tools.
             security_prompt: Optional terminal prompt for approvals.
             project_root: Project root for dependency lock fingerprint.
+            workspace_root: Workspace root for jobs and run artifacts.
+            jobs_scheduler_control: Optional scheduler controls for `/jobs`.
 
         Returns:
             Command registry with invoker and executor dependencies.
@@ -384,6 +406,13 @@ class RuntimeFacade:
             ToolDispatchExecutor(providers=providers),
         )
         invoker = SkillInvoker(executors=executors)
+        jobs_dir = workspace_root / "jobs"
+        runs_root = workspace_root / "runs"
+        jobs_executor = JobExecutor(
+            repository=JobRepository(jobs_dir=jobs_dir),
+            blueprint_registry=build_default_blueprint_registry(),
+            runs_root=runs_root,
+        )
         return CommandRegistry(
             skill_invoker=invoker,
             persona_repository=self._persona_repository,
@@ -393,6 +422,25 @@ class RuntimeFacade:
             consolidation_backend=consolidation_backend,
             consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
             evidence_chunking=evidence_chunking,
+            jobs_executor=jobs_executor,
+            jobs_runs_root=runs_root,
+            jobs_scheduler_control=jobs_scheduler_control,
+        )
+
+    def _build_jobs_scheduler_runtime(self) -> JobSchedulerRuntime:
+        """Build APScheduler runtime service for cron job execution.
+
+        Returns:
+            Scheduler runtime service.
+        """
+        jobs_dir = self._workspace_root / "jobs"
+        runs_root = self._workspace_root / "runs"
+        scheduler_db_path = self._workspace_root / "db" / "jobs_scheduler.sqlite3"
+        return JobSchedulerRuntime(
+            repository=JobRepository(jobs_dir=jobs_dir),
+            jobs_dir=jobs_dir,
+            runs_root=runs_root,
+            sqlite_path=scheduler_db_path,
         )
 
     def _maybe_run_scheduled_consolidation(self, session: Session) -> None:

@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-18"
+last_updated: "2026-02-19"
 status: "active"
 source_of_truth: true
 ---
@@ -28,38 +28,38 @@ Jobs unify manual runs, scheduled runs, and trigger-based runs under one contrac
 ## 3. Job Contract
 
 Locked decisions (V0):
-- Blueprint metadata mode: code-only blueprints (execution truth in code).
-- Job spec location: concrete executable jobs live under `.lily/jobs/*.job.yaml`.
-- Cron timezone: explicit per-job IANA timezone is required.
-- Retention default: retain all run artifacts in V0.
+- [x] Blueprint metadata mode: code-only blueprints (execution truth in code).
+- [x] Job spec location: concrete executable jobs live under `.lily/jobs/*.job.yaml`.
+- [x] Cron timezone: explicit per-job IANA timezone is required.
+- [x] Retention default: retain all run artifacts in V0.
 
 ## 3.1 Job Schema (Conceptual)
 
 Required fields:
-- `id`
-- `title`
-- `target.kind` (`blueprint` in V0)
-- `target.id` (for example `council.v1`)
-- `bindings`
-- `trigger`
-- `runtime` (timeout/retry/parallelism caps)
-- `output` (artifact and render settings)
-- `timezone` (IANA timezone name, required when `trigger.type=cron`)
+- [ ] `id`
+- [ ] `title`
+- [ ] `target.kind` (`blueprint` in V0)
+- [ ] `target.id` (for example `council.v1`)
+- [ ] `bindings`
+- [ ] `trigger`
+- [ ] `runtime` (timeout/retry/parallelism caps)
+- [ ] `output` (artifact and render settings)
+- [ ] `timezone` (IANA timezone name, required when `trigger.type=cron`)
 
 ## 3.2 Trigger Model (V0)
 
 Supported:
-- `manual`
-- `cron`
+- [x] `manual`
+- [x] `cron`
 
 Deferred:
-- webhook/event triggers
-- queue/topic triggers
+- [ ] webhook/event triggers
+- [ ] queue/topic triggers
 
 Timezone contract:
-- cron jobs must declare explicit IANA timezone.
-- missing or invalid timezone fails with `job_trigger_invalid`.
-- run receipts store timestamps in UTC for stable audit semantics.
+- [x] cron jobs must declare explicit IANA timezone.
+- [x] missing or invalid timezone fails with `job_trigger_invalid`.
+- [x] run receipts store timestamps in UTC for stable audit semantics.
 
 ## 3.3 Execution Contract
 
@@ -71,6 +71,47 @@ Job run sequence:
 5. execute target via Run Contract R0.
 6. persist artifacts and run receipt.
 7. emit deterministic summary.
+
+## 3.6 Scheduler Engine Contract (APScheduler 3.x)
+
+Cron scheduling in J1 must use APScheduler as the primary scheduler runtime, not just
+its trigger parser.
+
+Required:
+- [x] run one dedicated APScheduler instance (`BackgroundScheduler` or `BlockingScheduler`).
+- [x] register cron jobs via `add_job(..., id=<job_id>, replace_existing=True)`.
+- [x] build cron schedule with `CronTrigger.from_crontab(<expr>, timezone=<iana>)`.
+- [x] configure scheduler/job defaults with:
+  - [x] `coalesce=True`
+  - [x] `max_instances=1`
+  - [x] `misfire_grace_time` explicitly set by policy
+- [x] attach listeners for:
+  - [x] `EVENT_JOB_EXECUTED`
+  - [x] `EVENT_JOB_ERROR`
+  - [x] `EVENT_JOB_MISSED`
+- [x] map APScheduler lifecycle events to Lily run artifacts/events deterministically.
+- [x] enforce single-scheduler-process ownership for one APScheduler job store.
+
+Disallowed as primary scheduler behavior:
+- [ ] custom scheduler loop that reimplements APScheduler due-run evaluation.
+- [ ] multi-process schedulers sharing the same APScheduler job store.
+
+## 3.7 Durable State and Recovery Contract (J3)
+
+Required:
+- [x] use SQLite-backed APScheduler job store persisted under `db/`.
+- [x] scheduler startup performs deterministic reconciliation for missed windows.
+- [x] recovery emits stable lifecycle events into `events.jsonl` for auditability.
+- [x] operator lifecycle controls exist for scheduled jobs:
+  - [x] `jobs pause <job_id>`
+  - [x] `jobs resume <job_id>`
+  - [x] `jobs disable <job_id>`
+- [x] run history query exists with deterministic ordering and bounded output:
+  - [x] `jobs history <job_id> [--limit N]`
+
+Disallowed:
+- [ ] manual editing of scheduler internals as the only pause/disable mechanism.
+- [ ] implicit replay that bypasses deterministic event emission.
 
 ## 3.4 Shared Output Envelope
 
@@ -116,10 +157,13 @@ V0 must support:
 
 ## 6. Acceptance Criteria
 
-- `jobs list`, `jobs run <job_id>`, and `jobs tail <job_id>` work for V0 job types.
-- Cron-triggered jobs execute with deterministic runtime boundaries.
-- Every run writes mandatory artifacts and a stable receipt.
-- Failures remain contained and return stable error codes.
+- [x] `jobs list`, `jobs run <job_id>`, and `jobs tail <job_id>` work for V0 job types.
+- [x] Cron-triggered jobs execute with deterministic runtime boundaries.
+- [x] Every run writes mandatory artifacts and a stable receipt.
+- [x] Failures remain contained and return stable error codes.
+- [x] J1 cron behavior is driven by APScheduler runtime APIs, not trigger-only usage.
+- [x] J3 durable scheduler state survives restart and reconciles deterministically.
+- [x] J3 operator lifecycle controls (pause/resume/disable/history) are command-complete.
 
 ## 7. Non-Goals (V0)
 
@@ -130,13 +174,17 @@ V0 must support:
 
 ## 8. Required Tests and Gates
 
-- Job schema validation tests.
-- Trigger parsing/evaluation tests.
-- Artifact persistence tests.
-- Failure/retry boundary tests.
-- CLI integration tests for list/run/tail.
-- `just quality-check`
-- `just contract-conformance`
+- [x] Job schema validation tests.
+- [x] Trigger parsing/evaluation tests.
+- [x] Artifact persistence tests.
+- [x] Failure/retry boundary tests.
+- [x] CLI integration tests for list/run/tail.
+- [x] APScheduler integration tests (job registration + listeners + misfire/coalesce).
+- [x] restart/reconciliation integration tests.
+- [x] pause/resume/disable command integration tests.
+- [x] history query tests.
+- [x] `just quality-check`
+- [x] `just contract-conformance`
 
 ## 9. Open Questions
 

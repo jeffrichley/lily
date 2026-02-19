@@ -13,6 +13,7 @@ from lily.blueprints.council import (
     CouncilSynthStrategy,
     LLMSynthesizer,
 )
+from lily.blueprints.defaults import build_default_blueprint_registry
 from lily.blueprints.models import (
     Blueprint,
     BlueprintError,
@@ -41,5 +42,6 @@ __all__ = [
     "CouncilSynthStrategy",
     "CouncilSynthesisError",
     "LLMSynthesizer",
+    "build_default_blueprint_registry",
     "validate_blueprint_contract",
 ]
