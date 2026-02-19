@@ -117,15 +117,15 @@ Required tests and gates:
 ## Phase B3: Synth Strategy Expansion (Deterministic + LLM)
 
 Phase checklist:
-- [ ] add optional `LLMSynthesizer` implementation behind `CouncilSynthesizer` protocol
-- [ ] enforce deterministic fallback to baseline synthesizer on LLM unavailability/invalid output
-- [ ] define stable config switch for synth strategy selection
-- [ ] add deterministic error mapping for LLM synth failures
-- [ ] add strategy selection unit tests
-- [ ] add fallback-path integration tests
-- [ ] add output-envelope conformance tests for both synth strategies
-- [ ] pass `just quality-check`
-- [ ] pass `just contract-conformance`
+- [x] add optional `LLMSynthesizer` implementation behind `CouncilSynthesizer` protocol
+- [x] enforce deterministic fallback to baseline synthesizer on LLM unavailability/invalid output
+- [x] define stable config switch for synth strategy selection
+- [x] add deterministic error mapping for LLM synth failures
+- [x] add strategy selection unit tests
+- [x] add fallback-path integration tests
+- [x] add output-envelope conformance tests for both synth strategies
+- [x] pass `just quality-check`
+- [x] pass `just contract-conformance`
 
 User-visible features:
 - optional higher-quality synthesis mode while preserving deterministic reliability fallback.
@@ -136,28 +136,28 @@ Internal engineering tasks:
 - enforce typed output validation for LLM synth path before envelope emission.
 
 Acceptance criteria:
-- [ ] deterministic synthesizer remains default behavior.
-- [ ] LLM synthesizer can be enabled explicitly via stable config.
-- [ ] LLM synth failure or invalid output automatically falls back deterministically.
-- [ ] output envelope remains contract-conformant for both strategy paths.
+- [x] deterministic synthesizer remains default behavior.
+- [x] LLM synthesizer can be enabled explicitly via stable config.
+- [x] LLM synth failure or invalid output automatically falls back deterministically.
+- [x] output envelope remains contract-conformant for both strategy paths.
 
 Non-goals:
 - no autonomous self-modifying synthesis prompts.
 - no silent strategy switching without explicit config.
 
 Required tests and gates:
-- [ ] synth strategy selection tests.
-- [ ] LLM failure fallback tests.
-- [ ] envelope conformance tests across both synth paths.
-- [ ] `just quality-check`.
-- [ ] `just contract-conformance`.
+- [x] synth strategy selection tests.
+- [x] LLM failure fallback tests.
+- [x] envelope conformance tests across both synth paths.
+- [x] `just quality-check`.
+- [x] `just contract-conformance`.
 
 ## Milestone Checklist
 
 - [x] B0 complete
 - [x] B1 complete
 - [x] B2 complete
-- [ ] B3 complete
+- [x] B3 complete
 
 ## Decision Log
 
@@ -166,3 +166,4 @@ Required tests and gates:
 - 2026-02-18: B0 completed with `Blueprint` contract, deterministic registry, binding validation, unit coverage, and green quality gate.
 - 2026-02-19: B1 completed with `council.v1` compile/execute map-reduce path, typed specialist/synthesis contracts, deterministic run envelope output, failure containment tests, and green `quality-check` + `contract-conformance` gates.
 - 2026-02-19: B2 completed with blueprint authoring constraints doc, high-visibility CLI blueprint diagnostics, runbook and canonical-doc links, and green docs/quality gates.
+- 2026-02-19: B3 completed with `synth_strategy` selection (`deterministic`/`llm`), optional `LLMSynthesizer`, deterministic fallback path, stable synthesis error mapping, expanded council tests, and green `quality-check` + `contract-conformance` gates.

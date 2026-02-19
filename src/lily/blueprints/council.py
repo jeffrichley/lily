@@ -27,6 +27,13 @@ class CouncilSpecialistStatus(StrEnum):
     ERROR = "error"
 
 
+class CouncilSynthStrategy(StrEnum):
+    """Stable synth strategy selector for council blueprint bindings."""
+
+    DETERMINISTIC = "deterministic"
+    LLM = "llm"
+
+
 class CouncilBindingModel(BaseModel):
     """Bindings schema for council blueprint compilation."""
 
@@ -34,6 +41,7 @@ class CouncilBindingModel(BaseModel):
 
     specialists: tuple[str, ...] = Field(min_length=2)
     synthesizer: str = Field(min_length=1)
+    synth_strategy: CouncilSynthStrategy = CouncilSynthStrategy.DETERMINISTIC
     max_findings: int = Field(default=8, ge=1, le=20)
 
 
@@ -110,6 +118,20 @@ class CouncilSynthesizer(Protocol):
         """
 
 
+class CouncilSynthesisError(RuntimeError):
+    """Deterministic synthesis failure raised by strategy wrappers."""
+
+    def __init__(self, *, code: str, message: str) -> None:
+        """Store stable synthesis failure payload.
+
+        Args:
+            code: Stable machine-readable synthesis code.
+            message: Human-readable synthesis failure message.
+        """
+        super().__init__(message)
+        self.code = code
+
+
 class _DeterministicSynthesizer:
     """Default deterministic council synthesizer."""
 
@@ -156,6 +178,78 @@ class _DeterministicSynthesizer:
             participating_specialists=tuple(report.specialist_id for report in reports),
             failed_specialists=failed,
         )
+
+
+class LLMSynthesizer:
+    """Optional LLM synthesis strategy with deterministic fallback behavior."""
+
+    def __init__(
+        self,
+        *,
+        primary: CouncilSynthesizer,
+        fallback: CouncilSynthesizer,
+    ) -> None:
+        """Store strategy chain for LLM synthesis.
+
+        Args:
+            primary: LLM-backed synthesis strategy.
+            fallback: Deterministic fallback synthesis strategy.
+        """
+        self._primary = primary
+        self._fallback = fallback
+
+    def run(
+        self,
+        *,
+        request: CouncilInputModel,
+        reports: tuple[CouncilSpecialistReport, ...],
+        max_findings: int,
+    ) -> CouncilOutputModel:
+        """Execute primary synth and fall back deterministically on failure.
+
+        Args:
+            request: Typed council input.
+            reports: Specialist report set.
+            max_findings: Maximum finding count.
+
+        Returns:
+            Typed council output payload.
+
+        Raises:
+            CouncilSynthesisError: If primary and fallback both fail.
+        """
+        try:
+            primary_output = self._primary.run(
+                request=request,
+                reports=reports,
+                max_findings=max_findings,
+            )
+            return CouncilOutputModel.model_validate(primary_output)
+        except Exception as primary_exc:
+            try:
+                fallback_output = CouncilOutputModel.model_validate(
+                    self._fallback.run(
+                        request=request,
+                        reports=reports,
+                        max_findings=max_findings,
+                    )
+                )
+            except Exception as fallback_exc:
+                raise CouncilSynthesisError(
+                    code="llm_synth_fallback_failed",
+                    message=(
+                        "Error: council synthesis failed in both llm and "
+                        "deterministic fallback paths."
+                    ),
+                ) from fallback_exc
+            return fallback_output.model_copy(
+                update={
+                    "summary": (
+                        f"{fallback_output.summary} "
+                        f"[fallback: llm_synth_failed ({primary_exc})]"
+                    )
+                }
+            )
 
 
 class CouncilCompiledRunnable:
@@ -250,14 +344,47 @@ class CouncilCompiledRunnable:
         reduce_step = cast(
             RunnableSerializable[dict[str, object], CouncilOutputModel],
             RunnableLambda(
-                lambda payload: self._synthesizer.run(
+                lambda payload: self._reduce_reports(
                     request=payload["request"],
                     reports=tuple(payload["reports_map"].values()),
-                    max_findings=self._max_findings,
                 )
             ),
         )
         return collect | reduce_step
+
+    def _reduce_reports(
+        self,
+        *,
+        request: CouncilInputModel,
+        reports: tuple[CouncilSpecialistReport, ...],
+    ) -> CouncilOutputModel:
+        """Run synthesis step with deterministic LLM-failure error mapping.
+
+        Args:
+            request: Typed council input payload.
+            reports: Specialist report set.
+
+        Returns:
+            Typed council output payload.
+
+        Raises:
+            BlueprintError: If synthesis fails after fallback strategy.
+        """
+        try:
+            return self._synthesizer.run(
+                request=request,
+                reports=reports,
+                max_findings=self._max_findings,
+            )
+        except CouncilSynthesisError as exc:
+            raise BlueprintError(
+                BlueprintErrorCode.EXECUTION_FAILED,
+                "Error: council synthesis failed.",
+                data={
+                    "blueprint": self._blueprint_id,
+                    "synth_error_code": exc.code,
+                },
+            ) from exc
 
     def _build_specialist_step(
         self, specialist_id: str
@@ -318,18 +445,23 @@ class CouncilBlueprint:
         *,
         specialists: Mapping[str, CouncilSpecialist],
         synthesizers: Mapping[str, CouncilSynthesizer] | None = None,
+        llm_synthesizers: Mapping[str, CouncilSynthesizer] | None = None,
     ) -> None:
         """Create council blueprint dependencies.
 
         Args:
             specialists: Specialist runners keyed by id.
             synthesizers: Optional synthesizer runners keyed by id.
+            llm_synthesizers: Optional llm synth runners keyed by id.
         """
         self._specialists = dict(specialists)
         self._synthesizers = (
             dict(synthesizers)
             if synthesizers is not None
             else {"default.v1": _DeterministicSynthesizer()}
+        )
+        self._llm_synthesizers = (
+            dict(llm_synthesizers) if llm_synthesizers is not None else {}
         )
 
     def compile(self, bindings: BaseModel) -> CouncilCompiledRunnable:
@@ -356,16 +488,40 @@ class CouncilBlueprint:
                 "Error: council compile failed due to unresolved specialists.",
                 data={"blueprint": self.id, "unresolved_specialists": unresolved},
             )
-        synthesizer = self._synthesizers.get(parsed.synthesizer)
-        if synthesizer is None:
-            raise BlueprintError(
-                BlueprintErrorCode.COMPILE_FAILED,
-                "Error: council compile failed due to unresolved synthesizer.",
-                data={
-                    "blueprint": self.id,
-                    "unresolved_synthesizer": parsed.synthesizer,
-                },
-            )
+        synth_strategy = parsed.synth_strategy
+        if synth_strategy == CouncilSynthStrategy.DETERMINISTIC:
+            synthesizer = self._synthesizers.get(parsed.synthesizer)
+            if synthesizer is None:
+                raise BlueprintError(
+                    BlueprintErrorCode.COMPILE_FAILED,
+                    "Error: council compile failed due to unresolved synthesizer.",
+                    data={
+                        "blueprint": self.id,
+                        "unresolved_synthesizer": parsed.synthesizer,
+                    },
+                )
+        else:
+            primary = self._llm_synthesizers.get(parsed.synthesizer)
+            if primary is None:
+                raise BlueprintError(
+                    BlueprintErrorCode.COMPILE_FAILED,
+                    "Error: council compile failed due to unresolved llm synthesizer.",
+                    data={
+                        "blueprint": self.id,
+                        "unresolved_llm_synthesizer": parsed.synthesizer,
+                    },
+                )
+            fallback = self._synthesizers.get("default.v1")
+            if fallback is None:
+                raise BlueprintError(
+                    BlueprintErrorCode.COMPILE_FAILED,
+                    (
+                        "Error: council compile failed due to missing deterministic "
+                        "fallback synthesizer."
+                    ),
+                    data={"blueprint": self.id},
+                )
+            synthesizer = LLMSynthesizer(primary=primary, fallback=fallback)
         resolved = {
             specialist_id: self._specialists[specialist_id]
             for specialist_id in parsed.specialists

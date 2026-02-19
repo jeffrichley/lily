@@ -34,6 +34,7 @@ Update cadence:
 - [x] Blueprints + jobs planning docs published (specs, architecture, execution plans, runbook).
 - [x] Blueprints Phase B0 and B1 completed (`council.v1` compile/execute + typed contracts + tests + gates).
 - [x] Blueprints Phase B2 completed (authoring constraints, diagnostic UX, runbook/docs discoverability, docs/quality gates).
+- [x] Blueprints Phase B3 completed (deterministic + llm synth strategy, fallback/error mapping, test/gate coverage).
 
 ## In Progress
 

@@ -9,6 +9,9 @@ from lily.blueprints.council import (
     CouncilOutputModel,
     CouncilSpecialistReport,
     CouncilSpecialistStatus,
+    CouncilSynthesisError,
+    CouncilSynthStrategy,
+    LLMSynthesizer,
 )
 from lily.blueprints.models import (
     Blueprint,
@@ -35,5 +38,8 @@ __all__ = [
     "CouncilOutputModel",
     "CouncilSpecialistReport",
     "CouncilSpecialistStatus",
+    "CouncilSynthStrategy",
+    "CouncilSynthesisError",
+    "LLMSynthesizer",
     "validate_blueprint_contract",
 ]
