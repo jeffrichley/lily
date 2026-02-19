@@ -8,6 +8,7 @@ from typing import cast
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
+from lily.blueprints import build_default_blueprint_registry
 from lily.commands.handlers._memory_support import (
     build_personality_namespace,
     build_personality_repository,
@@ -19,6 +20,7 @@ from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
 from lily.config import SecuritySettings
+from lily.jobs import JobExecutor, JobRepository
 from lily.memory import (
     ConsolidationBackend,
     ConsolidationRequest,
@@ -101,6 +103,7 @@ class RuntimeFacade:
         security: SecuritySettings | None = None,
         security_prompt: SecurityPrompt | None = None,
         project_root: Path | None = None,
+        workspace_root: Path | None = None,
     ) -> None:
         """Create facade with command and conversation dependencies.
 
@@ -122,6 +125,7 @@ class RuntimeFacade:
             security: Security settings for plugin-backed tool execution.
             security_prompt: Optional terminal prompt for HITL approvals.
             project_root: Optional project root for dependency lock hashing.
+            workspace_root: Optional `.lily` workspace root for jobs/runs storage.
         """
         self._consolidation_enabled = consolidation_enabled
         self._consolidation_backend = consolidation_backend
@@ -134,6 +138,7 @@ class RuntimeFacade:
         self._security = security or SecuritySettings()
         self._security_prompt = security_prompt
         self._project_root = project_root or Path.cwd()
+        self._workspace_root = workspace_root or Path.cwd() / ".lily"
         self._persona_repository = persona_repository or FilePersonaRepository(
             root_dir=default_persona_root()
         )
@@ -147,6 +152,7 @@ class RuntimeFacade:
             security=self._security,
             security_prompt=self._security_prompt,
             project_root=self._project_root,
+            workspace_root=self._workspace_root,
         )
         self._conversation_executor = (
             conversation_executor
@@ -334,6 +340,7 @@ class RuntimeFacade:
         security: SecuritySettings,
         security_prompt: SecurityPrompt | None,
         project_root: Path,
+        workspace_root: Path,
     ) -> CommandRegistry:
         """Construct default command registry with hidden LLM backend wiring.
 
@@ -347,6 +354,7 @@ class RuntimeFacade:
             security: Security settings for plugin-backed tools.
             security_prompt: Optional terminal prompt for approvals.
             project_root: Project root for dependency lock fingerprint.
+            workspace_root: Workspace root for jobs and run artifacts.
 
         Returns:
             Command registry with invoker and executor dependencies.
@@ -384,6 +392,13 @@ class RuntimeFacade:
             ToolDispatchExecutor(providers=providers),
         )
         invoker = SkillInvoker(executors=executors)
+        jobs_dir = workspace_root / "jobs"
+        runs_root = workspace_root / "runs"
+        jobs_executor = JobExecutor(
+            repository=JobRepository(jobs_dir=jobs_dir),
+            blueprint_registry=build_default_blueprint_registry(),
+            runs_root=runs_root,
+        )
         return CommandRegistry(
             skill_invoker=invoker,
             persona_repository=self._persona_repository,
@@ -393,6 +408,8 @@ class RuntimeFacade:
             consolidation_backend=consolidation_backend,
             consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
             evidence_chunking=evidence_chunking,
+            jobs_executor=jobs_executor,
+            jobs_runs_root=runs_root,
         )
 
     def _maybe_run_scheduled_consolidation(self, session: Session) -> None:

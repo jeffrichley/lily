@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from lily.commands.handlers.agent import AgentCommand
 from lily.commands.handlers.forget import ForgetCommand
 from lily.commands.handlers.help_skill import HelpSkillCommand
+from lily.commands.handlers.jobs import JobsCommand
 from lily.commands.handlers.memory import MemoryCommand
 from lily.commands.handlers.persona import PersonaCommand
 from lily.commands.handlers.reload_persona import ReloadPersonaCommand
@@ -15,6 +18,7 @@ from lily.commands.handlers.skills_list import SkillsListCommand
 from lily.commands.handlers.style import StyleCommand
 from lily.commands.parser import CommandCall
 from lily.commands.types import CommandHandler, CommandResult
+from lily.jobs import JobExecutor
 from lily.memory import ConsolidationBackend, EvidenceChunkingSettings
 from lily.persona import FilePersonaRepository, default_persona_root
 from lily.runtime.skill_invoker import SkillInvoker
@@ -36,6 +40,8 @@ class CommandRegistry:
         consolidation_backend: ConsolidationBackend = ConsolidationBackend.RULE_BASED,
         consolidation_llm_assisted_enabled: bool = False,
         evidence_chunking: EvidenceChunkingSettings | None = None,
+        jobs_executor: JobExecutor | None = None,
+        jobs_runs_root: Path | None = None,
         handlers: dict[str, CommandHandler] | None = None,
     ) -> None:
         """Construct registry with built-in handlers plus optional overrides.
@@ -49,6 +55,8 @@ class CommandRegistry:
             consolidation_backend: Consolidation backend selection.
             consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
             evidence_chunking: Evidence chunking settings.
+            jobs_executor: Optional jobs executor for `/jobs`.
+            jobs_runs_root: Optional run artifact root path for `/jobs`.
             handlers: Optional custom handlers keyed by command name.
         """
         self._skill_invoker = skill_invoker
@@ -75,6 +83,10 @@ class CommandRegistry:
                 evidence_chunking=evidence_chunking,
             ),
         }
+        if jobs_executor is not None and jobs_runs_root is not None:
+            self._handlers["jobs"] = JobsCommand(
+                jobs_executor, runs_root=jobs_runs_root
+            )
         if handlers:
             self._handlers.update(handlers)
 

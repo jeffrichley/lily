@@ -16,14 +16,14 @@ This plan covers job execution, scheduling, artifacts, and operational controls.
 ## Phase J0: Job Contract + Manual Execution
 
 Phase checklist:
-- [ ] define job spec model and validation
-- [ ] implement job repository loading and deterministic error mapping
-- [ ] implement manual run executor using Run Contract R0 target resolution
-- [ ] persist required artifacts (`run_receipt.json`, `summary.md`, `events.jsonl`)
-- [ ] add job schema validation tests
-- [ ] add manual execution integration tests
-- [ ] add artifact write tests
-- [ ] pass `just quality-check`
+- [x] define job spec model and validation
+- [x] implement job repository loading and deterministic error mapping
+- [x] implement manual run executor using Run Contract R0 target resolution
+- [x] persist required artifacts (`run_receipt.json`, `summary.md`, `events.jsonl`)
+- [x] add job schema validation tests
+- [x] add manual execution integration tests
+- [x] add artifact write tests
+- [x] pass `just quality-check`
 
 User-visible features:
 - `jobs list`
@@ -36,19 +36,19 @@ Internal engineering tasks:
 - persist required artifacts (`run_receipt.json`, `summary.md`, `events.jsonl`).
 
 Acceptance criteria:
-- [ ] valid job specs run deterministically through target execution path.
-- [ ] invalid specs fail with `job_invalid_spec`.
-- [ ] missing jobs fail with `job_not_found`.
+- [x] valid job specs run deterministically through target execution path.
+- [x] invalid specs fail with `job_invalid_spec`.
+- [x] missing jobs fail with `job_not_found`.
 
 Non-goals:
 - no scheduler loop yet.
 - no tail streaming yet.
 
 Required tests and gates:
-- [ ] job schema validation tests.
-- [ ] manual execution integration tests.
-- [ ] artifact write tests.
-- [ ] `just quality-check`.
+- [x] job schema validation tests.
+- [x] manual execution integration tests.
+- [x] artifact write tests.
+- [x] `just quality-check`.
 
 ## Phase J1: Cron Scheduling + Tailing
 
@@ -127,7 +127,7 @@ Required tests and gates:
 
 ## Milestone Checklist
 
-- [ ] J0 complete
+- [x] J0 complete
 - [ ] J1 complete
 - [ ] J2 complete
 
