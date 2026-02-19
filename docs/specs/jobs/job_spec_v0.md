@@ -72,6 +72,30 @@ Job run sequence:
 6. persist artifacts and run receipt.
 7. emit deterministic summary.
 
+## 3.6 Scheduler Engine Contract (APScheduler 3.x)
+
+Cron scheduling in J1 must use APScheduler as the primary scheduler runtime, not just
+its trigger parser.
+
+Required:
+- [x] run one dedicated APScheduler instance (`BackgroundScheduler` or `BlockingScheduler`).
+- [x] register cron jobs via `add_job(..., id=<job_id>, replace_existing=True)`.
+- [x] build cron schedule with `CronTrigger.from_crontab(<expr>, timezone=<iana>)`.
+- [x] configure scheduler/job defaults with:
+  - [x] `coalesce=True`
+  - [x] `max_instances=1`
+  - [x] `misfire_grace_time` explicitly set by policy
+- [x] attach listeners for:
+  - [x] `EVENT_JOB_EXECUTED`
+  - [x] `EVENT_JOB_ERROR`
+  - [x] `EVENT_JOB_MISSED`
+- [x] map APScheduler lifecycle events to Lily run artifacts/events deterministically.
+- [x] enforce single-scheduler-process ownership for one APScheduler job store.
+
+Disallowed as primary scheduler behavior:
+- [ ] custom scheduler loop that reimplements APScheduler due-run evaluation.
+- [ ] multi-process schedulers sharing the same APScheduler job store.
+
 ## 3.4 Shared Output Envelope
 
 Every job run returns:
@@ -116,10 +140,11 @@ V0 must support:
 
 ## 6. Acceptance Criteria
 
-- [ ] `jobs list`, `jobs run <job_id>`, and `jobs tail <job_id>` work for V0 job types.
-- [ ] Cron-triggered jobs execute with deterministic runtime boundaries.
-- [ ] Every run writes mandatory artifacts and a stable receipt.
-- [ ] Failures remain contained and return stable error codes.
+- [x] `jobs list`, `jobs run <job_id>`, and `jobs tail <job_id>` work for V0 job types.
+- [x] Cron-triggered jobs execute with deterministic runtime boundaries.
+- [x] Every run writes mandatory artifacts and a stable receipt.
+- [x] Failures remain contained and return stable error codes.
+- [x] J1 cron behavior is driven by APScheduler runtime APIs, not trigger-only usage.
 
 ## 7. Non-Goals (V0)
 
@@ -130,13 +155,14 @@ V0 must support:
 
 ## 8. Required Tests and Gates
 
-- [ ] Job schema validation tests.
-- [ ] Trigger parsing/evaluation tests.
-- [ ] Artifact persistence tests.
-- [ ] Failure/retry boundary tests.
-- [ ] CLI integration tests for list/run/tail.
-- [ ] `just quality-check`
-- [ ] `just contract-conformance`
+- [x] Job schema validation tests.
+- [x] Trigger parsing/evaluation tests.
+- [x] Artifact persistence tests.
+- [x] Failure/retry boundary tests.
+- [x] CLI integration tests for list/run/tail.
+- [x] APScheduler integration tests (job registration + listeners + misfire/coalesce).
+- [x] `just quality-check`
+- [x] `just contract-conformance`
 
 ## 9. Open Questions
 

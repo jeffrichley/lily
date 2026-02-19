@@ -136,3 +136,13 @@ class JobRunEnvelope(BaseModel):
     approvals_requested: tuple[str, ...] = ()
     references: tuple[str, ...] = ()
     payload: dict[str, object] = {}
+
+
+class JobTailResult(BaseModel):
+    """Recent event tail payload for one job."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    job_id: str
+    run_id: str | None = None
+    lines: tuple[str, ...] = ()

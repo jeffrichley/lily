@@ -85,7 +85,8 @@ class CommandRegistry:
         }
         if jobs_executor is not None and jobs_runs_root is not None:
             self._handlers["jobs"] = JobsCommand(
-                jobs_executor, runs_root=jobs_runs_root
+                jobs_executor,
+                runs_root=jobs_runs_root,
             )
         if handlers:
             self._handlers.update(handlers)

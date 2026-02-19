@@ -63,6 +63,8 @@ _HIDE_DATA_CODES = {
     "jobs_listed",
     "jobs_empty",
     "job_run_completed",
+    "jobs_tailed",
+    "jobs_tail_empty",
 }
 _SECURITY_ALERT_CODES = {
     "provider_policy_denied",
@@ -376,6 +378,7 @@ def _build_runtime_for_workspace(
         security_prompt=_TerminalSecurityPrompt(),
         project_root=_project_root(),
         workspace_root=workspace_dir.parent,
+        jobs_scheduler_enabled=True,
     )
 
 
@@ -502,6 +505,8 @@ def _render_rich_success(result: CommandResult) -> bool:
         "jobs_listed": _render_jobs_list,
         "jobs_empty": _render_jobs_list,
         "job_run_completed": _render_job_run,
+        "jobs_tailed": _render_jobs_tail,
+        "jobs_tail_empty": _render_jobs_tail,
     }
     renderer = renderers.get(result.code)
     if renderer is None:
@@ -873,6 +878,49 @@ def _render_job_run(result: CommandResult) -> bool:
             ),
             title="Job Run",
             border_style="green",
+            expand=True,
+        )
+    )
+    return True
+
+
+def _render_jobs_tail(result: CommandResult) -> bool:
+    """Render `/jobs tail` output in structured panel form.
+
+    Args:
+        result: Command result payload.
+
+    Returns:
+        True when panel render succeeded.
+    """
+    data = result.data if isinstance(result.data, dict) else None
+    if data is None:
+        return False
+    job_id = str(data.get("job_id", "")).strip()
+    run_id = data.get("run_id")
+    lines = data.get("lines")
+    if not job_id:
+        return False
+    if run_id is None:
+        _CONSOLE.print(
+            Panel(
+                f"Job: [bold]{job_id}[/bold]\nNo runs found yet.",
+                title="Job Tail",
+                border_style="yellow",
+                expand=True,
+            )
+        )
+        return True
+    if not isinstance(lines, list):
+        return False
+    text = (
+        "\n".join(str(line) for line in lines) if lines else "(events.jsonl is empty)"
+    )
+    _CONSOLE.print(
+        Panel(
+            f"Job: [bold]{job_id}[/bold]\nRun: [bold]{run_id}[/bold]\n\n{text}",
+            title="Job Tail",
+            border_style="cyan",
             expand=True,
         )
     )

@@ -7,10 +7,12 @@ from lily.jobs.models import (
     JobRepositoryScan,
     JobRunEnvelope,
     JobSpec,
+    JobTailResult,
     JobTargetKind,
     JobTriggerType,
 )
 from lily.jobs.repository import JobRepository
+from lily.jobs.scheduler_runtime import JobSchedulerRuntime
 
 __all__ = [
     "JobDiagnostic",
@@ -20,7 +22,9 @@ __all__ = [
     "JobRepository",
     "JobRepositoryScan",
     "JobRunEnvelope",
+    "JobSchedulerRuntime",
     "JobSpec",
+    "JobTailResult",
     "JobTargetKind",
     "JobTriggerType",
 ]

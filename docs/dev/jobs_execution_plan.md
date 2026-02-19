@@ -53,52 +53,66 @@ Required tests and gates:
 ## Phase J1: Cron Scheduling + Tailing
 
 Phase checklist:
-- [ ] implement scheduler component with deterministic cron evaluation
-- [ ] enforce explicit per-job IANA timezone validation
-- [ ] add run queue semantics and duplicate-run guardrails
-- [ ] implement event tailer for structured run stream output
-- [ ] add scheduler tick tests
-- [ ] add cron parsing/timezone behavior tests
-- [ ] add tail streaming tests
-- [ ] pass `just quality-check`
+- [x] implement APScheduler runtime service (`BackgroundScheduler`/`BlockingScheduler`)
+- [x] register cron jobs with `add_job(..., id=<job_id>, replace_existing=True)`
+- [x] configure `coalesce=True`, `max_instances=1`, and explicit `misfire_grace_time`
+- [x] attach APScheduler listeners (`executed`, `error`, `missed`) and map to events/artifacts
+- [x] enforce explicit per-job IANA timezone validation
+- [x] enforce single scheduler process ownership for one APScheduler job store
+- [x] implement event tailer for structured run stream output
+- [x] add scheduler runtime registration tests
+- [x] add cron parsing/timezone behavior tests
+- [x] add tail streaming tests
+- [x] add APScheduler integration tests (registration/listeners/misfire-coalesce)
+- [x] pass `just quality-check`
 
 User-visible features:
 - cron-triggered job runs.
 - `jobs tail <job_id>` for active/recent run output.
 
 Internal engineering tasks:
-- implement scheduler component with deterministic cron evaluation.
-- add run queue semantics and duplicate-run guardrails.
+- implement APScheduler runtime service with explicit scheduler defaults.
+- map APScheduler lifecycle events to deterministic Lily run events/artifacts.
+- enforce single-process scheduler ownership semantics.
 - implement event tailer for structured run stream output.
 
 Acceptance criteria:
-- [ ] cron jobs execute according to configured schedule.
-- [ ] concurrent scheduler ticks do not duplicate the same intended run.
-- [ ] tail command displays ordered structured events.
+- [x] cron jobs execute according to configured schedule.
+- [x] APScheduler controls (`coalesce`, `max_instances`, `misfire_grace_time`) are configured and test-covered.
+- [x] scheduler listeners emit deterministic run lifecycle records (`executed`/`error`/`missed`).
+- [x] tail command displays ordered structured events.
 
 Non-goals:
 - no distributed scheduler.
 - no webhook/event triggers yet.
 
 Required tests and gates:
-- [ ] scheduler tick tests.
-- [ ] cron parsing and timezone behavior tests.
-- [ ] tail streaming tests.
-- [ ] `just quality-check`.
+- [x] scheduler runtime registration tests.
+- [x] cron parsing and timezone behavior tests.
+- [x] APScheduler registration and listener integration tests.
+- [x] APScheduler misfire/coalesce behavior tests.
+- [x] tail streaming tests.
+- [x] `just quality-check`.
+
+APScheduler implementation guardrails (must hold for J1 completion):
+- [x] scheduler uses APScheduler runtime APIs, not trigger-only custom scheduling loop.
+- [x] cron triggers are created through `CronTrigger.from_crontab(..., timezone=...)`.
+- [x] scheduler adds jobs with stable ids and `replace_existing=True`.
+- [x] exactly one scheduler process owns a given job store.
 
 ## Phase J2: Retry/Failure Policy + Ops Hardening
 
 Phase checklist:
-- [ ] implement bounded retry semantics
-- [ ] enforce timeout/resource boundary handling in run executor
-- [ ] keep retain-all artifact policy in V0 with deterministic run indexing
-- [ ] document deferred cleanup/self-learning scheduled jobs as debt/TODO
-- [ ] document runbook procedures for failures and replay
-- [ ] add retry boundary tests
-- [ ] add timeout/failure mapping tests
-- [ ] add retention lifecycle tests
-- [ ] pass `just quality-check`
-- [ ] pass `just contract-conformance`
+- [x] implement bounded retry semantics
+- [x] enforce timeout/resource boundary handling in run executor
+- [x] keep retain-all artifact policy in V0 with deterministic run indexing
+- [x] document deferred cleanup/self-learning scheduled jobs as debt/TODO
+- [x] document runbook procedures for failures and replay
+- [x] add retry boundary tests
+- [x] add timeout/failure mapping tests
+- [x] add retention lifecycle tests
+- [x] pass `just quality-check`
+- [x] pass `just contract-conformance`
 
 User-visible features:
 - consistent retry behavior and clearer run failure diagnostics.
@@ -110,26 +124,26 @@ Internal engineering tasks:
 - document runbook procedures for failures and replay.
 
 Acceptance criteria:
-- [ ] retry policy behavior is deterministic and test-covered.
-- [ ] timeout and policy denials produce stable error envelopes.
-- [ ] retention policy can be applied without corrupting active runs.
+- [x] retry policy behavior is deterministic and test-covered.
+- [x] timeout and policy denials produce stable error envelopes.
+- [x] retention policy can be applied without corrupting active runs.
 
 Non-goals:
 - no cross-host failover.
 - no advanced SLA monitoring stack.
 
 Required tests and gates:
-- [ ] retry boundary tests.
-- [ ] timeout/failure mapping tests.
-- [ ] retention lifecycle tests.
-- [ ] `just quality-check`.
-- [ ] `just contract-conformance`.
+- [x] retry boundary tests.
+- [x] timeout/failure mapping tests.
+- [x] retention lifecycle tests.
+- [x] `just quality-check`.
+- [x] `just contract-conformance`.
 
 ## Milestone Checklist
 
 - [x] J0 complete
-- [ ] J1 complete
-- [ ] J2 complete
+- [x] J1 complete
+- [x] J2 complete
 
 ## Decision Log
 

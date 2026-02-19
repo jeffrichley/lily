@@ -8,7 +8,12 @@ from typing import Protocol
 from lily.blueprints import BlueprintError
 from lily.commands.parser import CommandCall
 from lily.commands.types import CommandResult
-from lily.jobs import JobError, JobRepositoryScan, JobRunEnvelope
+from lily.jobs import (
+    JobError,
+    JobRepositoryScan,
+    JobRunEnvelope,
+    JobTailResult,
+)
 from lily.session.models import Session
 
 _RUN_ARG_COUNT = 2
@@ -27,11 +32,24 @@ class JobExecutorPort(Protocol):
             job_id: Stable job identifier.
         """
 
+    def tail(self, job_id: str, *, limit: int = 50) -> JobTailResult:
+        """Tail latest run events for one job.
+
+        Args:
+            job_id: Stable job identifier.
+            limit: Max lines to return.
+        """
+
 
 class JobsCommand:
     """Deterministic `/jobs` command handler."""
 
-    def __init__(self, executor: JobExecutorPort, *, runs_root: Path) -> None:
+    def __init__(
+        self,
+        executor: JobExecutorPort,
+        *,
+        runs_root: Path,
+    ) -> None:
         """Store execution dependencies.
 
         Args:
@@ -54,35 +72,89 @@ class JobsCommand:
         del session
         if not call.args:
             return CommandResult.error(
-                "Error: /jobs requires a subcommand: list | run <job_id>.",
+                (
+                    "Error: /jobs requires subcommand: "
+                    "list | run <job_id> | tail <job_id>."
+                ),
                 code="invalid_args",
                 data={"command": "jobs"},
             )
+        return self._dispatch_subcommand(call.args)
 
-        subcommand = call.args[0]
-        if subcommand == "list":
-            if len(call.args) != 1:
-                return CommandResult.error(
-                    "Error: /jobs list does not accept additional arguments.",
-                    code="invalid_args",
-                    data={"command": "jobs list"},
-                )
-            return self._list_jobs()
+    def _dispatch_subcommand(self, args: tuple[str, ...]) -> CommandResult:
+        """Dispatch parsed jobs subcommand to handler.
 
-        if subcommand == "run":
-            if len(call.args) != _RUN_ARG_COUNT:
-                return CommandResult.error(
-                    "Error: /jobs run requires exactly one job id.",
-                    code="invalid_args",
-                    data={"command": "jobs run"},
-                )
-            return self._run_job(call.args[1])
+        Args:
+            args: Slash command arguments.
 
-        return CommandResult.error(
-            f"Error: unknown jobs subcommand '{subcommand}'.",
-            code="invalid_args",
-            data={"command": "jobs", "subcommand": subcommand},
-        )
+        Returns:
+            Deterministic command result payload.
+        """
+        subcommand = args[0]
+        handlers = {
+            "list": self._handle_list,
+            "run": self._handle_run,
+            "tail": self._handle_tail,
+        }
+        handler = handlers.get(subcommand)
+        if handler is None:
+            return CommandResult.error(
+                f"Error: unknown jobs subcommand '{subcommand}'.",
+                code="invalid_args",
+                data={"command": "jobs", "subcommand": subcommand},
+            )
+        return handler(args)
+
+    def _handle_list(self, args: tuple[str, ...]) -> CommandResult:
+        """Handle `/jobs list` validation and execution.
+
+        Args:
+            args: Slash command arguments.
+
+        Returns:
+            Deterministic command result payload.
+        """
+        if len(args) != 1:
+            return CommandResult.error(
+                "Error: /jobs list does not accept additional arguments.",
+                code="invalid_args",
+                data={"command": "jobs list"},
+            )
+        return self._list_jobs()
+
+    def _handle_run(self, args: tuple[str, ...]) -> CommandResult:
+        """Handle `/jobs run` validation and execution.
+
+        Args:
+            args: Slash command arguments.
+
+        Returns:
+            Deterministic command result payload.
+        """
+        if len(args) != _RUN_ARG_COUNT:
+            return CommandResult.error(
+                "Error: /jobs run requires exactly one job id.",
+                code="invalid_args",
+                data={"command": "jobs run"},
+            )
+        return self._run_job(args[1])
+
+    def _handle_tail(self, args: tuple[str, ...]) -> CommandResult:
+        """Handle `/jobs tail` validation and execution.
+
+        Args:
+            args: Slash command arguments.
+
+        Returns:
+            Deterministic command result payload.
+        """
+        if len(args) != _RUN_ARG_COUNT:
+            return CommandResult.error(
+                "Error: /jobs tail requires exactly one job id.",
+                code="invalid_args",
+                data={"command": "jobs tail"},
+            )
+        return self._tail_job(args[1])
 
     def _list_jobs(self) -> CommandResult:
         """List repository jobs with deterministic diagnostics section.
@@ -181,5 +253,35 @@ class JobsCommand:
                 "references": list(run.references),
                 "payload": run.payload,
                 "run_path": str(run_path),
+            },
+        )
+
+    def _tail_job(self, job_id: str) -> CommandResult:
+        """Tail latest run events for one job.
+
+        Args:
+            job_id: Target job identifier.
+
+        Returns:
+            Deterministic command result payload.
+        """
+        try:
+            tail = self._executor.tail(job_id, limit=50)
+        except JobError as exc:
+            return CommandResult.error(str(exc), code=exc.code.value, data=exc.data)
+        if tail.run_id is None:
+            return CommandResult.ok(
+                f"No run artifacts found yet for job '{tail.job_id}'.",
+                code="jobs_tail_empty",
+                data={"job_id": tail.job_id, "run_id": None, "lines": []},
+            )
+        return CommandResult.ok(
+            "\n".join(tail.lines) if tail.lines else "(events.jsonl is empty)",
+            code="jobs_tailed",
+            data={
+                "job_id": tail.job_id,
+                "run_id": tail.run_id,
+                "lines": list(tail.lines),
+                "line_count": len(tail.lines),
             },
         )

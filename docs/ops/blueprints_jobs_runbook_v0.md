@@ -42,6 +42,25 @@ Validation checklist:
 - `lily jobs tail <job_id>`
   - tails structured events for active/recent runs.
 
+## 3.1 Scheduler Runtime Standard (J1)
+
+Operators should verify that cron scheduling is implemented with APScheduler runtime
+features, not trigger-only helper usage.
+
+Required implementation signals:
+- one dedicated APScheduler runtime process is active.
+- cron jobs are registered with stable ids and `replace_existing=True`.
+- scheduler/job defaults include:
+  - `coalesce=True`
+  - `max_instances=1`
+  - explicit `misfire_grace_time`
+- APScheduler event listeners are active for:
+  - `EVENT_JOB_EXECUTED`
+  - `EVENT_JOB_ERROR`
+  - `EVENT_JOB_MISSED`
+- listener events are reflected in Lily `events.jsonl`/receipts.
+- only one scheduler process owns a given APScheduler job store.
+
 ## 4. Artifact Inspection
 
 Inspect:
@@ -86,9 +105,24 @@ Use receipt as source of truth for:
 4. Re-run with same spec after remediation.
 5. If repeated, open defect with run receipt and event excerpt.
 
+## 6.1 Retry/Timeout Operations (J2)
+
+- Retry behavior:
+  - job runtime uses bounded attempts (`retry_max + 1` total tries).
+  - each attempt emits structured events (`job_attempt_started`, `job_attempt_failed`, `job_attempt_succeeded`).
+- Timeout behavior:
+  - each attempt is bounded by `runtime.timeout_seconds`.
+  - timeout failures map to deterministic `job_execution_failed`.
+- Replay workflow:
+  - use `lily jobs run <job_id>` to replay the same durable job spec.
+  - compare latest and prior `run_receipt.json` payload attempt lineage for diffs.
+
 ## 7. Pre-Merge Operational Checks
 
 - run representative jobs manually.
+- verify APScheduler runtime registration for cron jobs (stable ids).
+- verify `coalesce/max_instances/misfire_grace_time` config is explicitly set.
+- verify listener-driven lifecycle events (`executed/error/missed`) appear in artifacts.
 - validate required artifact set exists.
 - confirm deterministic failure behavior for at least one invalid job.
 - run `just quality-check`.
@@ -98,9 +132,12 @@ Use receipt as source of truth for:
 - distributed scheduler operations.
 - webhook/event-trigger runbook.
 - external notifier operations (telegram/slack).
+- scheduled cleanup policy (retention pruning) automation.
+- scheduled self-learning/feedback jobs.
 
 ## 9. Related Docs
 
 - Authoring constraints: `docs/dev/blueprint_authoring_constraints.md`
 - Blueprint execution plan: `docs/dev/blueprints_execution_plan.md`
 - Jobs execution plan: `docs/dev/jobs_execution_plan.md`
+- APScheduler user guide (3.x): `https://apscheduler.readthedocs.io/en/3.x/userguide.html`

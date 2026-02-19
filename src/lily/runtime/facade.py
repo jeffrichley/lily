@@ -20,7 +20,7 @@ from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
 from lily.config import SecuritySettings
-from lily.jobs import JobExecutor, JobRepository
+from lily.jobs import JobExecutor, JobRepository, JobSchedulerRuntime
 from lily.memory import (
     ConsolidationBackend,
     ConsolidationRequest,
@@ -104,6 +104,7 @@ class RuntimeFacade:
         security_prompt: SecurityPrompt | None = None,
         project_root: Path | None = None,
         workspace_root: Path | None = None,
+        jobs_scheduler_enabled: bool = False,
     ) -> None:
         """Create facade with command and conversation dependencies.
 
@@ -126,6 +127,7 @@ class RuntimeFacade:
             security_prompt: Optional terminal prompt for HITL approvals.
             project_root: Optional project root for dependency lock hashing.
             workspace_root: Optional `.lily` workspace root for jobs/runs storage.
+            jobs_scheduler_enabled: Whether cron scheduler runtime should start.
         """
         self._consolidation_enabled = consolidation_enabled
         self._consolidation_backend = consolidation_backend
@@ -154,6 +156,10 @@ class RuntimeFacade:
             project_root=self._project_root,
             workspace_root=self._workspace_root,
         )
+        self._jobs_scheduler_runtime: JobSchedulerRuntime | None = None
+        if command_registry is None and jobs_scheduler_enabled:
+            self._jobs_scheduler_runtime = self._build_jobs_scheduler_runtime()
+            self._jobs_scheduler_runtime.start()
         self._conversation_executor = (
             conversation_executor
             or LangChainConversationExecutor(checkpointer=conversation_checkpointer)
@@ -176,6 +182,8 @@ class RuntimeFacade:
 
     def close(self) -> None:
         """Release runtime resources (for example sqlite-backed checkpointers)."""
+        if self._jobs_scheduler_runtime is not None:
+            self._jobs_scheduler_runtime.shutdown()
         maybe_close = getattr(self._conversation_executor, "close", None)
         if callable(maybe_close):
             maybe_close()
@@ -410,6 +418,25 @@ class RuntimeFacade:
             evidence_chunking=evidence_chunking,
             jobs_executor=jobs_executor,
             jobs_runs_root=runs_root,
+        )
+
+    def _build_jobs_scheduler_runtime(self) -> JobSchedulerRuntime:
+        """Build APScheduler runtime service for cron job execution.
+
+        Returns:
+            Scheduler runtime service.
+        """
+        jobs_dir = self._workspace_root / "jobs"
+        runs_root = self._workspace_root / "runs"
+        executor = JobExecutor(
+            repository=JobRepository(jobs_dir=jobs_dir),
+            blueprint_registry=build_default_blueprint_registry(),
+            runs_root=runs_root,
+        )
+        return JobSchedulerRuntime(
+            repository=JobRepository(jobs_dir=jobs_dir),
+            executor=executor,
+            runs_root=runs_root,
         )
 
     def _maybe_run_scheduled_consolidation(self, session: Session) -> None:
