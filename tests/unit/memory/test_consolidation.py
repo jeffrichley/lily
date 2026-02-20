@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from lily.memory import (
     ConsolidationBackend,
     ConsolidationRequest,
@@ -35,6 +37,7 @@ def _request(
     )
 
 
+@pytest.mark.unit
 def test_rule_based_consolidation_extracts_and_writes(tmp_path: Path) -> None:
     """Rule-based engine should infer deterministic preference memories."""
     repository = StoreBackedPersonalityMemoryRepository(
@@ -67,6 +70,7 @@ def test_rule_based_consolidation_extracts_and_writes(tmp_path: Path) -> None:
     assert "name is Jeff" in contents
 
 
+@pytest.mark.unit
 def test_rule_based_consolidation_marks_conflicts(tmp_path: Path) -> None:
     """Incoming candidate should mark prior conflicting record as conflicted."""
     repository = StoreBackedPersonalityMemoryRepository(
@@ -108,6 +112,7 @@ def test_rule_based_consolidation_marks_conflicts(tmp_path: Path) -> None:
     assert statuses.get("favorite color is blue") == "needs_verification"
 
 
+@pytest.mark.unit
 def test_langmem_manager_consolidation_writes(tmp_path: Path) -> None:
     """LangMem-manager engine should persist extracted candidates."""
     adapter = LangMemToolingAdapter(store_file=tmp_path / "memory" / "store.sqlite")
@@ -138,6 +143,7 @@ def test_langmem_manager_consolidation_writes(tmp_path: Path) -> None:
     assert "prefers concise responses" in contents
 
 
+@pytest.mark.unit
 def test_rule_based_consolidation_writes_task_memory_candidates(tmp_path: Path) -> None:
     """Rule-based backend should persist extracted task facts when repository exists."""
     personality_repo = StoreBackedPersonalityMemoryRepository(
@@ -176,6 +182,7 @@ def test_rule_based_consolidation_writes_task_memory_candidates(tmp_path: Path) 
     assert task_rows[0].content == "include tax line item"
 
 
+@pytest.mark.unit
 def test_consolidation_disabled_returns_disabled_status(tmp_path: Path) -> None:
     """Both engines should short-circuit to disabled status when off."""
     repository = StoreBackedPersonalityMemoryRepository(

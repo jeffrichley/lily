@@ -6,6 +6,7 @@ import json
 import time
 from pathlib import Path
 
+import pytest
 from pydantic import BaseModel, ConfigDict, Field
 
 from lily.blueprints import (
@@ -126,6 +127,7 @@ class _AlwaysSleepBlueprint:
         return _AlwaysSleepRunnable(delay_seconds=1.3)
 
 
+@pytest.mark.unit
 def test_job_executor_run_writes_required_artifacts(tmp_path: Path) -> None:
     """Successful run should write run receipt, summary, and events."""
     jobs_dir = tmp_path / ".lily" / "jobs"
@@ -167,6 +169,7 @@ def test_job_executor_run_writes_required_artifacts(tmp_path: Path) -> None:
     assert receipt["status"] == "ok"
 
 
+@pytest.mark.unit
 def test_job_executor_missing_job_maps_to_job_not_found(tmp_path: Path) -> None:
     """Unknown job should fail with deterministic not-found code."""
     executor = JobExecutor(
@@ -184,6 +187,7 @@ def test_job_executor_missing_job_maps_to_job_not_found(tmp_path: Path) -> None:
         raise AssertionError("Expected missing job failure.")
 
 
+@pytest.mark.unit
 def test_job_executor_blueprint_bindings_error_is_propagated(tmp_path: Path) -> None:
     """Invalid bindings should map to deterministic job bindings-invalid code."""
     jobs_dir = tmp_path / ".lily" / "jobs"
@@ -220,6 +224,7 @@ def test_job_executor_blueprint_bindings_error_is_propagated(tmp_path: Path) -> 
         raise AssertionError("Expected job bindings-invalid failure.")
 
 
+@pytest.mark.unit
 def test_job_executor_tail_reads_latest_events(tmp_path: Path) -> None:
     """Tail should read latest run events for a job."""
     jobs_dir = tmp_path / ".lily" / "jobs"
@@ -258,6 +263,7 @@ def test_job_executor_tail_reads_latest_events(tmp_path: Path) -> None:
     assert "job_completed" in tail.lines[-1]
 
 
+@pytest.mark.unit
 def test_job_executor_retries_and_succeeds_with_attempt_lineage(tmp_path: Path) -> None:
     """Executor should retry transient failure and persist attempt lineage."""
     jobs_dir = tmp_path / ".lily" / "jobs"
@@ -300,6 +306,7 @@ def test_job_executor_retries_and_succeeds_with_attempt_lineage(tmp_path: Path) 
     assert attempts[1]["status"] == "ok"
 
 
+@pytest.mark.unit
 def test_job_executor_timeout_maps_to_execution_failed_and_attempts(
     tmp_path: Path,
 ) -> None:
@@ -352,6 +359,7 @@ def test_job_executor_timeout_maps_to_execution_failed_and_attempts(
     assert receipt["payload"]["error_code"] == "job_execution_failed"
 
 
+@pytest.mark.unit
 def test_job_executor_retain_all_policy_keeps_prior_runs(tmp_path: Path) -> None:
     """Retain-all policy should preserve prior run artifact directories."""
     jobs_dir = tmp_path / ".lily" / "jobs"
@@ -391,6 +399,7 @@ def test_job_executor_retain_all_policy_keeps_prior_runs(tmp_path: Path) -> None
     assert all((path / "run_receipt.json").exists() for path in run_dirs)
 
 
+@pytest.mark.unit
 def test_job_executor_history_returns_newest_first(tmp_path: Path) -> None:
     """History should return deterministically ordered entries."""
     jobs_dir = tmp_path / ".lily" / "jobs"

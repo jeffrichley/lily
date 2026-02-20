@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from lily.config import SkillSandboxSettings
 from lily.runtime.security import (
     ApprovalDecision,
@@ -62,6 +64,7 @@ def _write_skill(skill_root: Path, plugin_source: str) -> None:
     (skill_root / "plugin.py").write_text(plugin_source, encoding="utf-8")
 
 
+@pytest.mark.unit
 def test_security_hash_is_deterministic(tmp_path: Path) -> None:
     """Security hash should be stable for unchanged bundle content."""
     skill_root = tmp_path / "skills" / "echo_plugin"
@@ -79,6 +82,7 @@ def test_security_hash_is_deterministic(tmp_path: Path) -> None:
     assert first == second
 
 
+@pytest.mark.unit
 def test_security_preflight_denies_blocked_signature(tmp_path: Path) -> None:
     """Preflight should hard-deny blocked code signatures before execution."""
     skill_root = tmp_path / "skills" / "echo_plugin"
@@ -94,6 +98,7 @@ def test_security_preflight_denies_blocked_signature(tmp_path: Path) -> None:
         raise AssertionError("Expected SecurityAuthorizationError")
 
 
+@pytest.mark.unit
 def test_security_gate_requires_prompt_when_no_cached_grant(tmp_path: Path) -> None:
     """Security gate should fail with approval_required when prompt is absent."""
     skill_root = tmp_path / "skills" / "echo_plugin"
@@ -119,6 +124,7 @@ def test_security_gate_requires_prompt_when_no_cached_grant(tmp_path: Path) -> N
         raise AssertionError("Expected SecurityAuthorizationError")
 
 
+@pytest.mark.unit
 def test_security_gate_reuses_always_allow_grant(tmp_path: Path) -> None:
     """Always-allow grant should persist and skip repeat prompts for same hash."""
     skill_root = tmp_path / "skills" / "echo_plugin"

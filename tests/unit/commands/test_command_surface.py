@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from lily.memory import (
     ConsolidationBackend,
     MemoryWriteRequest,
@@ -114,6 +116,7 @@ def _write_persona(root: Path, name: str, summary: str, default_style: str) -> N
     )
 
 
+@pytest.mark.unit
 def test_unknown_command_returns_explicit_error() -> None:
     """Unknown commands should fail with deterministic explicit error output."""
     runtime = RuntimeFacade()
@@ -125,6 +128,7 @@ def test_unknown_command_returns_explicit_error() -> None:
     assert result.message == "Error: unknown command '/unknown'."
 
 
+@pytest.mark.unit
 def test_skill_command_requires_name_argument() -> None:
     """`/skill` without name should fail with explicit missing arg message."""
     runtime = RuntimeFacade()
@@ -136,6 +140,7 @@ def test_skill_command_requires_name_argument() -> None:
     assert result.message == "Error: /skill requires a skill name."
 
 
+@pytest.mark.unit
 def test_skill_command_missing_name_has_no_fallback() -> None:
     """Missing skill should return explicit no-fallback error."""
     runtime = RuntimeFacade()
@@ -147,6 +152,7 @@ def test_skill_command_missing_name_has_no_fallback() -> None:
     assert result.message == "Error: skill 'missing_name' not found in snapshot."
 
 
+@pytest.mark.unit
 def test_skills_command_returns_deterministic_sorted_output() -> None:
     """`/skills` should list snapshot entries in deterministic sorted order."""
     runtime = RuntimeFacade()
@@ -166,6 +172,7 @@ def test_skills_command_returns_deterministic_sorted_output() -> None:
     ]
 
 
+@pytest.mark.unit
 def test_skills_command_includes_diagnostics_section() -> None:
     """`/skills` should include snapshot diagnostics deterministically."""
     runtime = RuntimeFacade()
@@ -199,6 +206,7 @@ def test_skills_command_includes_diagnostics_section() -> None:
     assert "- echo [malformed_frontmatter] Bad frontmatter" in result.message
 
 
+@pytest.mark.unit
 def test_skill_command_delegates_to_hidden_llm_adapter_path() -> None:
     """`/skill` should delegate through invoker/executor backend path."""
     runtime = RuntimeFacade()
@@ -210,6 +218,7 @@ def test_skill_command_delegates_to_hidden_llm_adapter_path() -> None:
     assert result.message == "Error: LLM backend is unavailable."
 
 
+@pytest.mark.unit
 def test_skill_command_tool_dispatch_executes_without_llm() -> None:
     """`/skill` should execute tool_dispatch skills deterministically."""
     runtime = RuntimeFacade()
@@ -230,6 +239,7 @@ def test_skill_command_tool_dispatch_executes_without_llm() -> None:
     assert result.message == "4"
 
 
+@pytest.mark.unit
 def test_reload_skills_refreshes_current_session_snapshot(tmp_path: Path) -> None:
     """`/reload_skills` should update only current session snapshot contents."""
     bundled_dir = tmp_path / "bundled"
@@ -279,6 +289,7 @@ def test_reload_skills_refreshes_current_session_snapshot(tmp_path: Path) -> Non
     assert [entry.name for entry in session.skill_snapshot.skills] == ["add", "echo"]
 
 
+@pytest.mark.unit
 def test_reload_skills_rejects_arguments() -> None:
     """`/reload_skills` should reject unexpected arguments deterministically."""
     runtime = RuntimeFacade()
@@ -290,6 +301,7 @@ def test_reload_skills_rejects_arguments() -> None:
     assert result.message == "Error: /reload_skills does not accept arguments."
 
 
+@pytest.mark.unit
 def test_reload_skills_errors_without_snapshot_config() -> None:
     """`/reload_skills` should fail when session cannot rebuild snapshots."""
     runtime = RuntimeFacade()
@@ -301,6 +313,7 @@ def test_reload_skills_errors_without_snapshot_config() -> None:
     assert result.message == "Error: /reload_skills is unavailable for this session."
 
 
+@pytest.mark.unit
 def test_help_requires_exactly_one_skill_name() -> None:
     """`/help` should require exactly one skill argument."""
     runtime = RuntimeFacade()
@@ -312,6 +325,7 @@ def test_help_requires_exactly_one_skill_name() -> None:
     assert result.message == "Error: /help requires exactly one skill name."
 
 
+@pytest.mark.unit
 def test_help_fails_for_unknown_skill() -> None:
     """`/help <skill>` should fail clearly when skill is missing."""
     runtime = RuntimeFacade()
@@ -323,6 +337,7 @@ def test_help_fails_for_unknown_skill() -> None:
     assert result.message == "Error: skill 'missing' not found in snapshot."
 
 
+@pytest.mark.unit
 def test_help_returns_snapshot_metadata_without_execution() -> None:
     """`/help <skill>` should return deterministic snapshot metadata."""
     runtime = RuntimeFacade()
@@ -345,6 +360,7 @@ def test_help_returns_snapshot_metadata_without_execution() -> None:
     assert "- `command_tool`: add" in result.message
 
 
+@pytest.mark.unit
 def test_alias_command_invokes_matching_skill() -> None:
     """`/<alias>` should invoke snapshot skill by frontmatter command alias."""
     runtime = RuntimeFacade()
@@ -366,6 +382,7 @@ def test_alias_command_invokes_matching_skill() -> None:
     assert result.message == "4"
 
 
+@pytest.mark.unit
 def test_alias_collision_returns_deterministic_error() -> None:
     """Ambiguous alias across skills should fail without fallback."""
     runtime = RuntimeFacade()
@@ -387,6 +404,7 @@ def test_alias_collision_returns_deterministic_error() -> None:
     assert result.message == "Error: command alias '/go' is ambiguous in snapshot."
 
 
+@pytest.mark.unit
 def test_built_in_command_precedence_over_alias() -> None:
     """Built-in commands should win even if a skill defines same alias."""
     runtime = RuntimeFacade()
@@ -406,6 +424,7 @@ def test_built_in_command_precedence_over_alias() -> None:
     ]
 
 
+@pytest.mark.unit
 def test_runtime_records_turns_in_conversation_state() -> None:
     """Runtime should append user/assistant entries to session conversation state."""
     runtime = RuntimeFacade()
@@ -420,6 +439,7 @@ def test_runtime_records_turns_in_conversation_state() -> None:
     assert session.conversation_state[1].role.value == "assistant"
 
 
+@pytest.mark.unit
 def test_persona_list_use_show_and_style_commands(tmp_path: Path) -> None:
     """Persona and style commands should be deterministic and session-scoped."""
     personas_dir = tmp_path / "personas"
@@ -463,6 +483,7 @@ def test_persona_list_use_show_and_style_commands(tmp_path: Path) -> None:
     assert "- `effective_style`: focus" in shown_after_style.message
 
 
+@pytest.mark.unit
 def test_memory_commands_roundtrip(tmp_path: Path) -> None:
     """Remember/show/forget should roundtrip through personality memory store."""
     bundled_dir = tmp_path / "bundled"
@@ -503,6 +524,7 @@ def test_memory_commands_roundtrip(tmp_path: Path) -> None:
     assert shown_after_forget.code == "memory_empty"
 
 
+@pytest.mark.unit
 def test_reload_persona_refreshes_cache_for_current_session(tmp_path: Path) -> None:
     """`/reload_persona` should refresh repository cache and expose new personas."""
     personas_dir = tmp_path / "personas"
@@ -525,6 +547,7 @@ def test_reload_persona_refreshes_cache_for_current_session(tmp_path: Path) -> N
     assert "chad" in after.message
 
 
+@pytest.mark.unit
 def test_persona_export_and_import_commands(tmp_path: Path) -> None:
     """`/persona export|import` should roundtrip persona markdown artifacts."""
     personas_dir = tmp_path / "personas"
@@ -561,6 +584,7 @@ def test_persona_export_and_import_commands(tmp_path: Path) -> None:
     assert "zen - Calm helper" in listed.message
 
 
+@pytest.mark.unit
 def test_agent_commands_persona_backed_compatibility(tmp_path: Path) -> None:
     """`/agent` commands should use persona-backed compatibility behavior."""
     personas_dir = tmp_path / "personas"
@@ -586,6 +610,7 @@ def test_agent_commands_persona_backed_compatibility(tmp_path: Path) -> None:
     assert "Agent: chad" in shown.message
 
 
+@pytest.mark.unit
 def test_context_aware_tone_adaptation_without_style_override(tmp_path: Path) -> None:
     """Conversation route should derive style from context when no explicit override."""
     personas_dir = tmp_path / "personas"
@@ -606,6 +631,7 @@ def test_context_aware_tone_adaptation_without_style_override(tmp_path: Path) ->
     assert capture.last_request.persona_context.style_level.value == "focus"
 
 
+@pytest.mark.unit
 def test_conversation_request_includes_repository_backed_memory_summary(
     tmp_path: Path,
 ) -> None:
@@ -634,6 +660,7 @@ def test_conversation_request_includes_repository_backed_memory_summary(
     assert "favorite number is 42" in capture.last_request.memory_summary
 
 
+@pytest.mark.unit
 def test_memory_command_family_long_short_and_evidence_paths(tmp_path: Path) -> None:
     """`/memory short|long|evidence` command family should route deterministically."""
     bundled_dir = tmp_path / "bundled"
@@ -669,6 +696,7 @@ def test_memory_command_family_long_short_and_evidence_paths(tmp_path: Path) -> 
     assert evidence_show.code == "memory_evidence_empty"
 
 
+@pytest.mark.unit
 def test_memory_evidence_ingest_and_show_with_citations(tmp_path: Path) -> None:
     """`/memory evidence` should ingest local text and return cited hits."""
     bundled_dir = tmp_path / "bundled"
@@ -706,6 +734,7 @@ def test_memory_evidence_ingest_and_show_with_citations(tmp_path: Path) -> None:
     assert "architecture_notes.txt#chunk-" in shown.message
 
 
+@pytest.mark.unit
 def test_memory_evidence_results_remain_non_canonical_vs_structured(
     tmp_path: Path,
 ) -> None:
@@ -746,6 +775,7 @@ def test_memory_evidence_results_remain_non_canonical_vs_structured(
     assert evidence.data.get("canonical_precedence") == "structured_long_term"
 
 
+@pytest.mark.unit
 def test_memory_long_show_domain_isolation(tmp_path: Path) -> None:
     """`/memory long show --domain` should isolate personality subdomains."""
     bundled_dir = tmp_path / "bundled"
@@ -799,6 +829,7 @@ def test_memory_long_show_domain_isolation(tmp_path: Path) -> None:
     assert "Core directive only" not in profile.message
 
 
+@pytest.mark.unit
 def test_memory_long_tool_requires_opt_in_flag(tmp_path: Path) -> None:
     """Tool-backed memory command should fail when tooling flag is disabled."""
     bundled_dir = tmp_path / "bundled"
@@ -821,6 +852,7 @@ def test_memory_long_tool_requires_opt_in_flag(tmp_path: Path) -> None:
     assert result.code == "memory_tooling_disabled"
 
 
+@pytest.mark.unit
 def test_memory_long_tool_remember_enforces_policy_redline(tmp_path: Path) -> None:
     """Tool-backed remember should preserve deterministic policy-denied behavior."""
     bundled_dir = tmp_path / "bundled"
@@ -846,6 +878,7 @@ def test_memory_long_tool_remember_enforces_policy_redline(tmp_path: Path) -> No
     assert result.code == "memory_policy_denied"
 
 
+@pytest.mark.unit
 def test_memory_long_tool_show_uses_langmem_adapter_when_enabled(
     tmp_path: Path,
 ) -> None:
@@ -883,6 +916,7 @@ def test_memory_long_tool_show_uses_langmem_adapter_when_enabled(
     assert "favorite number is 42" in shown.message
 
 
+@pytest.mark.unit
 def test_memory_tooling_auto_apply_switches_standard_show_route(tmp_path: Path) -> None:
     """Auto-apply flag should route regular long-show through LangMem tooling."""
     bundled_dir = tmp_path / "bundled"
@@ -918,6 +952,7 @@ def test_memory_tooling_auto_apply_switches_standard_show_route(tmp_path: Path) 
     assert shown.data.get("route") == "langmem_search_tool"
 
 
+@pytest.mark.unit
 def test_memory_long_consolidate_disabled_by_default(tmp_path: Path) -> None:
     """Consolidation command should fail deterministically when disabled."""
     bundled_dir = tmp_path / "bundled"
@@ -940,6 +975,7 @@ def test_memory_long_consolidate_disabled_by_default(tmp_path: Path) -> None:
     assert result.code == "memory_consolidation_disabled"
 
 
+@pytest.mark.unit
 def test_memory_long_consolidate_rule_based_writes_candidates(tmp_path: Path) -> None:
     """Rule-based consolidation should infer and persist candidate memories."""
     bundled_dir = tmp_path / "bundled"
@@ -970,6 +1006,7 @@ def test_memory_long_consolidate_rule_based_writes_candidates(tmp_path: Path) ->
     assert "favorite number is 42" in shown.message
 
 
+@pytest.mark.unit
 def test_memory_long_consolidate_langmem_manager_backend(tmp_path: Path) -> None:
     """LangMem-manager consolidation backend should write deterministic memories."""
     bundled_dir = tmp_path / "bundled"
@@ -1007,6 +1044,7 @@ def test_memory_long_consolidate_langmem_manager_backend(tmp_path: Path) -> None
     assert "name is Jeff" in shown.message
 
 
+@pytest.mark.unit
 def test_memory_long_verify_updates_last_verified(tmp_path: Path) -> None:
     """`/memory long verify` should set verified status and last_verified timestamp."""
     bundled_dir = tmp_path / "bundled"
@@ -1045,6 +1083,7 @@ def test_memory_long_verify_updates_last_verified(tmp_path: Path) -> None:
     assert target.get("last_verified")
 
 
+@pytest.mark.unit
 def test_memory_long_show_excludes_conflicted_unless_requested(tmp_path: Path) -> None:
     """Conflicted records should be hidden by default and visible when requested."""
     bundled_dir = tmp_path / "bundled"
@@ -1084,6 +1123,7 @@ def test_memory_long_show_excludes_conflicted_unless_requested(tmp_path: Path) -
     assert "favorite color is green" in visible.message
 
 
+@pytest.mark.unit
 def test_scheduled_auto_consolidation_runs_on_interval(tmp_path: Path) -> None:
     """Scheduled auto consolidation should run on configured conversation interval."""
     bundled_dir = tmp_path / "bundled"

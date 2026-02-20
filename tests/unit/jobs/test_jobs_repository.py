@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from lily.jobs import JobError, JobErrorCode, JobRepository
 
 
@@ -13,6 +15,7 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+@pytest.mark.unit
 def test_job_repository_loads_valid_manual_job(tmp_path: Path) -> None:
     """Repository should load a valid manual job spec."""
     jobs_dir = tmp_path / ".lily" / "jobs"
@@ -44,6 +47,7 @@ def test_job_repository_loads_valid_manual_job(tmp_path: Path) -> None:
     assert loaded.trigger.type.value == "manual"
 
 
+@pytest.mark.unit
 def test_job_repository_invalid_spec_maps_to_job_invalid_spec(tmp_path: Path) -> None:
     """Malformed spec should fail with deterministic invalid spec code."""
     jobs_dir = tmp_path / ".lily" / "jobs"
@@ -62,6 +66,7 @@ def test_job_repository_invalid_spec_maps_to_job_invalid_spec(tmp_path: Path) ->
         raise AssertionError("Expected invalid spec failure.")
 
 
+@pytest.mark.unit
 def test_job_repository_invalid_cron_timezone_maps_trigger_invalid(
     tmp_path: Path,
 ) -> None:

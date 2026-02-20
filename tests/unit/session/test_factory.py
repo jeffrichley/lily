@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from lily.session.factory import SessionFactory, SessionFactoryConfig
 from lily.session.models import ModelConfig
 from lily.skills.types import InvocationMode, SkillSource
@@ -15,6 +17,7 @@ def _write_skill(root: Path, name: str, content: str) -> None:
     (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
 
 
+@pytest.mark.unit
 def test_create_builds_session_with_snapshot(tmp_path: Path) -> None:
     """SessionFactory should create a session with deterministic snapshot data."""
     bundled_dir = tmp_path / "bundled"
@@ -58,6 +61,7 @@ invocation_mode: llm_orchestration
     assert entry.invocation_mode == InvocationMode.LLM_ORCHESTRATION
 
 
+@pytest.mark.unit
 def test_session_snapshot_does_not_drift_after_filesystem_changes(
     tmp_path: Path,
 ) -> None:

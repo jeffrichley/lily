@@ -7,6 +7,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
 from _pytest.monkeypatch import MonkeyPatch
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, JobExecutionEvent
 from apscheduler.triggers.interval import IntervalTrigger
@@ -31,6 +32,7 @@ def _build_runtime(workspace_root: Path) -> JobSchedulerRuntime:
     )
 
 
+@pytest.mark.unit
 def test_scheduler_refresh_registers_cron_job_with_defaults(tmp_path: Path) -> None:
     """Refresh should register cron jobs with stable id and APS defaults."""
     workspace = tmp_path / ".lily"
@@ -68,6 +70,7 @@ def test_scheduler_refresh_registers_cron_job_with_defaults(tmp_path: Path) -> N
         runtime.shutdown()
 
 
+@pytest.mark.unit
 def test_scheduler_listener_writes_execution_event_payload(tmp_path: Path) -> None:
     """Scheduler listener should append executed-event payload to jsonl stream."""
     workspace = tmp_path / ".lily"
@@ -90,6 +93,7 @@ def test_scheduler_listener_writes_execution_event_payload(tmp_path: Path) -> No
     assert row["run_id"] == "run_abc123"
 
 
+@pytest.mark.unit
 def test_scheduler_listener_writes_error_event_payload(tmp_path: Path) -> None:
     """Scheduler listener should append error event with exception message."""
     workspace = tmp_path / ".lily"
@@ -110,6 +114,7 @@ def test_scheduler_listener_writes_error_event_payload(tmp_path: Path) -> None:
     assert row["exception"] == "boom"
 
 
+@pytest.mark.unit
 def test_scheduler_executes_registered_job_via_aps_runtime(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
@@ -158,6 +163,7 @@ def test_scheduler_executes_registered_job_via_aps_runtime(
     assert run_dirs
 
 
+@pytest.mark.unit
 def test_scheduler_pause_resume_disable_persist_state(tmp_path: Path) -> None:
     """Lifecycle controls should persist state and apply to APS jobs."""
     workspace = tmp_path / ".lily"
@@ -209,6 +215,7 @@ def test_scheduler_pause_resume_disable_persist_state(tmp_path: Path) -> None:
         runtime.shutdown()
 
 
+@pytest.mark.unit
 def test_scheduler_persisted_pause_state_survives_restart(tmp_path: Path) -> None:
     """Paused scheduler state should persist and be re-applied on restart."""
     workspace = tmp_path / ".lily"

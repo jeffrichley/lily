@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from lily.memory.evidence_repository import (
     EvidenceChunkingMode,
     EvidenceChunkingSettings,
@@ -12,6 +14,7 @@ from lily.memory.evidence_repository import (
 from lily.memory.models import MemoryError
 
 
+@pytest.mark.unit
 def test_evidence_ingest_and_query_returns_ranked_hits(tmp_path: Path) -> None:
     """Ingested evidence should be queryable with citation metadata."""
     repository = FileBackedEvidenceRepository(root_dir=tmp_path / "memory")
@@ -41,6 +44,7 @@ def test_evidence_ingest_and_query_returns_ranked_hits(tmp_path: Path) -> None:
     assert hits[0].score > 0
 
 
+@pytest.mark.unit
 def test_evidence_ingest_missing_path_returns_not_found(tmp_path: Path) -> None:
     """Ingest should fail with deterministic missing-source error."""
     repository = FileBackedEvidenceRepository(root_dir=tmp_path / "memory")
@@ -56,6 +60,7 @@ def test_evidence_ingest_missing_path_returns_not_found(tmp_path: Path) -> None:
     raise AssertionError("Expected ingest to raise MemoryError for missing source.")
 
 
+@pytest.mark.unit
 def test_evidence_ingest_supports_recursive_splitter_config(tmp_path: Path) -> None:
     """Repository should use recursive splitter when configured."""
     repository = FileBackedEvidenceRepository(
@@ -77,6 +82,7 @@ def test_evidence_ingest_supports_recursive_splitter_config(tmp_path: Path) -> N
     assert len(written) > 1
 
 
+@pytest.mark.unit
 def test_evidence_ingest_supports_token_splitter_config(tmp_path: Path) -> None:
     """Repository should use token-aware splitter when configured."""
     repository = FileBackedEvidenceRepository(

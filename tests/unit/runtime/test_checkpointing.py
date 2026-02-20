@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
+import pytest
 from langgraph.checkpoint.base import empty_checkpoint
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -13,6 +14,7 @@ from lily.config import CheckpointerBackend, CheckpointerSettings
 from lily.runtime.checkpointing import CheckpointerBuildError, build_checkpointer
 
 
+@pytest.mark.unit
 def test_build_checkpointer_memory_backend() -> None:
     """Memory backend should construct in-memory saver with no sqlite path."""
     result = build_checkpointer(
@@ -23,6 +25,7 @@ def test_build_checkpointer_memory_backend() -> None:
     assert result.resolved_sqlite_path is None
 
 
+@pytest.mark.unit
 def test_build_checkpointer_sqlite_creates_file(tmp_path: Path) -> None:
     """SQLite backend should create resolved file path and saver."""
     sqlite_path = tmp_path / "checkpoints" / "phase1.sqlite"
@@ -39,6 +42,7 @@ def test_build_checkpointer_sqlite_creates_file(tmp_path: Path) -> None:
     result.saver.conn.close()
 
 
+@pytest.mark.unit
 def test_sqlite_checkpointer_persists_history_and_replay_across_restart(
     tmp_path: Path,
 ) -> None:
@@ -88,6 +92,7 @@ def test_sqlite_checkpointer_persists_history_and_replay_across_restart(
     saver_two.conn.close()
 
 
+@pytest.mark.unit
 def test_build_checkpointer_postgres_contract_errors_until_implemented() -> None:
     """Postgres backend should fail with explicit deterministic message for now."""
     try:

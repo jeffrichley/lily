@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import pytest
+
 from lily.memory import (
     MemoryQuery,
     MemoryRecord,
@@ -85,6 +87,7 @@ def _record(  # noqa: PLR0913
     )
 
 
+@pytest.mark.unit
 def test_retrieval_priority_and_confidence_threshold() -> None:
     """Retrieval should prioritize stable domains and filter low-confidence rows."""
     now = datetime.now(UTC)
@@ -167,6 +170,7 @@ def test_retrieval_priority_and_confidence_threshold() -> None:
     assert "Low-confidence stale preference." not in summary
 
 
+@pytest.mark.unit
 def test_retrieval_uses_recency_tiebreak_with_equal_lexical_score() -> None:
     """Records with equal lexical score should be ordered by recency."""
     older = datetime(2025, 1, 1, tzinfo=UTC)

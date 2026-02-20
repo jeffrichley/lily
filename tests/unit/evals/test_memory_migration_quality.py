@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from tests.unit.evals._memory_migration_harness import (
     COMPACTION_MIN_CASES,
     COMPACTION_MIN_PASS_RATE,
@@ -35,6 +37,7 @@ def _assert_thresholds(*, report: object, min_cases: int, min_pass_rate: float) 
     )
 
 
+@pytest.mark.unit
 def test_memory_phase7_restart_continuity_thresholds(tmp_path: Path) -> None:
     """Restart continuity suite should pass configured thresholds."""
     report = run_restart_continuity_suite(temp_dir=tmp_path / "restart")
@@ -45,6 +48,7 @@ def test_memory_phase7_restart_continuity_thresholds(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.unit
 def test_memory_phase7_store_parity_thresholds(tmp_path: Path) -> None:
     """Store parity suite should pass configured thresholds."""
     report = run_store_parity_suite(temp_dir=tmp_path / "parity")
@@ -55,6 +59,7 @@ def test_memory_phase7_store_parity_thresholds(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.unit
 def test_memory_phase7_policy_redline_thresholds(tmp_path: Path) -> None:
     """Policy redline suite should pass configured thresholds."""
     report = run_policy_redline_suite(temp_dir=tmp_path / "policy")
@@ -65,6 +70,7 @@ def test_memory_phase7_policy_redline_thresholds(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.unit
 def test_memory_phase7_retrieval_relevance_thresholds(tmp_path: Path) -> None:
     """Retrieval relevance suite should pass configured thresholds."""
     report = run_retrieval_relevance_suite(temp_dir=tmp_path / "retrieval")
@@ -75,6 +81,7 @@ def test_memory_phase7_retrieval_relevance_thresholds(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.unit
 def test_memory_phase7_compaction_effectiveness_thresholds(tmp_path: Path) -> None:
     """Compaction suite should pass configured thresholds."""
     report = run_compaction_effectiveness_suite(temp_dir=tmp_path / "compaction")

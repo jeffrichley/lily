@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 
+import pytest
 from langgraph.errors import GraphRecursionError
 
 from lily.runtime.conversation import (
@@ -241,6 +242,7 @@ def _request_with_limits(
     )
 
 
+@pytest.mark.unit
 def test_conversation_executor_returns_response_on_success() -> None:
     """Conversation executor should normalize valid payload output."""
     executor = LangChainConversationExecutor(runner=_RunnerSuccess())
@@ -250,6 +252,7 @@ def test_conversation_executor_returns_response_on_success() -> None:
     assert response.text == "hello from lily"
 
 
+@pytest.mark.unit
 def test_conversation_executor_returns_explicit_invalid_response_error() -> None:
     """Conversation executor should fail with deterministic invalid-response code."""
     executor = LangChainConversationExecutor(runner=_RunnerInvalidResponse())
@@ -263,6 +266,7 @@ def test_conversation_executor_returns_explicit_invalid_response_error() -> None
         raise AssertionError("Expected ConversationExecutionError")
 
 
+@pytest.mark.unit
 def test_conversation_executor_maps_backend_failures_to_stable_code() -> None:
     """Conversation executor should normalize backend exceptions deterministically."""
     executor = LangChainConversationExecutor(runner=_RunnerUnavailable())
@@ -276,6 +280,7 @@ def test_conversation_executor_maps_backend_failures_to_stable_code() -> None:
         raise AssertionError("Expected ConversationExecutionError")
 
 
+@pytest.mark.unit
 def test_conversation_executor_maps_recursion_to_tool_loop_limit() -> None:
     """Recursion overflow should map to deterministic loop-limit error code."""
     executor = LangChainConversationExecutor(runner=_RunnerRecursion())
@@ -296,6 +301,7 @@ def test_conversation_executor_maps_recursion_to_tool_loop_limit() -> None:
         raise AssertionError("Expected ConversationExecutionError")
 
 
+@pytest.mark.unit
 def test_conversation_executor_enforces_timeout_boundary() -> None:
     """Enabled timeout should fail deterministically when budget is exceeded."""
     executor = LangChainConversationExecutor(runner=_RunnerSlow())
@@ -316,6 +322,7 @@ def test_conversation_executor_enforces_timeout_boundary() -> None:
         raise AssertionError("Expected ConversationExecutionError")
 
 
+@pytest.mark.unit
 def test_conversation_executor_retries_transient_backend_failures() -> None:
     """Enabled retries should re-attempt transient backend failures."""
     runner = _RunnerRetryThenSuccess()
@@ -335,6 +342,7 @@ def test_conversation_executor_retries_transient_backend_failures() -> None:
     assert response.text == "recovered"
 
 
+@pytest.mark.unit
 def test_conversation_executor_disables_retry_when_configured() -> None:
     """Disabled retries should fail on first transient backend failure."""
     runner = _RunnerRetryThenSuccess()
@@ -357,6 +365,7 @@ def test_conversation_executor_disables_retry_when_configured() -> None:
         raise AssertionError("Expected ConversationExecutionError")
 
 
+@pytest.mark.unit
 def test_conversation_executor_denies_redline_user_input() -> None:
     """Pre-generation policy should deny bypass-style user input."""
     executor = LangChainConversationExecutor(runner=_RunnerSuccess())
@@ -371,6 +380,7 @@ def test_conversation_executor_denies_redline_user_input() -> None:
         raise AssertionError("Expected ConversationExecutionError")
 
 
+@pytest.mark.unit
 def test_conversation_executor_denies_manipulative_output() -> None:
     """Post-generation policy should deny manipulative dependency output."""
     executor = LangChainConversationExecutor(runner=_RunnerManipulativeOutput())
@@ -384,6 +394,7 @@ def test_conversation_executor_denies_manipulative_output() -> None:
         raise AssertionError("Expected ConversationExecutionError")
 
 
+@pytest.mark.unit
 def test_langchain_runner_builds_tool_guardrail_middleware() -> None:
     """Runner middleware stack should include wrap_tool_call guardrail hook."""
     runner = _LangChainAgentRunner()
@@ -393,6 +404,7 @@ def test_langchain_runner_builds_tool_guardrail_middleware() -> None:
     assert any(hasattr(item, "wrap_tool_call") for item in middleware)
 
 
+@pytest.mark.unit
 def test_conversation_executor_rejects_empty_user_text() -> None:
     """Conversation executor should reject empty normalized turn text."""
     executor = LangChainConversationExecutor(runner=_RunnerSuccess())
@@ -405,6 +417,7 @@ def test_conversation_executor_rejects_empty_user_text() -> None:
         raise AssertionError("Expected ConversationExecutionError")
 
 
+@pytest.mark.unit
 def test_runtime_routes_non_command_input_to_conversation_executor() -> None:
     """Runtime should route non-command turns through conversation executor path."""
     runtime = RuntimeFacade(conversation_executor=_ConversationSuccessExecutor())
@@ -422,6 +435,7 @@ def test_runtime_routes_non_command_input_to_conversation_executor() -> None:
     assert session.conversation_state[-1].content == "hello human"
 
 
+@pytest.mark.unit
 def test_runtime_maps_conversation_errors_to_deterministic_result() -> None:
     """Runtime should map conversation execution failures into stable envelopes."""
     runtime = RuntimeFacade(conversation_executor=_ConversationErrorExecutor())
@@ -434,6 +448,7 @@ def test_runtime_maps_conversation_errors_to_deterministic_result() -> None:
     assert result.message == "Error: Conversation backend is unavailable."
 
 
+@pytest.mark.unit
 def test_build_messages_compacts_low_value_tool_output_and_bounds_history() -> None:
     """Message builder should evict low-value tool payloads and compact history."""
     history = tuple(
@@ -471,6 +486,7 @@ def test_build_messages_compacts_low_value_tool_output_and_bounds_history() -> N
     )
 
 
+@pytest.mark.unit
 def test_build_messages_langgraph_native_backend_bounds_history() -> None:
     """LangGraph-native compaction should bound history under token budget."""
     history = tuple(
@@ -498,6 +514,7 @@ def test_build_messages_langgraph_native_backend_bounds_history() -> None:
     assert len(messages) < len(history) + 1
 
 
+@pytest.mark.unit
 def test_compaction_backend_parity_preserves_latest_history_turn() -> None:
     """Both compaction backends should preserve recent turns near prompt tail."""
     history = tuple(
@@ -534,6 +551,7 @@ def test_compaction_backend_parity_preserves_latest_history_turn() -> None:
     assert any(item["content"] == "user turn 59" for item in native_messages)
 
 
+@pytest.mark.unit
 def test_runtime_facade_can_override_compaction_backend() -> None:
     """Runtime facade should pass configured compaction backend into request limits."""
     capture = _ConversationCaptureExecutor()

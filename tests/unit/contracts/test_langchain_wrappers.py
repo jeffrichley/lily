@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from pydantic import BaseModel, ConfigDict
 
 from lily.runtime.executors.langchain_wrappers import (
@@ -95,6 +96,7 @@ def _session() -> Session:
     )
 
 
+@pytest.mark.unit
 def test_langchain_to_lily_wrapper_invokes_with_envelope() -> None:
     """LangChain adapter should preserve deterministic Lily envelope shape."""
     adapter = LangChainToLilyTool(tool=_FakeLangChainTool())
@@ -111,6 +113,7 @@ def test_langchain_to_lily_wrapper_invokes_with_envelope() -> None:
     assert result.message == "HELLO"
 
 
+@pytest.mark.unit
 def test_langchain_to_lily_wrapper_maps_failure_to_deterministic_code() -> None:
     """Wrapper failures should map to stable LangChain wrapper error code."""
     adapter = LangChainToLilyTool(tool=_FailingLangChainTool())
@@ -126,6 +129,7 @@ def test_langchain_to_lily_wrapper_maps_failure_to_deterministic_code() -> None:
     assert result.code == "langchain_wrapper_invoke_failed"
 
 
+@pytest.mark.unit
 def test_lily_to_langchain_wrapper_roundtrip() -> None:
     """Lily contract should be exposed as LangChain StructuredTool."""
     tool = _AddTool()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from pydantic import BaseModel, ConfigDict
 
 from lily.blueprints import BlueprintError, BlueprintErrorCode, BlueprintRegistry
@@ -47,6 +48,7 @@ class _CouncilBlueprint:
         return {"compiled": True, "bindings": bindings.model_dump()}
 
 
+@pytest.mark.unit
 def test_registry_resolves_known_blueprint_deterministically() -> None:
     """Known blueprint id should resolve to registered blueprint object."""
     blueprint = _CouncilBlueprint()
@@ -58,6 +60,7 @@ def test_registry_resolves_known_blueprint_deterministically() -> None:
     assert resolved.id == "council.v1"
 
 
+@pytest.mark.unit
 def test_registry_raises_deterministic_not_found_error() -> None:
     """Unknown blueprint id should raise stable not-found error code."""
     registry = BlueprintRegistry((_CouncilBlueprint(),))
@@ -72,6 +75,7 @@ def test_registry_raises_deterministic_not_found_error() -> None:
         raise AssertionError("Expected BlueprintError for missing blueprint.")
 
 
+@pytest.mark.unit
 def test_registry_validates_bindings_successfully() -> None:
     """Valid bindings should be coerced into typed bindings model."""
     registry = BlueprintRegistry((_CouncilBlueprint(),))
@@ -86,6 +90,7 @@ def test_registry_validates_bindings_successfully() -> None:
     assert validated.specialists == 4
 
 
+@pytest.mark.unit
 def test_registry_raises_deterministic_bindings_invalid_error() -> None:
     """Invalid bindings should raise stable bindings-invalid error code."""
     registry = BlueprintRegistry((_CouncilBlueprint(),))

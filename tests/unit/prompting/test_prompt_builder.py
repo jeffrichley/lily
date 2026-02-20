@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from lily.prompting import (
     PersonaContext,
     PersonaStyleLevel,
@@ -32,6 +34,7 @@ def _context(*, mode: PromptMode = PromptMode.FULL) -> PromptBuildContext:
     )
 
 
+@pytest.mark.unit
 def test_prompt_builder_full_mode_renders_all_core_sections() -> None:
     """Full mode should include identity/safety/skills/memory/runtime sections."""
     builder = PromptBuilder(section_max_chars=200)
@@ -46,6 +49,7 @@ def test_prompt_builder_full_mode_renders_all_core_sections() -> None:
     assert "## Runtime" in prompt
 
 
+@pytest.mark.unit
 def test_prompt_builder_minimal_mode_skips_skills_and_memory() -> None:
     """Minimal mode should omit skills and memory sections."""
     builder = PromptBuilder(section_max_chars=200)
@@ -60,6 +64,7 @@ def test_prompt_builder_minimal_mode_skips_skills_and_memory() -> None:
     assert "## Memory" not in prompt
 
 
+@pytest.mark.unit
 def test_truncate_with_marker_emits_deterministic_marker() -> None:
     """Truncation should include stable marker with kept/original lengths."""
     source = "a" * 80

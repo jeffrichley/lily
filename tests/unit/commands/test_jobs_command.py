@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from lily.blueprints import build_default_blueprint_registry
 from lily.commands.handlers.jobs import JobsCommand
 from lily.commands.parser import CommandCall
@@ -73,6 +75,7 @@ class _StubSchedulerControl:
         }
 
 
+@pytest.mark.unit
 def test_jobs_list_and_run_paths_work_in_handler(tmp_path: Path) -> None:
     """`/jobs list` and `/jobs run` should succeed for valid job spec."""
     workspace_root = tmp_path / ".lily"
@@ -123,6 +126,7 @@ def test_jobs_list_and_run_paths_work_in_handler(tmp_path: Path) -> None:
     assert (run_path / "events.jsonl").exists()
 
 
+@pytest.mark.unit
 def test_jobs_run_missing_job_maps_to_job_not_found(tmp_path: Path) -> None:
     """Missing job id should return deterministic `job_not_found` error."""
     command = _build_command(tmp_path / ".lily")
@@ -137,6 +141,7 @@ def test_jobs_run_missing_job_maps_to_job_not_found(tmp_path: Path) -> None:
     assert result.code == "job_not_found"
 
 
+@pytest.mark.unit
 def test_jobs_tail_returns_latest_events(tmp_path: Path) -> None:
     """`/jobs tail` should return latest run events for existing job."""
     workspace_root = tmp_path / ".lily"
@@ -187,6 +192,7 @@ def test_jobs_tail_returns_latest_events(tmp_path: Path) -> None:
     assert tailed.data["line_count"] >= 1
 
 
+@pytest.mark.unit
 def test_jobs_history_returns_run_entries(tmp_path: Path) -> None:
     """`/jobs history` should return newest-first history payload."""
     workspace_root = tmp_path / ".lily"
@@ -238,6 +244,7 @@ def test_jobs_history_returns_run_entries(tmp_path: Path) -> None:
     assert len(entries) == 1
 
 
+@pytest.mark.unit
 def test_jobs_scheduler_controls_and_status(tmp_path: Path) -> None:
     """Scheduler control subcommands should route to control port."""
     workspace_root = tmp_path / ".lily"

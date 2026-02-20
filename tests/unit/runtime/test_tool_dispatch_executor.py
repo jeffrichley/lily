@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
 from pydantic import BaseModel, ConfigDict
 
 from lily.config import SkillSandboxSettings
@@ -66,6 +67,7 @@ def _entry(
     )
 
 
+@pytest.mark.unit
 def test_tool_dispatch_executes_registered_add_tool() -> None:
     """Registered add command tool should execute with typed contract output."""
     executor = ToolDispatchExecutor(
@@ -81,6 +83,7 @@ def test_tool_dispatch_executes_registered_add_tool() -> None:
     assert result.data["output"]["value"] == 4.0
 
 
+@pytest.mark.unit
 def test_tool_dispatch_requires_command_tool() -> None:
     """Executor should fail clearly when entry lacks command_tool."""
     executor = ToolDispatchExecutor(
@@ -96,6 +99,7 @@ def test_tool_dispatch_requires_command_tool() -> None:
     )
 
 
+@pytest.mark.unit
 def test_tool_dispatch_fails_for_unknown_tool() -> None:
     """Executor should fail clearly for unregistered tool names."""
     executor = ToolDispatchExecutor(
@@ -112,6 +116,7 @@ def test_tool_dispatch_fails_for_unknown_tool() -> None:
     assert result.code == "provider_tool_unregistered"
 
 
+@pytest.mark.unit
 def test_tool_dispatch_returns_input_validation_error_deterministically() -> None:
     """Invalid payload should return schema-based deterministic input error."""
     executor = ToolDispatchExecutor(
@@ -127,6 +132,7 @@ def test_tool_dispatch_returns_input_validation_error_deterministically() -> Non
     assert result.data["validation_errors"]
 
 
+@pytest.mark.unit
 def test_tool_dispatch_conformance_for_three_tools() -> None:
     """Typed contract conformance should hold for add/subtract/multiply tools."""
     executor = ToolDispatchExecutor(
@@ -206,6 +212,7 @@ class _BadOutputTool:
         return "unused"
 
 
+@pytest.mark.unit
 def test_tool_dispatch_returns_output_validation_error_deterministically() -> None:
     """Invalid tool output should produce deterministic schema error envelope."""
     bad_tool: ToolContract = _BadOutputTool()
@@ -221,6 +228,7 @@ def test_tool_dispatch_returns_output_validation_error_deterministically() -> No
     assert result.data["validation_errors"]
 
 
+@pytest.mark.unit
 def test_tool_dispatch_errors_for_unbound_provider() -> None:
     """Missing provider binding should return deterministic provider_unbound error."""
     executor = ToolDispatchExecutor(
@@ -256,6 +264,7 @@ class _McpAddResolver:
         return None
 
 
+@pytest.mark.unit
 def test_tool_dispatch_routes_through_mcp_provider_resolver() -> None:
     """MCP provider contract should support deterministic tool routing."""
     executor = ToolDispatchExecutor(
@@ -293,6 +302,7 @@ class _PolicyDeniedResolver:
         raise ProviderPolicyDeniedError("blocked for test")
 
 
+@pytest.mark.unit
 def test_tool_dispatch_maps_mcp_policy_denied_error() -> None:
     """Provider policy denials should map to deterministic security code."""
     executor = ToolDispatchExecutor(
@@ -343,6 +353,7 @@ class _PluginRunnerStub:
         return {"display": user_text.upper(), "data": {"ok": True}}
 
 
+@pytest.mark.unit
 def test_tool_dispatch_routes_through_plugin_provider(tmp_path: Path) -> None:
     """Plugin provider should route through security gate and runner stubs."""
     skill_root = tmp_path / "skills" / "echo_plugin"
@@ -389,6 +400,7 @@ def test_tool_dispatch_routes_through_plugin_provider(tmp_path: Path) -> None:
     assert result.code == "tool_ok"
 
 
+@pytest.mark.unit
 def test_tool_dispatch_maps_plugin_runtime_error(tmp_path: Path) -> None:
     """Plugin runtime failures should return deterministic plugin code."""
     skill_root = tmp_path / "skills" / "echo_plugin"

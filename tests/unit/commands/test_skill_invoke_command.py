@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from lily.commands.handlers.skill_invoke import SkillInvokeCommand
 from lily.commands.parser import CommandCall
 from lily.commands.types import CommandResult
@@ -72,6 +74,7 @@ def _session(skills: tuple[SkillEntry, ...]) -> Session:
     )
 
 
+@pytest.mark.unit
 def test_skill_invoke_forces_exact_snapshot_match() -> None:
     """Handler should delegate exactly requested skill with forwarded payload."""
     invoker = _CapturingInvoker()

@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from lily.memory import (
     FileBackedPersonalityMemoryRepository,
     FileBackedTaskMemoryRepository,
@@ -25,6 +27,7 @@ def _task_repo(tmp_path: Path) -> FileBackedTaskMemoryRepository:
     return FileBackedTaskMemoryRepository(root_dir=tmp_path / "memory")
 
 
+@pytest.mark.unit
 def test_personality_memory_roundtrip_and_dedup(tmp_path: Path) -> None:
     """Personality repository should upsert duplicate namespace/content writes."""
     repo = _personality_repo(tmp_path)
@@ -42,6 +45,7 @@ def test_personality_memory_roundtrip_and_dedup(tmp_path: Path) -> None:
     assert results[0].store.value == "personality_memory"
 
 
+@pytest.mark.unit
 def test_task_memory_requires_namespace_for_query(tmp_path: Path) -> None:
     """Task queries should fail deterministically when namespace is absent."""
     repo = _task_repo(tmp_path)
@@ -55,6 +59,7 @@ def test_task_memory_requires_namespace_for_query(tmp_path: Path) -> None:
         raise AssertionError("Expected MemoryError")
 
 
+@pytest.mark.unit
 def test_no_cross_store_leakage_between_personality_and_task(tmp_path: Path) -> None:
     """Split stores should not leak records across repository boundaries."""
     personality = _personality_repo(tmp_path)
@@ -82,6 +87,7 @@ def test_no_cross_store_leakage_between_personality_and_task(tmp_path: Path) -> 
     assert task_hits[0].store.value == "task_memory"
 
 
+@pytest.mark.unit
 def test_forget_missing_id_returns_deterministic_not_found(tmp_path: Path) -> None:
     """Forget should emit stable not-found memory error."""
     repo = _personality_repo(tmp_path)
@@ -94,6 +100,7 @@ def test_forget_missing_id_returns_deterministic_not_found(tmp_path: Path) -> No
         raise AssertionError("Expected MemoryError")
 
 
+@pytest.mark.unit
 def test_invalid_store_payload_returns_schema_mismatch(tmp_path: Path) -> None:
     """Invalid JSON structure should map to deterministic schema mismatch error."""
     root = tmp_path / "memory"
@@ -109,6 +116,7 @@ def test_invalid_store_payload_returns_schema_mismatch(tmp_path: Path) -> None:
         raise AssertionError("Expected MemoryError")
 
 
+@pytest.mark.unit
 def test_memory_policy_denied_blocks_sensitive_writes(tmp_path: Path) -> None:
     """Memory writes should fail deterministically for sensitive content."""
     repo = _personality_repo(tmp_path)
@@ -121,6 +129,7 @@ def test_memory_policy_denied_blocks_sensitive_writes(tmp_path: Path) -> None:
         raise AssertionError("Expected MemoryError")
 
 
+@pytest.mark.unit
 def test_query_excludes_archived_conflicted_and_expired_by_default(
     tmp_path: Path,
 ) -> None:

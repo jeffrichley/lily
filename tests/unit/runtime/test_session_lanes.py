@@ -6,6 +6,8 @@ import threading
 import time
 from dataclasses import dataclass, field
 
+import pytest
+
 from lily.commands.types import CommandResult
 from lily.runtime.facade import RuntimeFacade
 from lily.runtime.session_lanes import reset_session_lanes
@@ -45,6 +47,7 @@ def _session(session_id: str) -> Session:
     )
 
 
+@pytest.mark.unit
 def test_runtime_serializes_same_session_inputs() -> None:
     """Same session should execute one dispatch at a time."""
     reset_session_lanes()
@@ -67,6 +70,7 @@ def test_runtime_serializes_same_session_inputs() -> None:
     assert registry.max_active == 1
 
 
+@pytest.mark.unit
 def test_runtime_allows_parallel_inputs_across_sessions() -> None:
     """Different sessions should be able to run in parallel lanes."""
     reset_session_lanes()

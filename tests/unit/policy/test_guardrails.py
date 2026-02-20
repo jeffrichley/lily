@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from lily.policy import (
     PRECEDENCE_CONTRACT,
     evaluate_memory_write,
@@ -18,6 +20,7 @@ from tests.unit.policy.redline_fixtures import (
 )
 
 
+@pytest.mark.unit
 def test_precedence_contract_constant_is_documented() -> None:
     """Policy precedence contract should be stable and explicit."""
     assert (
@@ -26,17 +29,20 @@ def test_precedence_contract_constant_is_documented() -> None:
     )
 
 
+@pytest.mark.unit
 def test_resolve_effective_style_prefers_user_style() -> None:
     """User style should take precedence over persona default style."""
     resolved = resolve_effective_style(user_style=PersonaStyleLevel.PLAYFUL)
     assert resolved == PersonaStyleLevel.PLAYFUL
 
 
+@pytest.mark.unit
 def test_force_safe_style_overrides_to_focus() -> None:
     """Safety override style should be focus."""
     assert force_safe_style() == PersonaStyleLevel.FOCUS
 
 
+@pytest.mark.unit
 def test_pre_generation_redlines_block_policy_bypass_requests() -> None:
     """Pre-generation policy should deny known bypass prompts."""
     for text in CONVERSATION_INPUT_DENY:
@@ -45,6 +51,7 @@ def test_pre_generation_redlines_block_policy_bypass_requests() -> None:
         assert decision.code == "conversation_policy_denied"
 
 
+@pytest.mark.unit
 def test_post_generation_redlines_block_dependency_language() -> None:
     """Post-generation policy should deny manipulative dependency output."""
     for text in CONVERSATION_OUTPUT_DENY:
@@ -53,6 +60,7 @@ def test_post_generation_redlines_block_dependency_language() -> None:
         assert decision.code == "conversation_policy_denied"
 
 
+@pytest.mark.unit
 def test_memory_redlines_block_sensitive_content() -> None:
     """Memory policy should deny sensitive secret-like content."""
     for text in MEMORY_DENY:
@@ -61,6 +69,7 @@ def test_memory_redlines_block_sensitive_content() -> None:
         assert decision.code == "memory_policy_denied"
 
 
+@pytest.mark.unit
 def test_policy_allows_normal_safe_content() -> None:
     """Policy should allow normal input/output/memory content."""
     assert (

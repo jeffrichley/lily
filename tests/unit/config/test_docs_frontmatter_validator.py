@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 from lily.docs_validator import ValidationConfig, validate_docs_frontmatter
 
 
@@ -14,6 +16,7 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+@pytest.mark.unit
 def test_validator_adds_missing_frontmatter_with_fix_and_then_fails_placeholders(
     tmp_path: Path,
 ) -> None:
@@ -33,6 +36,7 @@ def test_validator_adds_missing_frontmatter_with_fix_and_then_fails_placeholders
     assert any("last_updated" in error for error in errors)
 
 
+@pytest.mark.unit
 def test_validator_fails_stale_active_doc(tmp_path: Path) -> None:
     """Active docs should fail when last_updated exceeds max age."""
     _write(
@@ -54,6 +58,7 @@ def test_validator_fails_stale_active_doc(tmp_path: Path) -> None:
     assert any("stale for active docs" in error for error in errors)
 
 
+@pytest.mark.unit
 def test_validator_passes_valid_docs(tmp_path: Path) -> None:
     """Valid frontmatter with fresh active docs should pass."""
     _write(

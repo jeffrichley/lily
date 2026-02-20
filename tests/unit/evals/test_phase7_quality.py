@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from tests.unit.evals._phase7_harness import (
     CONSISTENCY_MIN_CASES,
     CONSISTENCY_MIN_PASS_RATE,
@@ -38,6 +40,7 @@ def _assert_thresholds(*, report: object, min_cases: int, min_pass_rate: float) 
     )
 
 
+@pytest.mark.unit
 def test_phase7_personality_consistency_thresholds(tmp_path: Path) -> None:
     """Personality consistency suite should pass configured thresholds."""
     report = run_personality_consistency_suite(temp_dir=tmp_path / "consistency")
@@ -48,6 +51,7 @@ def test_phase7_personality_consistency_thresholds(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.unit
 def test_phase7_task_effectiveness_thresholds(tmp_path: Path) -> None:
     """Task effectiveness suite should pass configured thresholds."""
     report = run_task_effectiveness_suite(temp_dir=tmp_path / "task")
@@ -58,6 +62,7 @@ def test_phase7_task_effectiveness_thresholds(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.unit
 def test_phase7_fun_delight_thresholds(tmp_path: Path) -> None:
     """Fun/delight suite should pass configured thresholds."""
     report = run_fun_delight_suite(temp_dir=tmp_path / "fun")
@@ -68,6 +73,7 @@ def test_phase7_fun_delight_thresholds(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.unit
 def test_phase7_safety_redline_thresholds(tmp_path: Path) -> None:
     """Safety redline suite should pass configured thresholds."""
     report = run_safety_redline_suite(temp_dir=tmp_path / "safety")

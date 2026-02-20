@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
 from lily.memory import (
@@ -19,6 +20,7 @@ from lily.memory import (
 )
 
 
+@pytest.mark.unit
 def test_store_personality_roundtrip_matches_file_behavior(tmp_path: Path) -> None:
     """Store-backed personality repo should match file-backed roundtrip semantics."""
     store_repo = StoreBackedPersonalityMemoryRepository(
@@ -52,6 +54,7 @@ def test_store_personality_roundtrip_matches_file_behavior(tmp_path: Path) -> No
     assert store_results[0].content == file_results[0].content
 
 
+@pytest.mark.unit
 def test_store_task_repo_requires_namespace(tmp_path: Path) -> None:
     """Store-backed task repo should enforce required namespace query contract."""
     repo = StoreBackedTaskMemoryRepository(
@@ -67,6 +70,7 @@ def test_store_task_repo_requires_namespace(tmp_path: Path) -> None:
         raise AssertionError("Expected MemoryError")
 
 
+@pytest.mark.unit
 def test_store_forget_missing_returns_not_found(tmp_path: Path) -> None:
     """Store-backed forget should keep deterministic missing-id contract."""
     repo = StoreBackedPersonalityMemoryRepository(
@@ -81,6 +85,7 @@ def test_store_forget_missing_returns_not_found(tmp_path: Path) -> None:
         raise AssertionError("Expected MemoryError")
 
 
+@pytest.mark.unit
 def test_store_policy_denied_matches_file_behavior(tmp_path: Path) -> None:
     """Store-backed writes should enforce same memory policy denial contract."""
     store_repo = StoreBackedPersonalityMemoryRepository(
@@ -102,6 +107,7 @@ def test_store_policy_denied_matches_file_behavior(tmp_path: Path) -> None:
             raise AssertionError("Expected MemoryError")
 
 
+@pytest.mark.unit
 def test_store_query_and_forget_paginate_across_large_namespace_set(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
@@ -133,6 +139,7 @@ def test_store_query_and_forget_paginate_across_large_namespace_set(
     assert all(record.id != target_id for record in after)
 
 
+@pytest.mark.unit
 def test_store_query_excludes_archived_conflicted_and_expired_by_default(
     tmp_path: Path,
 ) -> None:

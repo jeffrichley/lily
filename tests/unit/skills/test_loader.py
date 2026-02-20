@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from lily.skills.loader import SkillSnapshotRequest, build_skill_snapshot
 from lily.skills.types import SkillSource
 
@@ -21,6 +23,7 @@ def _write_skill(root: Path, name: str, content: str) -> None:
     (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
 
 
+@pytest.mark.unit
 def test_loader_precedence_workspace_over_bundled(tmp_path: Path) -> None:
     """Workspace skill should win over bundled skill with same name."""
     bundled_dir = tmp_path / "bundled"
@@ -65,6 +68,7 @@ invocation_mode: llm_orchestration
     assert any(diag.code == "precedence_conflict" for diag in snapshot.diagnostics)
 
 
+@pytest.mark.unit
 def test_loader_no_fallback_when_high_precedence_ineligible(tmp_path: Path) -> None:
     """Ineligible higher-precedence winner should not fall back to bundled variant."""
     bundled_dir = tmp_path / "bundled"
@@ -112,6 +116,7 @@ eligibility:
     assert any(diag.code == "precedence_conflict" for diag in snapshot.diagnostics)
 
 
+@pytest.mark.unit
 def test_loader_rejects_underdeclared_tool_capability(tmp_path: Path) -> None:
     """tool_dispatch skill should fail when command tool is undeclared."""
     bundled_dir = tmp_path / "bundled"
@@ -149,6 +154,7 @@ capabilities:
     )
 
 
+@pytest.mark.unit
 def test_loader_rejects_tool_dispatch_without_capabilities(tmp_path: Path) -> None:
     """tool_dispatch skill should fail when capabilities are missing."""
     bundled_dir = tmp_path / "bundled"
@@ -184,6 +190,7 @@ command_tool: add
     )
 
 
+@pytest.mark.unit
 def test_loader_rejects_plugin_provider_without_entrypoint(tmp_path: Path) -> None:
     """Plugin provider skills must declare plugin.entrypoint metadata."""
     bundled_dir = tmp_path / "bundled"

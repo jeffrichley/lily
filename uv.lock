@@ -955,7 +955,7 @@ dev = [
     { name = "pylint", specifier = ">=3.0" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
-    { name = "pytest-drill-sergeant", editable = "../../tools/pytest-drill-sergeant" },
+    { name = "pytest-drill-sergeant", specifier = ">=0.4.0" },
     { name = "radon", specifier = ">=6.0" },
     { name = "ruff", specifier = ">=0.8.0" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
@@ -1513,45 +1513,14 @@ wheels = [
 
 [[package]]
 name = "pytest-drill-sergeant"
-source = { editable = "../../tools/pytest-drill-sergeant" }
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pytest" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "black", marker = "extra == 'dev'", specifier = ">=23.0.0" },
-    { name = "hypothesis", marker = "extra == 'test'", specifier = ">=6.136.6" },
-    { name = "mike", marker = "extra == 'docs'", specifier = ">=2.1.3" },
-    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.5.0" },
-    { name = "mkdocs-git-revision-date-localized-plugin", marker = "extra == 'docs'", specifier = ">=1.4.7" },
-    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.6.17" },
-    { name = "mkdocs-mermaid2-plugin", marker = "extra == 'docs'", specifier = ">=1.2.1" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.30.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "mypy", marker = "extra == 'typecheck'" },
-    { name = "pip-audit", marker = "extra == 'security'" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0.0" },
-    { name = "psutil", marker = "extra == 'test'", specifier = ">=5.9.0" },
-    { name = "pytest", specifier = ">=7.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "pytest-benchmark", marker = "extra == 'test'", specifier = ">=4.0.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
-]
-provides-extras = ["dev", "test", "docs", "typecheck", "security"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "black", specifier = ">=25.1.0" },
-    { name = "build", specifier = ">=1.3.0" },
-    { name = "mypy", specifier = ">=1.17.1" },
-    { name = "pip-audit", specifier = ">=2.9.0" },
-    { name = "pytest-cov", specifier = ">=6.2.1" },
-    { name = "pytest-mock", specifier = ">=3.14.1" },
-    { name = "twine", specifier = ">=6.2.0" },
-    { name = "validate-pyproject", specifier = ">=0.24.1" },
-    { name = "xenon", specifier = ">=0.9.3" },
+sdist = { url = "https://files.pythonhosted.org/packages/d8/1a/14b52124ca26fd66bb53e739c902b4c55e100683701a45ffd7e627795c62/pytest_drill_sergeant-0.4.0.tar.gz", hash = "sha256:4e16c29d06650f39ea40b510dcdbcf5955990e267356f1f2becb8c8a9e86920b", size = 25335, upload-time = "2026-02-20T02:13:55.545Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f3/5d/7c9ebdc0c53a5c68dea19a747936cc046bd1465742f0d58973f6df73f50b/pytest_drill_sergeant-0.4.0-py3-none-any.whl", hash = "sha256:48ec86658fd0ad74924728f4de8aa11c416c2ebf3e7f75daa5a81560b06653d6", size = 26493, upload-time = "2026-02-20T02:13:54.601Z" },
 ]
 
 [[package]]

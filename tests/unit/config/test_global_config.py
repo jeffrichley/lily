@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from lily.config import (
@@ -16,6 +17,7 @@ from lily.config import (
 )
 
 
+@pytest.mark.unit
 def test_load_global_config_defaults_when_missing(tmp_path: Path) -> None:
     """Missing config file should yield deterministic defaults."""
     config = load_global_config(tmp_path / "missing.json")
@@ -38,6 +40,7 @@ def test_load_global_config_defaults_when_missing(tmp_path: Path) -> None:
     assert config.security.sandbox.image.startswith("python:3.13-slim@sha256:")
 
 
+@pytest.mark.unit
 def test_load_global_config_reads_custom_backend(tmp_path: Path) -> None:
     """Config loader should parse explicit backend overrides."""
     config_path = tmp_path / "config.json"
@@ -51,6 +54,7 @@ def test_load_global_config_reads_custom_backend(tmp_path: Path) -> None:
     assert config.checkpointer.backend == CheckpointerBackend.MEMORY
 
 
+@pytest.mark.unit
 def test_load_global_config_reads_postgres_contract_fields(tmp_path: Path) -> None:
     """Config loader should parse postgres contract fields when provided."""
     config_path = tmp_path / "config.json"
@@ -69,6 +73,7 @@ def test_load_global_config_reads_postgres_contract_fields(tmp_path: Path) -> No
     assert config.checkpointer.postgres_dsn == "postgresql://x:y@z/db"
 
 
+@pytest.mark.unit
 def test_load_global_config_rejects_invalid_json(tmp_path: Path) -> None:
     """Invalid JSON should raise deterministic global config error."""
     config_path = tmp_path / "config.json"
@@ -82,6 +87,7 @@ def test_load_global_config_rejects_invalid_json(tmp_path: Path) -> None:
         raise AssertionError("Expected GlobalConfigError")
 
 
+@pytest.mark.unit
 def test_load_global_config_reads_memory_tooling_flags(tmp_path: Path) -> None:
     """Config loader should parse memory tooling flags."""
     config_path = tmp_path / "config.json"
@@ -101,6 +107,7 @@ def test_load_global_config_reads_memory_tooling_flags(tmp_path: Path) -> None:
     assert config.memory_tooling.auto_apply is True
 
 
+@pytest.mark.unit
 def test_load_global_config_reads_consolidation_flags(tmp_path: Path) -> None:
     """Config loader should parse consolidation flags and backend mode."""
     config_path = tmp_path / "config.json"
@@ -122,6 +129,7 @@ def test_load_global_config_reads_consolidation_flags(tmp_path: Path) -> None:
     assert config.consolidation.auto_run_every_n_turns == 3
 
 
+@pytest.mark.unit
 def test_load_global_config_reads_evidence_chunking_settings(tmp_path: Path) -> None:
     """Config loader should parse evidence chunking settings."""
     config_path = tmp_path / "config.json"
@@ -144,6 +152,7 @@ def test_load_global_config_reads_evidence_chunking_settings(tmp_path: Path) -> 
     assert config.evidence.token_encoding_name == "cl100k_base"
 
 
+@pytest.mark.unit
 def test_load_global_config_reads_compaction_settings(tmp_path: Path) -> None:
     """Config loader should parse compaction backend and token budget settings."""
     config_path = tmp_path / "config.json"
@@ -163,6 +172,7 @@ def test_load_global_config_reads_compaction_settings(tmp_path: Path) -> None:
     assert config.compaction.max_tokens == 1200
 
 
+@pytest.mark.unit
 def test_load_global_config_reads_yaml_payload(tmp_path: Path) -> None:
     """Config loader should parse YAML payloads."""
     config_path = tmp_path / "config.yaml"
@@ -184,6 +194,7 @@ def test_load_global_config_reads_yaml_payload(tmp_path: Path) -> None:
     assert config.checkpointer.backend == CheckpointerBackend.MEMORY
 
 
+@pytest.mark.unit
 def test_load_global_config_rejects_invalid_yaml(tmp_path: Path) -> None:
     """Invalid YAML should raise deterministic global config error."""
     config_path = tmp_path / "config.yaml"
@@ -197,6 +208,7 @@ def test_load_global_config_rejects_invalid_yaml(tmp_path: Path) -> None:
         raise AssertionError("Expected GlobalConfigError")
 
 
+@pytest.mark.unit
 def test_load_global_config_rejects_unpinned_security_image(tmp_path: Path) -> None:
     """Security sandbox image must be pinned by sha256 digest."""
     config_path = tmp_path / "config.json"

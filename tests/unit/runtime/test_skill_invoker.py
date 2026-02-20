@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from lily.commands.types import CommandResult
 from lily.runtime.executors.base import SkillExecutor
 from lily.runtime.executors.llm_orchestration import LlmOrchestrationExecutor
@@ -80,6 +82,7 @@ def _make_entry(name: str, mode: InvocationMode) -> SkillEntry:
     )
 
 
+@pytest.mark.unit
 def test_invoker_dispatches_to_llm_executor() -> None:
     """Invoker should route llm_orchestration entries to LLM executor."""
     invoker = SkillInvoker(executors=(LlmOrchestrationExecutor(_StubLlmBackend()),))
@@ -92,6 +95,7 @@ def test_invoker_dispatches_to_llm_executor() -> None:
     assert result.message == "stub-response"
 
 
+@pytest.mark.unit
 def test_invoker_returns_explicit_error_for_unbound_mode() -> None:
     """Invoker should return explicit error when executor binding is missing."""
     invoker = SkillInvoker(executors=())
@@ -107,6 +111,7 @@ def test_invoker_returns_explicit_error_for_unbound_mode() -> None:
     )
 
 
+@pytest.mark.unit
 def test_invoker_dispatches_to_tool_executor() -> None:
     """Invoker should route tool_dispatch entries to tool executor."""
     executors: tuple[SkillExecutor, ...] = (_EchoToolDispatchExecutor(),)
@@ -120,6 +125,7 @@ def test_invoker_dispatches_to_tool_executor() -> None:
     assert result.message == "tool:dispatch_me:payload"
 
 
+@pytest.mark.unit
 def test_invoker_denies_undeclared_tool_capability() -> None:
     """Invoker should deny tool_dispatch entry missing declared tool capability."""
     executors: tuple[SkillExecutor, ...] = (_EchoToolDispatchExecutor(),)

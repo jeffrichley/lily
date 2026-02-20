@@ -83,6 +83,7 @@ def _request() -> LlmRunRequest:
     )
 
 
+@pytest.mark.unit
 def test_langchain_backend_returns_response_on_success() -> None:
     """Backend should return valid response for successful invocations."""
     backend = LangChainBackend(invoker=_SuccessInvoker())
@@ -92,6 +93,7 @@ def test_langchain_backend_returns_response_on_success() -> None:
     assert response.text == "ok:echo:hello"
 
 
+@pytest.mark.unit
 def test_langchain_backend_retries_retryable_error_then_succeeds() -> None:
     """Backend should retry retryable errors based on configured policy."""
     sleeps: list[float] = []
@@ -110,6 +112,7 @@ def test_langchain_backend_retries_retryable_error_then_succeeds() -> None:
     assert sleeps == [0.25]
 
 
+@pytest.mark.unit
 def test_langchain_backend_fails_fast_on_invalid_response() -> None:
     """Backend should not retry invalid-response failures."""
     backend = LangChainBackend(invoker=_InvalidResponseInvoker(), max_attempts=2)
@@ -122,6 +125,7 @@ def test_langchain_backend_fails_fast_on_invalid_response() -> None:
         raise AssertionError("Expected BackendInvalidResponseError")
 
 
+@pytest.mark.unit
 def test_system_prompt_uses_skill_instructions_without_skill_name_hardcoding() -> None:
     """Prompt construction should use instructions generically with no echo branch."""
     request = LlmRunRequest(
@@ -139,6 +143,7 @@ def test_system_prompt_uses_skill_instructions_without_skill_name_hardcoding() -
     assert "user payload transformed to uppercase" not in prompt
 
 
+@pytest.mark.unit
 def test_extract_text_supports_structured_response_payload() -> None:
     """Structured response payload should be accepted when messages are absent."""
     result = {"structured_response": {"text": "structured hello"}}
@@ -148,6 +153,7 @@ def test_extract_text_supports_structured_response_payload() -> None:
     assert text == "structured hello"
 
 
+@pytest.mark.unit
 def test_invoker_falls_back_when_structured_output_is_unsupported(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -194,6 +200,7 @@ def test_invoker_falls_back_when_structured_output_is_unsupported(
     assert "response_format" not in calls[1]
 
 
+@pytest.mark.unit
 def test_invoker_does_not_fallback_for_unknown_structured_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

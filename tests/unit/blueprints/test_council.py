@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from pydantic import BaseModel
 
 from lily.blueprints import (
@@ -151,6 +152,7 @@ def _bindings() -> BaseModel:
     )
 
 
+@pytest.mark.unit
 def test_council_compile_and_execute_returns_deterministic_envelope() -> None:
     """Council blueprint should compile and execute map/reduce deterministically."""
     blueprint = CouncilBlueprint(
@@ -181,6 +183,7 @@ def test_council_compile_and_execute_returns_deterministic_envelope() -> None:
     assert findings[1]["title"] == "defense.v1 operations finding"
 
 
+@pytest.mark.unit
 def test_council_compile_fails_with_unresolved_specialist() -> None:
     """Compile should fail deterministically when specialist id is unresolved."""
     blueprint = CouncilBlueprint(
@@ -210,6 +213,7 @@ def test_council_compile_fails_with_unresolved_specialist() -> None:
         raise AssertionError("Expected BlueprintError for unresolved specialist.")
 
 
+@pytest.mark.unit
 def test_council_execution_contains_specialist_failure() -> None:
     """Specialist failure should be contained and surfaced in output payload."""
     blueprint = CouncilBlueprint(
@@ -239,6 +243,7 @@ def test_council_execution_contains_specialist_failure() -> None:
     assert findings[0]["source_specialist"] == "offense.v1"
 
 
+@pytest.mark.unit
 def test_council_execution_invalid_input_maps_to_execution_failed() -> None:
     """Invalid execution input should map to deterministic execution-failed code."""
     blueprint = CouncilBlueprint(
@@ -265,6 +270,7 @@ def test_council_execution_invalid_input_maps_to_execution_failed() -> None:
         raise AssertionError("Expected BlueprintError for invalid execution input.")
 
 
+@pytest.mark.unit
 def test_council_llm_strategy_uses_llm_synthesizer_when_configured() -> None:
     """LLM synth strategy should run selected llm synthesizer implementation."""
     blueprint = CouncilBlueprint(
@@ -294,6 +300,7 @@ def test_council_llm_strategy_uses_llm_synthesizer_when_configured() -> None:
     assert result.payload["summary"] == "LLM synthesis for network posture"
 
 
+@pytest.mark.unit
 def test_council_llm_strategy_falls_back_deterministically_on_failure() -> None:
     """LLM synthesis failure should fall back to deterministic synthesis output."""
     blueprint = CouncilBlueprint(
@@ -324,6 +331,7 @@ def test_council_llm_strategy_falls_back_deterministically_on_failure() -> None:
     assert result.payload["ranked_findings"]
 
 
+@pytest.mark.unit
 def test_council_llm_strategy_maps_failure_when_fallback_also_fails() -> None:
     """LLM + fallback synthesis failure should map to deterministic synth code."""
     blueprint = CouncilBlueprint(
@@ -357,6 +365,7 @@ def test_council_llm_strategy_maps_failure_when_fallback_also_fails() -> None:
         raise AssertionError("Expected BlueprintError for failed llm synth fallback.")
 
 
+@pytest.mark.unit
 def test_council_binding_default_strategy_is_llm() -> None:
     """Default council strategy should be strict LLM synthesis mode."""
     bindings = CouncilBindingModel(
@@ -368,6 +377,7 @@ def test_council_binding_default_strategy_is_llm() -> None:
     assert bindings.synth_strategy == CouncilSynthStrategy.LLM
 
 
+@pytest.mark.unit
 def test_council_llm_maps_primary_failure_without_fallback() -> None:
     """Default llm strategy should fail deterministically without fallback."""
     blueprint = CouncilBlueprint(

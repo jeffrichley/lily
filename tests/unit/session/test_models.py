@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import pytest
 from pydantic import ValidationError
 
 from lily.session.models import ModelConfig
 
 
+@pytest.mark.unit
 def test_conversation_limits_allow_disabled_zero_values() -> None:
     """Disabled limits should allow zero-valued fields."""
     config = ModelConfig.model_validate(
@@ -28,6 +30,7 @@ def test_conversation_limits_allow_disabled_zero_values() -> None:
     assert config.conversation_limits.retries.max_retries == -1
 
 
+@pytest.mark.unit
 def test_conversation_limits_reject_invalid_enabled_tool_loop() -> None:
     """Enabled tool-loop limit requires at least one round."""
     try:
@@ -45,6 +48,7 @@ def test_conversation_limits_reject_invalid_enabled_tool_loop() -> None:
         raise AssertionError("Expected ValidationError")
 
 
+@pytest.mark.unit
 def test_conversation_limits_reject_invalid_enabled_timeout() -> None:
     """Enabled timeout limit requires a positive timeout value."""
     try:
@@ -60,6 +64,7 @@ def test_conversation_limits_reject_invalid_enabled_timeout() -> None:
         raise AssertionError("Expected ValidationError")
 
 
+@pytest.mark.unit
 def test_conversation_limits_reject_invalid_enabled_retries() -> None:
     """Enabled retries require non-negative retry count."""
     try:
@@ -77,6 +82,7 @@ def test_conversation_limits_reject_invalid_enabled_retries() -> None:
         raise AssertionError("Expected ValidationError")
 
 
+@pytest.mark.unit
 def test_conversation_limits_accept_valid_enabled_values() -> None:
     """Enabled limits should accept valid positive/non-negative values."""
     config = ModelConfig.model_validate(

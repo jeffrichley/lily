@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from lily.session.models import ModelConfig, Session
 from lily.session.store import (
     SESSION_SCHEMA_VERSION,
@@ -26,6 +28,7 @@ def _session() -> Session:
     )
 
 
+@pytest.mark.unit
 def test_save_and_load_roundtrip(tmp_path: Path) -> None:
     """Store should roundtrip persisted session payload."""
     path = tmp_path / "session.json"
@@ -40,6 +43,7 @@ def test_save_and_load_roundtrip(tmp_path: Path) -> None:
     assert payload["schema_version"] == SESSION_SCHEMA_VERSION
 
 
+@pytest.mark.unit
 def test_load_unsupported_schema_version_raises(tmp_path: Path) -> None:
     """Unsupported schema should raise explicit version error."""
     path = tmp_path / "session.json"
@@ -56,6 +60,7 @@ def test_load_unsupported_schema_version_raises(tmp_path: Path) -> None:
         raise AssertionError("Expected SessionSchemaVersionError")
 
 
+@pytest.mark.unit
 def test_recover_corrupt_session_moves_file_aside(tmp_path: Path) -> None:
     """Recovery should move invalid session to .corrupt backup path."""
     path = tmp_path / "session.json"

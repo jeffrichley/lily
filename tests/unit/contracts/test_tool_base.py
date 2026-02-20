@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from pydantic import BaseModel, ConfigDict
 
 from lily.runtime.executors.tool_base import BaseToolContract
@@ -46,6 +47,7 @@ def _session() -> Session:
     )
 
 
+@pytest.mark.unit
 def test_base_tool_defaults_allow_execute_only_override() -> None:
     """Tool should work by overriding execute only; parse/render defaults apply."""
     tool = _EchoTool()
@@ -56,6 +58,7 @@ def test_base_tool_defaults_allow_execute_only_override() -> None:
     assert tool.render_output(typed_output) == "HELLO"
 
 
+@pytest.mark.unit
 def test_base_tool_default_execute_raises_not_implemented() -> None:
     """Default execute method should force explicit behavior declaration."""
     tool = BaseToolContract()

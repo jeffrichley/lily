@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from lily.observability import memory_metrics
 
 
+@pytest.mark.unit
 def test_memory_metrics_snapshot_includes_expected_counters() -> None:
     """Snapshot should include required counters and subdomain rates."""
     memory_metrics.reset()
@@ -29,6 +32,7 @@ def test_memory_metrics_snapshot_includes_expected_counters() -> None:
     assert "task_memory" in subdomain
 
 
+@pytest.mark.unit
 def test_memory_metrics_last_verified_distribution_has_buckets() -> None:
     """Snapshot should bucket last-verified ages deterministically."""
     memory_metrics.reset()
