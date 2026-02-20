@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 from _pytest.monkeypatch import MonkeyPatch
 from typer.testing import CliRunner
@@ -34,6 +35,7 @@ invocation_mode: llm_orchestration
     )
 
 
+@pytest.mark.unit
 def test_run_single_shot_skills_lists_snapshot(tmp_path: Path) -> None:
     """`lily run /skills` should output deterministic skill list."""
     bundled_dir = tmp_path / "bundled"
@@ -58,6 +60,7 @@ def test_run_single_shot_skills_lists_snapshot(tmp_path: Path) -> None:
     assert "echo - Echo" in result.stdout
 
 
+@pytest.mark.unit
 def test_run_single_shot_renders_success(
     monkeypatch: MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -95,6 +98,7 @@ def test_run_single_shot_renders_success(
     assert "HELLO" in result.stdout
 
 
+@pytest.mark.unit
 def test_run_single_shot_renders_error_and_exit_code(
     monkeypatch: MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -132,6 +136,7 @@ def test_run_single_shot_renders_error_and_exit_code(
     assert "Error: boom" in result.stdout
 
 
+@pytest.mark.unit
 def test_run_renders_security_alert_panel_for_capability_denied(
     monkeypatch: MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -173,6 +178,7 @@ def test_run_renders_security_alert_panel_for_capability_denied(
     assert "SECURITY ALERT" in result.stdout
 
 
+@pytest.mark.unit
 def test_run_renders_blueprint_diagnostic_panel_for_compile_failure(
     monkeypatch: MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -217,6 +223,7 @@ def test_run_renders_blueprint_diagnostic_panel_for_compile_failure(
     assert "registered dependencies" in result.stdout
 
 
+@pytest.mark.unit
 def test_run_renders_blueprint_diagnostic_panel_for_execution_failure(
     monkeypatch: MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -260,6 +267,7 @@ def test_run_renders_blueprint_diagnostic_panel_for_execution_failure(
     assert "Review compile/execute logs" in result.stdout
 
 
+@pytest.mark.unit
 def test_repl_exit_parentheses_exits_cleanly(tmp_path: Path) -> None:
     """`lily repl` should treat `exit()` as clean shutdown signal."""
     bundled_dir = tmp_path / "bundled"
@@ -284,6 +292,7 @@ def test_repl_exit_parentheses_exits_cleanly(tmp_path: Path) -> None:
     assert "bye" in result.stdout
 
 
+@pytest.mark.unit
 def test_run_persona_list_renders_readable_persona_output(tmp_path: Path) -> None:
     """`lily run /persona list` should render persona output without JSON blob."""
     bundled_dir = tmp_path / "bundled"
@@ -312,6 +321,7 @@ def test_run_persona_list_renders_readable_persona_output(tmp_path: Path) -> Non
     assert '"persona":' not in result.stdout
 
 
+@pytest.mark.unit
 def test_run_persona_use_renders_human_friendly_panel(tmp_path: Path) -> None:
     """`lily run /persona use` should render friendly panel instead of JSON data."""
     bundled_dir = tmp_path / "bundled"
@@ -342,6 +352,7 @@ def test_run_persona_use_renders_human_friendly_panel(tmp_path: Path) -> None:
     assert '"persona":' not in result.stdout
 
 
+@pytest.mark.unit
 def test_run_memory_show_renders_table_instead_of_json(tmp_path: Path) -> None:
     """`/memory show` should render readable memory rows without raw JSON data pane."""
     bundled_dir = tmp_path / "bundled"
@@ -387,6 +398,7 @@ def test_run_memory_show_renders_table_instead_of_json(tmp_path: Path) -> None:
     assert '"records":' not in shown.stdout
 
 
+@pytest.mark.unit
 def test_run_persists_session_and_requires_reload_for_new_skills(
     tmp_path: Path,
 ) -> None:
@@ -472,6 +484,7 @@ def test_run_persists_session_and_requires_reload_for_new_skills(
     assert "demo - Demo" in third.stdout
 
 
+@pytest.mark.unit
 def test_repl_recovers_corrupt_session_file(tmp_path: Path) -> None:
     """REPL should recover by moving corrupt session aside and creating new session."""
     bundled_dir = tmp_path / "bundled"
@@ -505,6 +518,7 @@ def test_repl_recovers_corrupt_session_file(tmp_path: Path) -> None:
     assert payload["schema_version"] == 1
 
 
+@pytest.mark.unit
 def test_run_creates_default_sqlite_checkpointer_file(tmp_path: Path) -> None:
     """`lily run` should initialize default sqlite checkpointer file in local mode."""
     bundled_dir = tmp_path / "bundled"
@@ -548,6 +562,7 @@ def test_run_creates_default_sqlite_checkpointer_file(tmp_path: Path) -> None:
     assert checkpointer_file.exists()
 
 
+@pytest.mark.unit
 def test_init_bootstraps_workspace_and_default_config(tmp_path: Path) -> None:
     """`lily init` should create workspace directories and default config file."""
     workspace_dir = tmp_path / ".lily" / "skills"
@@ -574,6 +589,7 @@ def test_init_bootstraps_workspace_and_default_config(tmp_path: Path) -> None:
     assert payload["compaction"]["backend"] in {"rule_based", "langgraph_native"}
 
 
+@pytest.mark.unit
 def test_init_does_not_overwrite_existing_config_without_flag(tmp_path: Path) -> None:
     """`lily init` should keep existing config unless overwrite flag is set."""
     workspace_dir = tmp_path / ".lily" / "skills"
@@ -607,6 +623,7 @@ def test_init_does_not_overwrite_existing_config_without_flag(tmp_path: Path) ->
     assert payload["checkpointer"]["backend"] == "memory"
 
 
+@pytest.mark.unit
 def test_init_uses_existing_json_config_when_yaml_missing(tmp_path: Path) -> None:
     """`lily init` should preserve legacy config.json when already present."""
     workspace_dir = tmp_path / ".lily" / "skills"

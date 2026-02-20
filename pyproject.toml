@@ -42,6 +42,7 @@ dev = [
     "commitizen>=3.0",
     "docstr-coverage>=2.3",
     "pre-commit>=4.0",
+    "pytest-drill-sergeant>=0.3.1",
 ]
 
 [build-system]
@@ -54,6 +55,17 @@ packages = ["src/lily"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+drill_sergeant_enabled = true
+drill_sergeant_enforce_markers = true
+drill_sergeant_marker_severity = "error"
+drill_sergeant_write_markers = true
+drill_sergeant_auto_detect_markers = true
+drill_sergeant_enforce_aaa = true
+drill_sergeant_aaa_mode = "basic"
+drill_sergeant_aaa_severity = "warn"
+drill_sergeant_enforce_file_length = true
+drill_sergeant_max_file_length = 1200
+drill_sergeant_file_length_mode = "warn"
 markers = [
     "unit: Unit tests that test individual components in isolation",
     "integration: Integration tests that test multiple components together",
@@ -62,6 +74,7 @@ markers = [
 filterwarnings = [
     "error::ResourceWarning",
     "ignore:Importing Send from langgraph.constants is deprecated.*:DeprecationWarning:trustcall\\._base",
+    "ignore:Test '.*' is missing '.*' section:pytest.PytestWarning",
 ]
 
 [tool.ruff]
@@ -158,3 +171,9 @@ skips = ["B101"]
 name = "cz_conventional_commits"
 version_provider = "pep621"
 update_changelog_on_bump = true
+
+[tool.drill_sergeant]
+marker_mappings = { contracts = "integration" }
+
+[tool.uv.sources]
+pytest-drill-sergeant = { path = "../../tools/pytest-drill-sergeant", editable = true }

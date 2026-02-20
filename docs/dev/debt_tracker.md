@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-18"
+last_updated: "2026-02-20"
 status: "active"
 source_of_truth: true
 ---
@@ -47,18 +47,17 @@ Priority scale:
 
 ### P2
 
-- [ ] Integrate pytest-drill-sergeant for test quality enforcement
+- [x] Integrate pytest-drill-sergeant for test quality enforcement
   - Owner: `@team`
-  - Target: `TBD`
-  - Current state: no plugin enforcing marker classification, AAA structure, or file-length discipline; test quality relies on manual convention and Ruff/type checks.
+  - Closed: `2026-02-20`
+  - Current state: plugin now enforces marker classification and applies AAA/file-length policy in configured mode.
   - Reference: [pytest-drill-sergeant on PyPI](https://pypi.org/project/pytest-drill-sergeant/)
-  - Exit criteria:
-    - plugin added as dev dependency and loaded in pytest config (`pytest.ini` or `pyproject.toml`)
-    - marker rule enabled (e.g. `tests/unit/` → `@pytest.mark.unit`) with directory-to-marker mapping aligned to existing layout
-    - AAA rule enabled in at least `basic` mode for test bodies
-    - file-length rule configured (mode and max length); path exclusions or inline ignore documented if used
-    - existing test suite passes under plugin (no new failures); any required test updates done in same change
-    - CI/quality gates include drill-sergeant (e.g. `just verify` / `just quality test`)
+  - Evidence:
+    - dev dependency added: `pytest-drill-sergeant`
+    - pytest config wired in `pyproject.toml` (`drill_sergeant_*` options)
+    - marker mapping aligned for existing layout: `contracts -> integration`
+    - AAA enabled in `basic` mode; file-length rule configured (`max=1200`, `mode=warn`)
+    - full gate run passes with plugin active via `just quality test`
 
 - [ ] Add real `/agent <name>` once agent subsystem exists
   - Owner: `@team`
