@@ -40,11 +40,13 @@ def _request(
 @pytest.mark.unit
 def test_rule_based_consolidation_extracts_and_writes(tmp_path: Path) -> None:
     """Rule-based engine should infer deterministic preference memories."""
+    # Arrange - personality repo and rule-based engine
     repository = StoreBackedPersonalityMemoryRepository(
         store_file=tmp_path / "memory" / "store.sqlite"
     )
     engine = RuleBasedConsolidationEngine(personality_repository=repository)
 
+    # Act - run consolidation with user messages
     result = engine.run(
         _request(
             enabled=True,
@@ -56,6 +58,7 @@ def test_rule_based_consolidation_extracts_and_writes(tmp_path: Path) -> None:
         )
     )
 
+    # Assert - ok status and extracted content in repo
     assert result.status == "ok"
     assert result.written >= 2
     records = repository.query(
@@ -73,6 +76,7 @@ def test_rule_based_consolidation_extracts_and_writes(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_rule_based_consolidation_marks_conflicts(tmp_path: Path) -> None:
     """Incoming candidate should mark prior conflicting record as conflicted."""
+    # Arrange - repo with existing verified record and engine
     repository = StoreBackedPersonalityMemoryRepository(
         store_file=tmp_path / "memory" / "store.sqlite"
     )
@@ -86,6 +90,7 @@ def test_rule_based_consolidation_marks_conflicts(tmp_path: Path) -> None:
     )
     engine = RuleBasedConsolidationEngine(personality_repository=repository)
 
+    # Act - run consolidation with conflicting preference
     _ = engine.run(
         _request(
             enabled=True,
@@ -99,6 +104,7 @@ def test_rule_based_consolidation_marks_conflicts(tmp_path: Path) -> None:
         )
     )
 
+    # Assert - prior record conflicted and new needs_verification
     all_rows = repository.query(
         MemoryQuery(
             query="favorite color",
@@ -115,9 +121,11 @@ def test_rule_based_consolidation_marks_conflicts(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_langmem_manager_consolidation_writes(tmp_path: Path) -> None:
     """LangMem-manager engine should persist extracted candidates."""
+    # Arrange - langmem adapter and engine
     adapter = LangMemToolingAdapter(store_file=tmp_path / "memory" / "store.sqlite")
     engine = LangMemManagerConsolidationEngine(tooling_adapter=adapter)
 
+    # Act - run consolidation
     result = engine.run(
         _request(
             enabled=True,
@@ -128,6 +136,7 @@ def test_langmem_manager_consolidation_writes(tmp_path: Path) -> None:
         )
     )
 
+    # Assert - one written and searchable
     assert result.status == "ok"
     assert result.written == 1
     rows = adapter.search(
@@ -146,6 +155,7 @@ def test_langmem_manager_consolidation_writes(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_rule_based_consolidation_writes_task_memory_candidates(tmp_path: Path) -> None:
     """Rule-based backend should persist extracted task facts when repository exists."""
+    # Arrange - store-backed repos and rule-based engine
     personality_repo = StoreBackedPersonalityMemoryRepository(
         store_file=tmp_path / "memory" / "store.sqlite"
     )
@@ -157,6 +167,7 @@ def test_rule_based_consolidation_writes_task_memory_candidates(tmp_path: Path) 
         task_repository=task_repo,
     )
 
+    # Act - run consolidation with task message
     result = engine.run(
         _request(
             enabled=True,
@@ -170,6 +181,7 @@ def test_rule_based_consolidation_writes_task_memory_candidates(tmp_path: Path) 
         )
     )
 
+    # Assert - task memory written and queryable
     assert result.status == "ok"
     task_rows = task_repo.query(
         MemoryQuery(
@@ -185,6 +197,7 @@ def test_rule_based_consolidation_writes_task_memory_candidates(tmp_path: Path) 
 @pytest.mark.unit
 def test_consolidation_disabled_returns_disabled_status(tmp_path: Path) -> None:
     """Both engines should short-circuit to disabled status when off."""
+    # Arrange - repos and both engines and disabled request
     repository = StoreBackedPersonalityMemoryRepository(
         store_file=tmp_path / "memory" / "store.sqlite"
     )
@@ -200,10 +213,12 @@ def test_consolidation_disabled_returns_disabled_status(tmp_path: Path) -> None:
         history=(),
     )
 
+    # Act - run both engines with disabled request
     rule_result = rule_engine.run(request)
     langmem_result = langmem_engine.run(
         request.model_copy(update={"backend": ConsolidationBackend.LANGMEM_MANAGER})
     )
 
+    # Assert - both return disabled
     assert rule_result.status == "disabled"
     assert langmem_result.status == "disabled"

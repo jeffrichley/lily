@@ -16,7 +16,10 @@ from tests.unit.evals._memory_migration_harness import (
 @pytest.mark.unit
 def test_memory_performance_thresholds(tmp_path: Path) -> None:
     """Performance benchmark suite should pass configured thresholds."""
+    # Arrange - temp dir for performance run
+    # Act - run performance benchmark suite
     report = run_performance_benchmark_suite(temp_dir=tmp_path / "performance")
+    # Assert - case count and pass rate meet thresholds
     assert report.total >= PERFORMANCE_MIN_CASES
     assert report.pass_rate >= PERFORMANCE_MIN_PASS_RATE, (
         f"suite={report.suite_id} pass_rate={report.pass_rate:.3f} "

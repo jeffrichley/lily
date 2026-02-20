@@ -26,6 +26,7 @@ def _write_skill(root: Path, name: str, content: str) -> None:
 @pytest.mark.unit
 def test_loader_precedence_workspace_over_bundled(tmp_path: Path) -> None:
     """Workspace skill should win over bundled skill with same name."""
+    # Arrange - workspace and bundled dirs with same-named skill
     bundled_dir = tmp_path / "bundled"
     workspace_dir = tmp_path / "workspace"
     bundled_dir.mkdir()
@@ -52,6 +53,7 @@ invocation_mode: llm_orchestration
 """,
     )
 
+    # Act - build snapshot with both dirs
     snapshot = build_skill_snapshot(
         SkillSnapshotRequest(
             bundled_dir=bundled_dir,
@@ -61,6 +63,7 @@ invocation_mode: llm_orchestration
         )
     )
 
+    # Assert - workspace skill wins and precedence conflict is diagnosed
     assert [entry.name for entry in snapshot.skills] == ["echo"]
     assert snapshot.skills[0].source == SkillSource.WORKSPACE
     assert snapshot.skills[0].summary == "workspace echo"
@@ -71,6 +74,7 @@ invocation_mode: llm_orchestration
 @pytest.mark.unit
 def test_loader_no_fallback_when_high_precedence_ineligible(tmp_path: Path) -> None:
     """Ineligible higher-precedence winner should not fall back to bundled variant."""
+    # Arrange - workspace skill ineligible on linux, bundled eligible
     bundled_dir = tmp_path / "bundled"
     workspace_dir = tmp_path / "workspace"
     bundled_dir.mkdir()
@@ -99,6 +103,7 @@ eligibility:
 """,
     )
 
+    # Act - build snapshot on linux
     snapshot = build_skill_snapshot(
         SkillSnapshotRequest(
             bundled_dir=bundled_dir,
@@ -108,6 +113,7 @@ eligibility:
         )
     )
 
+    # Assert - no skills loaded and ineligible + precedence conflict diagnosed
     assert [entry.name for entry in snapshot.skills] == []
     assert any(
         diag.code == "ineligible" and diag.skill_name == "echo"
@@ -119,6 +125,7 @@ eligibility:
 @pytest.mark.unit
 def test_loader_rejects_underdeclared_tool_capability(tmp_path: Path) -> None:
     """tool_dispatch skill should fail when command tool is undeclared."""
+    # Arrange - skill with command_tool not in declared_tools
     bundled_dir = tmp_path / "bundled"
     workspace_dir = tmp_path / "workspace"
     bundled_dir.mkdir()
@@ -138,6 +145,7 @@ capabilities:
 """,
     )
 
+    # Act - build snapshot
     snapshot = build_skill_snapshot(
         SkillSnapshotRequest(
             bundled_dir=bundled_dir,
@@ -147,6 +155,7 @@ capabilities:
         )
     )
 
+    # Assert - no skills and malformed_frontmatter diagnostic
     assert [entry.name for entry in snapshot.skills] == []
     assert any(
         diag.code == "malformed_frontmatter" and diag.skill_name == "add"
@@ -157,6 +166,7 @@ capabilities:
 @pytest.mark.unit
 def test_loader_rejects_tool_dispatch_without_capabilities(tmp_path: Path) -> None:
     """tool_dispatch skill should fail when capabilities are missing."""
+    # Arrange - tool_dispatch skill with no capabilities block
     bundled_dir = tmp_path / "bundled"
     workspace_dir = tmp_path / "workspace"
     bundled_dir.mkdir()
@@ -174,6 +184,7 @@ command_tool: add
 """,
     )
 
+    # Act - build snapshot
     snapshot = build_skill_snapshot(
         SkillSnapshotRequest(
             bundled_dir=bundled_dir,
@@ -183,6 +194,7 @@ command_tool: add
         )
     )
 
+    # Assert - no skills and malformed_frontmatter diagnostic
     assert [entry.name for entry in snapshot.skills] == []
     assert any(
         diag.code == "malformed_frontmatter" and diag.skill_name == "add"
@@ -193,6 +205,7 @@ command_tool: add
 @pytest.mark.unit
 def test_loader_rejects_plugin_provider_without_entrypoint(tmp_path: Path) -> None:
     """Plugin provider skills must declare plugin.entrypoint metadata."""
+    # Arrange - plugin provider skill without plugin.entrypoint
     bundled_dir = tmp_path / "bundled"
     workspace_dir = tmp_path / "workspace"
     bundled_dir.mkdir()
@@ -215,6 +228,7 @@ plugin:
 """,
     )
 
+    # Act - build snapshot
     snapshot = build_skill_snapshot(
         SkillSnapshotRequest(
             bundled_dir=bundled_dir,
@@ -224,6 +238,7 @@ plugin:
         )
     )
 
+    # Assert - no skills and malformed_frontmatter diagnostic
     assert [entry.name for entry in snapshot.skills] == []
     assert any(
         diag.code == "malformed_frontmatter" and diag.skill_name == "echo_plugin"

@@ -155,6 +155,7 @@ def _bindings() -> BaseModel:
 @pytest.mark.unit
 def test_council_compile_and_execute_returns_deterministic_envelope() -> None:
     """Council blueprint should compile and execute map/reduce deterministically."""
+    # Arrange - blueprint with two specialists and bindings
     blueprint = CouncilBlueprint(
         specialists={
             "offense.v1": _SecuritySpecialist(
@@ -168,9 +169,11 @@ def test_council_compile_and_execute_returns_deterministic_envelope() -> None:
         }
     )
 
+    # Act - compile bindings and invoke with topic
     compiled = blueprint.compile(_bindings())
     result = compiled.invoke({"topic": "service perimeter", "context": ("api",)})
 
+    # Assert - status, artifacts, and payload structure
     assert result.status == BlueprintRunStatus.OK
     assert result.artifacts == ("summary.md", "events.jsonl")
     assert result.approvals_requested == ()
@@ -186,6 +189,7 @@ def test_council_compile_and_execute_returns_deterministic_envelope() -> None:
 @pytest.mark.unit
 def test_council_compile_fails_with_unresolved_specialist() -> None:
     """Compile should fail deterministically when specialist id is unresolved."""
+    # Arrange - blueprint missing one specialist and bindings referencing both
     blueprint = CouncilBlueprint(
         specialists={
             "offense.v1": _SecuritySpecialist(
@@ -201,9 +205,11 @@ def test_council_compile_fails_with_unresolved_specialist() -> None:
         max_findings=5,
     )
 
+    # Act - compile with bindings that reference unresolved specialist
     try:
         blueprint.compile(bindings)
     except BlueprintError as exc:
+        # Assert - compile failed with expected code and unresolved list
         assert exc.code == BlueprintErrorCode.COMPILE_FAILED
         assert str(exc) == (
             "Error: council compile failed due to unresolved specialists."
@@ -216,6 +222,7 @@ def test_council_compile_fails_with_unresolved_specialist() -> None:
 @pytest.mark.unit
 def test_council_execution_contains_specialist_failure() -> None:
     """Specialist failure should be contained and surfaced in output payload."""
+    # Arrange - blueprint with one ok specialist and one failing specialist
     blueprint = CouncilBlueprint(
         specialists={
             "offense.v1": _SecuritySpecialist(
@@ -233,8 +240,10 @@ def test_council_execution_contains_specialist_failure() -> None:
     )
     compiled = blueprint.compile(bindings)
 
+    # Act - invoke with topic
     result = compiled.invoke({"topic": "cloud perimeter"})
 
+    # Assert - status ok and failed specialist listed in payload
     assert result.status == BlueprintRunStatus.OK
     assert result.payload["failed_specialists"] == ["defense.v1"]
     findings = result.payload["ranked_findings"]
@@ -246,6 +255,7 @@ def test_council_execution_contains_specialist_failure() -> None:
 @pytest.mark.unit
 def test_council_execution_invalid_input_maps_to_execution_failed() -> None:
     """Invalid execution input should map to deterministic execution-failed code."""
+    # Arrange - valid blueprint and bindings
     blueprint = CouncilBlueprint(
         specialists={
             "offense.v1": _SecuritySpecialist(
@@ -259,9 +269,11 @@ def test_council_execution_invalid_input_maps_to_execution_failed() -> None:
         }
     )
     compiled = blueprint.compile(_bindings())
+    # Act - invoke with invalid input missing required topic
     try:
         compiled.invoke({"context": ("missing topic",)})
     except BlueprintError as exc:
+        # Assert - execution failed with validation errors
         assert exc.code == BlueprintErrorCode.EXECUTION_FAILED
         assert str(exc) == "Error: council execution input is invalid."
         assert exc.data["blueprint"] == "council.v1"
@@ -273,6 +285,7 @@ def test_council_execution_invalid_input_maps_to_execution_failed() -> None:
 @pytest.mark.unit
 def test_council_llm_strategy_uses_llm_synthesizer_when_configured() -> None:
     """LLM synth strategy should run selected llm synthesizer implementation."""
+    # Arrange - blueprint with llm synthesizer and bindings set to LLM strategy
     blueprint = CouncilBlueprint(
         specialists={
             "offense.v1": _SecuritySpecialist(
@@ -293,9 +306,11 @@ def test_council_llm_strategy_uses_llm_synthesizer_when_configured() -> None:
         max_findings=5,
     )
 
+    # Act - compile and invoke with topic
     compiled = blueprint.compile(bindings)
     result = compiled.invoke({"topic": "network posture"})
 
+    # Assert - success and llm-generated summary in payload
     assert result.status == BlueprintRunStatus.OK
     assert result.payload["summary"] == "LLM synthesis for network posture"
 
@@ -303,6 +318,7 @@ def test_council_llm_strategy_uses_llm_synthesizer_when_configured() -> None:
 @pytest.mark.unit
 def test_council_llm_strategy_falls_back_deterministically_on_failure() -> None:
     """LLM synthesis failure should fall back to deterministic synthesis output."""
+    # Arrange - blueprint with failing llm synth and LLM_WITH_FALLBACK strategy
     blueprint = CouncilBlueprint(
         specialists={
             "offense.v1": _SecuritySpecialist(
@@ -323,9 +339,11 @@ def test_council_llm_strategy_falls_back_deterministically_on_failure() -> None:
         max_findings=5,
     )
 
+    # Act - compile and invoke
     compiled = blueprint.compile(bindings)
     result = compiled.invoke({"topic": "network posture"})
 
+    # Assert - success with fallback summary and ranked findings
     assert result.status == BlueprintRunStatus.OK
     assert "[fallback: llm_synth_failed" in result.payload["summary"]
     assert result.payload["ranked_findings"]
@@ -334,6 +352,7 @@ def test_council_llm_strategy_falls_back_deterministically_on_failure() -> None:
 @pytest.mark.unit
 def test_council_llm_strategy_maps_failure_when_fallback_also_fails() -> None:
     """LLM + fallback synthesis failure should map to deterministic synth code."""
+    # Arrange - both llm and deterministic synthesizers fail
     blueprint = CouncilBlueprint(
         specialists={
             "offense.v1": _SecuritySpecialist(
@@ -354,10 +373,12 @@ def test_council_llm_strategy_maps_failure_when_fallback_also_fails() -> None:
         synth_strategy=CouncilSynthStrategy.LLM_WITH_FALLBACK,
         max_findings=5,
     )
+    # Act - compile and invoke
     compiled = blueprint.compile(bindings)
     try:
         compiled.invoke({"topic": "network posture"})
     except BlueprintError as exc:
+        # Assert - execution failed with fallback error code
         assert exc.code == BlueprintErrorCode.EXECUTION_FAILED
         assert str(exc) == "Error: council synthesis failed."
         assert exc.data["synth_error_code"] == "llm_synth_fallback_failed"
@@ -368,18 +389,22 @@ def test_council_llm_strategy_maps_failure_when_fallback_also_fails() -> None:
 @pytest.mark.unit
 def test_council_binding_default_strategy_is_llm() -> None:
     """Default council strategy should be strict LLM synthesis mode."""
+    # Arrange - bindings without explicit synth_strategy
     bindings = CouncilBindingModel(
         specialists=("offense.v1", "defense.v1"),
         synthesizer="llm.default.v1",
         max_findings=5,
     )
 
+    # Act - (none; bindings are the subject)
+    # Assert - default strategy is LLM
     assert bindings.synth_strategy == CouncilSynthStrategy.LLM
 
 
 @pytest.mark.unit
 def test_council_llm_maps_primary_failure_without_fallback() -> None:
     """Default llm strategy should fail deterministically without fallback."""
+    # Arrange - blueprint with failing llm synth and strict LLM strategy
     blueprint = CouncilBlueprint(
         specialists={
             "offense.v1": _SecuritySpecialist(
@@ -399,10 +424,12 @@ def test_council_llm_maps_primary_failure_without_fallback() -> None:
         synth_strategy=CouncilSynthStrategy.LLM,
         max_findings=5,
     )
+    # Act - compile and invoke
     compiled = blueprint.compile(bindings)
     try:
         compiled.invoke({"topic": "network posture"})
     except BlueprintError as exc:
+        # Assert - execution failed with llm_synth_failed code
         assert exc.code == BlueprintErrorCode.EXECUTION_FAILED
         assert str(exc) == "Error: council synthesis failed."
         assert exc.data["synth_error_code"] == "llm_synth_failed"

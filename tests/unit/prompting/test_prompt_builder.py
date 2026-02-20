@@ -37,10 +37,13 @@ def _context(*, mode: PromptMode = PromptMode.FULL) -> PromptBuildContext:
 @pytest.mark.unit
 def test_prompt_builder_full_mode_renders_all_core_sections() -> None:
     """Full mode should include identity/safety/skills/memory/runtime sections."""
+    # Arrange - builder and full-mode context
     builder = PromptBuilder(section_max_chars=200)
 
+    # Act - build prompt
     prompt = builder.build(_context(mode=PromptMode.FULL))
 
+    # Assert - all core sections present
     assert "## Identity" in prompt
     assert "## Persona" in prompt
     assert "## Safety" in prompt
@@ -52,10 +55,13 @@ def test_prompt_builder_full_mode_renders_all_core_sections() -> None:
 @pytest.mark.unit
 def test_prompt_builder_minimal_mode_skips_skills_and_memory() -> None:
     """Minimal mode should omit skills and memory sections."""
+    # Arrange - builder and minimal-mode context
     builder = PromptBuilder(section_max_chars=200)
 
+    # Act - build prompt
     prompt = builder.build(_context(mode=PromptMode.MINIMAL))
 
+    # Assert - core sections present, skills and memory absent
     assert "## Identity" in prompt
     assert "## Persona" in prompt
     assert "## Safety" in prompt
@@ -67,9 +73,12 @@ def test_prompt_builder_minimal_mode_skips_skills_and_memory() -> None:
 @pytest.mark.unit
 def test_truncate_with_marker_emits_deterministic_marker() -> None:
     """Truncation should include stable marker with kept/original lengths."""
+    # Arrange - long source string
     source = "a" * 80
 
+    # Act - truncate with marker
     truncated = truncate_with_marker(source, max_chars=20, label="memory_summary")
 
+    # Assert - marker and total length in output
     assert "[...truncated memory_summary: kept" in truncated
     assert "80 total" in truncated

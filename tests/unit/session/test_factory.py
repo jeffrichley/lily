@@ -20,6 +20,7 @@ def _write_skill(root: Path, name: str, content: str) -> None:
 @pytest.mark.unit
 def test_create_builds_session_with_snapshot(tmp_path: Path) -> None:
     """SessionFactory should create a session with deterministic snapshot data."""
+    # Arrange - bundled dir with echo skill, factory config
     bundled_dir = tmp_path / "bundled"
     workspace_dir = tmp_path / "workspace"
     bundled_dir.mkdir()
@@ -44,12 +45,14 @@ invocation_mode: llm_orchestration
             env={},
         )
     )
+    # Act - create session
     session = factory.create(
         active_agent="default",
         model_config=ModelConfig(model_name="stub-model"),
         session_id="session-001",
     )
 
+    # Assert - session and snapshot match expected
     assert session.session_id == "session-001"
     assert session.active_agent == "default"
     assert session.model_settings.model_name == "stub-model"
@@ -66,6 +69,7 @@ def test_session_snapshot_does_not_drift_after_filesystem_changes(
     tmp_path: Path,
 ) -> None:
     """Existing session snapshot should remain stable even if skills on disk change."""
+    # Arrange - bundled echo skill, factory, create initial session
     bundled_dir = tmp_path / "bundled"
     workspace_dir = tmp_path / "workspace"
     bundled_dir.mkdir()
@@ -94,6 +98,7 @@ invocation_mode: llm_orchestration
     session = factory.create()
     original_names = [entry.name for entry in session.skill_snapshot.skills]
 
+    # Act - add new skill on disk, read same session snapshot, then create new session
     _write_skill(
         workspace_dir,
         "new_skill",
@@ -106,6 +111,7 @@ invocation_mode: llm_orchestration
     )
 
     names_after_fs_change = [entry.name for entry in session.skill_snapshot.skills]
+    # Assert - existing session snapshot unchanged; new session sees new skill
     assert names_after_fs_change == original_names
 
     new_session = factory.create()

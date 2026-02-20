@@ -50,11 +50,13 @@ def _session(session_id: str) -> Session:
 @pytest.mark.unit
 def test_runtime_serializes_same_session_inputs() -> None:
     """Same session should execute one dispatch at a time."""
+    # Arrange - reset lanes, tracking registry, runtime, single session
     reset_session_lanes()
     registry = _TrackingRegistry()
     runtime = RuntimeFacade(command_registry=registry)  # type: ignore[arg-type]
     session = _session("session-a")
 
+    # Act - two threads dispatch /skills for same session concurrently
     start = threading.Barrier(2)
     t1 = threading.Thread(
         target=lambda: (start.wait(), runtime.handle_input("/skills", session))
@@ -66,19 +68,21 @@ def test_runtime_serializes_same_session_inputs() -> None:
     t2.start()
     t1.join()
     t2.join()
-
+    # Assert - at most one active at a time for same session
     assert registry.max_active == 1
 
 
 @pytest.mark.unit
 def test_runtime_allows_parallel_inputs_across_sessions() -> None:
     """Different sessions should be able to run in parallel lanes."""
+    # Arrange - reset lanes, registry, runtime, two sessions
     reset_session_lanes()
     registry = _TrackingRegistry()
     runtime = RuntimeFacade(command_registry=registry)  # type: ignore[arg-type]
     session_a = _session("session-a")
     session_b = _session("session-b")
 
+    # Act - two threads dispatch for different sessions concurrently
     start = threading.Barrier(2)
     t1 = threading.Thread(
         target=lambda: (start.wait(), runtime.handle_input("/skills", session_a))
@@ -90,5 +94,5 @@ def test_runtime_allows_parallel_inputs_across_sessions() -> None:
     t2.start()
     t1.join()
     t2.join()
-
+    # Assert - both lanes can run in parallel
     assert registry.max_active >= 2

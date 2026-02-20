@@ -86,16 +86,20 @@ def _request() -> LlmRunRequest:
 @pytest.mark.unit
 def test_langchain_backend_returns_response_on_success() -> None:
     """Backend should return valid response for successful invocations."""
+    # Arrange - backend with success invoker
     backend = LangChainBackend(invoker=_SuccessInvoker())
 
+    # Act - run
     response = backend.run(_request())
 
+    # Assert - text matches invoker output
     assert response.text == "ok:echo:hello"
 
 
 @pytest.mark.unit
 def test_langchain_backend_retries_retryable_error_then_succeeds() -> None:
     """Backend should retry retryable errors based on configured policy."""
+    # Arrange - retry-then-success invoker, backend with backoff
     sleeps: list[float] = []
     invoker = _RetryThenSuccessInvoker()
     backend = LangChainBackend(
@@ -105,8 +109,10 @@ def test_langchain_backend_retries_retryable_error_then_succeeds() -> None:
         backoff_seconds=0.25,
     )
 
+    # Act - run (first attempt fails)
     response = backend.run(_request())
 
+    # Assert - second attempt succeeds, backoff recorded
     assert response.text == "ok:echo:hello"
     assert invoker.calls == 2
     assert sleeps == [0.25]
@@ -115,11 +121,14 @@ def test_langchain_backend_retries_retryable_error_then_succeeds() -> None:
 @pytest.mark.unit
 def test_langchain_backend_fails_fast_on_invalid_response() -> None:
     """Backend should not retry invalid-response failures."""
+    # Arrange - backend with invalid-response invoker
     backend = LangChainBackend(invoker=_InvalidResponseInvoker(), max_attempts=2)
 
+    # Act - run (invalid output)
     try:
         backend.run(_request())
     except BackendInvalidResponseError as exc:
+        # Assert - empty output in message
         assert "empty output" in str(exc)
     else:  # pragma: no cover - safety assertion
         raise AssertionError("Expected BackendInvalidResponseError")
@@ -128,6 +137,7 @@ def test_langchain_backend_fails_fast_on_invalid_response() -> None:
 @pytest.mark.unit
 def test_system_prompt_uses_skill_instructions_without_skill_name_hardcoding() -> None:
     """Prompt construction should use instructions generically with no echo branch."""
+    # Arrange - request with skill_instructions
     request = LlmRunRequest(
         session_id="session-test",
         skill_name="echo",
@@ -137,8 +147,10 @@ def test_system_prompt_uses_skill_instructions_without_skill_name_hardcoding() -
         model_name="default",
     )
 
+    # Act - build system prompt
     prompt = _LangChainV1Invoker._build_system_prompt(request)
 
+    # Assert - instructions included, no skill-name hardcoding
     assert "Skill instructions:\nReturn the text in lowercase." in prompt
     assert "user payload transformed to uppercase" not in prompt
 
@@ -146,10 +158,13 @@ def test_system_prompt_uses_skill_instructions_without_skill_name_hardcoding() -
 @pytest.mark.unit
 def test_extract_text_supports_structured_response_payload() -> None:
     """Structured response payload should be accepted when messages are absent."""
+    # Arrange - result with structured_response only
     result = {"structured_response": {"text": "structured hello"}}
 
+    # Act - extract text
     text = _LangChainV1Invoker._extract_text(result)
 
+    # Assert - text from structured payload
     assert text == "structured hello"
 
 
@@ -158,6 +173,7 @@ def test_invoker_falls_back_when_structured_output_is_unsupported(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Invoker should retry without response_format on known vLLM error signature."""
+    # Arrange - first agent tool_choice error, second succeeds; patch create_agent
     calls: list[dict[str, object]] = []
 
     class _FirstAgent:
@@ -192,8 +208,10 @@ def test_invoker_falls_back_when_structured_output_is_unsupported(
         model_name="openai:Qwen/Qwen2.5-Coder-7B-Instruct-AWQ",
     )
 
+    # Act - invoke (first with response_format, fallback without)
     result = _LangChainV1Invoker().invoke(request)
 
+    # Assert - fallback path succeeded, second call had no response_format
     assert result == "fallback-ok"
     assert len(calls) == 2
     assert "response_format" in calls[0]
@@ -206,6 +224,7 @@ def test_invoker_does_not_fallback_for_unknown_structured_error(
 ) -> None:
     """Invoker should bubble non-matching exceptions from structured path."""
 
+    # Arrange - failing agent with non-matching error, monkeypatch create_agent
     class _FailingAgent:
         def invoke(self, payload: object) -> object:
             del payload
@@ -223,5 +242,7 @@ def test_invoker_does_not_fallback_for_unknown_structured_error(
         model_name="openai:Qwen/Qwen2.5-Coder-7B-Instruct-AWQ",
     )
 
+    # Act - invoke (structured path raises)
+    # Assert - exception propagated, no fallback
     with pytest.raises(RuntimeError, match="some other provider error"):
         _LangChainV1Invoker().invoke(request)

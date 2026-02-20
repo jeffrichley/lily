@@ -130,6 +130,7 @@ class _AlwaysSleepBlueprint:
 @pytest.mark.unit
 def test_job_executor_run_writes_required_artifacts(tmp_path: Path) -> None:
     """Successful run should write run receipt, summary, and events."""
+    # Arrange - jobs dir with nightly job spec and executor
     jobs_dir = tmp_path / ".lily" / "jobs"
     runs_root = tmp_path / ".lily" / "runs"
     _write(
@@ -157,8 +158,10 @@ def test_job_executor_run_writes_required_artifacts(tmp_path: Path) -> None:
         runs_root=runs_root,
     )
 
+    # Act - run job
     run = executor.run("nightly_security_council")
 
+    # Assert - run ok and artifacts present
     run_dir = runs_root / run.job_id / run.run_id
     assert run.status == "ok"
     assert (run_dir / "run_receipt.json").exists()
@@ -172,15 +175,18 @@ def test_job_executor_run_writes_required_artifacts(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_job_executor_missing_job_maps_to_job_not_found(tmp_path: Path) -> None:
     """Unknown job should fail with deterministic not-found code."""
+    # Arrange - executor with empty jobs dir
     executor = JobExecutor(
         repository=JobRepository(jobs_dir=tmp_path / ".lily" / "jobs"),
         blueprint_registry=build_default_blueprint_registry(),
         runs_root=tmp_path / ".lily" / "runs",
     )
 
+    # Act - run missing job
     try:
         executor.run("missing")
     except JobError as exc:
+        # Assert - not found code and message
         assert exc.code == JobErrorCode.NOT_FOUND
         assert "not found" in str(exc)
     else:  # pragma: no cover - defensive assertion
@@ -190,6 +196,7 @@ def test_job_executor_missing_job_maps_to_job_not_found(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_job_executor_blueprint_bindings_error_is_propagated(tmp_path: Path) -> None:
     """Invalid bindings should map to deterministic job bindings-invalid code."""
+    # Arrange - job spec with broken bindings and executor
     jobs_dir = tmp_path / ".lily" / "jobs"
     _write(
         jobs_dir / "broken_bindings.job.yaml",
@@ -216,9 +223,11 @@ def test_job_executor_blueprint_bindings_error_is_propagated(tmp_path: Path) -> 
         runs_root=tmp_path / ".lily" / "runs",
     )
 
+    # Act - run job with broken bindings
     try:
         executor.run("broken_bindings")
     except JobError as exc:
+        # Assert - bindings invalid code
         assert exc.code == JobErrorCode.BINDINGS_INVALID
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected job bindings-invalid failure.")
@@ -227,6 +236,7 @@ def test_job_executor_blueprint_bindings_error_is_propagated(tmp_path: Path) -> 
 @pytest.mark.unit
 def test_job_executor_tail_reads_latest_events(tmp_path: Path) -> None:
     """Tail should read latest run events for a job."""
+    # Arrange - job spec, executor, and one run
     jobs_dir = tmp_path / ".lily" / "jobs"
     runs_root = tmp_path / ".lily" / "runs"
     _write(
@@ -255,8 +265,10 @@ def test_job_executor_tail_reads_latest_events(tmp_path: Path) -> None:
     )
     run = executor.run("nightly_security_council")
 
+    # Act - tail job
     tail = executor.tail("nightly_security_council", limit=10)
 
+    # Assert - tail matches run and contains job_completed
     assert tail.job_id == "nightly_security_council"
     assert tail.run_id == run.run_id
     assert tail.lines
@@ -266,6 +278,7 @@ def test_job_executor_tail_reads_latest_events(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_job_executor_retries_and_succeeds_with_attempt_lineage(tmp_path: Path) -> None:
     """Executor should retry transient failure and persist attempt lineage."""
+    # Arrange - retry job spec, retry-then-success blueprint, executor
     jobs_dir = tmp_path / ".lily" / "jobs"
     runs_root = tmp_path / ".lily" / "runs"
     _write(
@@ -296,8 +309,10 @@ def test_job_executor_retries_and_succeeds_with_attempt_lineage(tmp_path: Path) 
         runs_root=runs_root,
     )
 
+    # Act - run retry job
     run = executor.run("retry_job")
 
+    # Assert - ok after retry with two attempts
     assert run.status == "ok"
     assert run.payload["attempt_count"] == 2
     attempts = run.payload["attempts"]
@@ -311,6 +326,7 @@ def test_job_executor_timeout_maps_to_execution_failed_and_attempts(
     tmp_path: Path,
 ) -> None:
     """Timeout should fail deterministically with attempt lineage in artifacts."""
+    # Arrange - timeout job spec, sleep blueprint, executor
     jobs_dir = tmp_path / ".lily" / "jobs"
     runs_root = tmp_path / ".lily" / "runs"
     _write(
@@ -340,14 +356,17 @@ def test_job_executor_timeout_maps_to_execution_failed_and_attempts(
         runs_root=runs_root,
     )
 
+    # Act - run timeout job
     try:
         executor.run("timeout_job")
     except JobError as exc:
+        # Assert - execution failed and timed out message
         assert exc.code == JobErrorCode.EXECUTION_FAILED
         assert "timed out" in str(exc)
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected timeout failure.")
 
+    # Assert - run dir has receipt with error and attempt lineage
     run_root = runs_root / "timeout_job"
     run_dirs = sorted(path for path in run_root.iterdir() if path.is_dir())
     assert run_dirs
@@ -362,6 +381,7 @@ def test_job_executor_timeout_maps_to_execution_failed_and_attempts(
 @pytest.mark.unit
 def test_job_executor_retain_all_policy_keeps_prior_runs(tmp_path: Path) -> None:
     """Retain-all policy should preserve prior run artifact directories."""
+    # Arrange - job spec and executor
     jobs_dir = tmp_path / ".lily" / "jobs"
     runs_root = tmp_path / ".lily" / "runs"
     _write(
@@ -389,9 +409,11 @@ def test_job_executor_retain_all_policy_keeps_prior_runs(tmp_path: Path) -> None
         runs_root=runs_root,
     )
 
+    # Act - run job twice
     first = executor.run("retain_all")
     second = executor.run("retain_all")
 
+    # Assert - two run dirs with receipts
     run_root = runs_root / "retain_all"
     run_dirs = sorted(path for path in run_root.iterdir() if path.is_dir())
     assert len(run_dirs) == 2
@@ -402,6 +424,7 @@ def test_job_executor_retain_all_policy_keeps_prior_runs(tmp_path: Path) -> None
 @pytest.mark.unit
 def test_job_executor_history_returns_newest_first(tmp_path: Path) -> None:
     """History should return deterministically ordered entries."""
+    # Arrange - history job spec, executor, two runs
     jobs_dir = tmp_path / ".lily" / "jobs"
     runs_root = tmp_path / ".lily" / "runs"
     _write(
@@ -431,8 +454,10 @@ def test_job_executor_history_returns_newest_first(tmp_path: Path) -> None:
     first = executor.run("history_job")
     second = executor.run("history_job")
 
+    # Act - get history
     history = executor.history("history_job", limit=10)
 
+    # Assert - two entries newest first
     assert history.job_id == "history_job"
     assert len(history.entries) == 2
     run_ids = {entry.run_id for entry in history.entries}

@@ -67,6 +67,7 @@ def _write_skill(skill_root: Path, plugin_source: str) -> None:
 @pytest.mark.unit
 def test_security_hash_is_deterministic(tmp_path: Path) -> None:
     """Security hash should be stable for unchanged bundle content."""
+    # Arrange - skill files, entry, hash service
     skill_root = tmp_path / "skills" / "echo_plugin"
     _write_skill(
         skill_root,
@@ -76,23 +77,28 @@ def test_security_hash_is_deterministic(tmp_path: Path) -> None:
     sandbox = SkillSandboxSettings()
     service = SecurityHashService(sandbox=sandbox, project_root=tmp_path)
 
+    # Act - compute hash twice
     first, _ = service.compute(entry)
     second, _ = service.compute(entry)
 
+    # Assert - hashes equal
     assert first == second
 
 
 @pytest.mark.unit
 def test_security_preflight_denies_blocked_signature(tmp_path: Path) -> None:
     """Preflight should hard-deny blocked code signatures before execution."""
+    # Arrange - skill with blocked import, entry, scanner
     skill_root = tmp_path / "skills" / "echo_plugin"
     _write_skill(skill_root, "import subprocess\n")
     entry = _entry(skill_root)
 
     scanner = SecurityPreflightScanner()
+    # Act - scan
     try:
         scanner.scan(entry)
     except SecurityAuthorizationError as exc:
+        # Assert - preflight denied
         assert exc.code == "security_preflight_denied"
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected SecurityAuthorizationError")
@@ -101,6 +107,7 @@ def test_security_preflight_denies_blocked_signature(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_security_gate_requires_prompt_when_no_cached_grant(tmp_path: Path) -> None:
     """Security gate should fail with approval_required when prompt is absent."""
+    # Arrange - skill, entry, gate with prompt=None
     skill_root = tmp_path / "skills" / "echo_plugin"
     _write_skill(
         skill_root,
@@ -116,9 +123,11 @@ def test_security_gate_requires_prompt_when_no_cached_grant(tmp_path: Path) -> N
         sandbox=sandbox,
     )
 
+    # Act - authorize
     try:
         gate.authorize(entry=entry, agent_id="default")
     except SecurityAuthorizationError as exc:
+        # Assert - approval_required
         assert exc.code == "approval_required"
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected SecurityAuthorizationError")
@@ -127,6 +136,7 @@ def test_security_gate_requires_prompt_when_no_cached_grant(tmp_path: Path) -> N
 @pytest.mark.unit
 def test_security_gate_reuses_always_allow_grant(tmp_path: Path) -> None:
     """Always-allow grant should persist and skip repeat prompts for same hash."""
+    # Arrange - skill, entry, gate with ALWAYS_ALLOW prompt stub
     skill_root = tmp_path / "skills" / "echo_plugin"
     _write_skill(
         skill_root,
@@ -143,8 +153,10 @@ def test_security_gate_reuses_always_allow_grant(tmp_path: Path) -> None:
         sandbox=sandbox,
     )
 
+    # Act - authorize twice
     first_hash, _ = gate.authorize(entry=entry, agent_id="default")
     second_hash, _ = gate.authorize(entry=entry, agent_id="default")
 
+    # Assert - same hash, prompt called once (cached)
     assert first_hash == second_hash
     assert prompt.calls == 1

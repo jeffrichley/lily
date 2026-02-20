@@ -77,13 +77,16 @@ def _session(skills: tuple[SkillEntry, ...]) -> Session:
 @pytest.mark.unit
 def test_skill_invoke_forces_exact_snapshot_match() -> None:
     """Handler should delegate exactly requested skill with forwarded payload."""
+    # Arrange - capturing invoker, handler, session with two skills, call for echo
     invoker = _CapturingInvoker()
     handler = SkillInvokeCommand(invoker)
     session = _session(skills=(_skill("echo"), _skill("echo_helper")))
     call = CommandCall(name="skill", args=("echo", "hello", "world"), raw="/skill ...")
 
+    # Act - execute handler
     result = handler.execute(call, session)
 
+    # Assert - ok result and invoker captured echo and payload
     assert result.status.value == "ok"
     assert result.message == "captured"
     assert invoker.skill_name == "echo"

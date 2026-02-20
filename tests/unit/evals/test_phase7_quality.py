@@ -43,7 +43,10 @@ def _assert_thresholds(*, report: object, min_cases: int, min_pass_rate: float) 
 @pytest.mark.unit
 def test_phase7_personality_consistency_thresholds(tmp_path: Path) -> None:
     """Personality consistency suite should pass configured thresholds."""
+    # Arrange - temp dir for consistency suite
+    # Act - run personality consistency suite
     report = run_personality_consistency_suite(temp_dir=tmp_path / "consistency")
+    # Assert - thresholds met
     _assert_thresholds(
         report=report,
         min_cases=CONSISTENCY_MIN_CASES,
@@ -54,7 +57,10 @@ def test_phase7_personality_consistency_thresholds(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_phase7_task_effectiveness_thresholds(tmp_path: Path) -> None:
     """Task effectiveness suite should pass configured thresholds."""
+    # Arrange - temp dir for task suite
+    # Act - run task effectiveness suite
     report = run_task_effectiveness_suite(temp_dir=tmp_path / "task")
+    # Assert - thresholds met
     _assert_thresholds(
         report=report,
         min_cases=TASK_MIN_CASES,
@@ -65,7 +71,10 @@ def test_phase7_task_effectiveness_thresholds(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_phase7_fun_delight_thresholds(tmp_path: Path) -> None:
     """Fun/delight suite should pass configured thresholds."""
+    # Arrange - temp dir for fun suite
+    # Act - run fun delight suite
     report = run_fun_delight_suite(temp_dir=tmp_path / "fun")
+    # Assert - thresholds met
     _assert_thresholds(
         report=report,
         min_cases=FUN_MIN_CASES,
@@ -76,7 +85,10 @@ def test_phase7_fun_delight_thresholds(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_phase7_safety_redline_thresholds(tmp_path: Path) -> None:
     """Safety redline suite should pass configured thresholds."""
+    # Arrange - temp dir for safety suite
+    # Act - run safety redline suite
     report = run_safety_redline_suite(temp_dir=tmp_path / "safety")
+    # Assert - thresholds met
     _assert_thresholds(
         report=report,
         min_cases=SAFETY_MIN_CASES,

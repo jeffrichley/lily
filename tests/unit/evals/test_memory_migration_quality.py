@@ -40,7 +40,10 @@ def _assert_thresholds(*, report: object, min_cases: int, min_pass_rate: float) 
 @pytest.mark.unit
 def test_memory_phase7_restart_continuity_thresholds(tmp_path: Path) -> None:
     """Restart continuity suite should pass configured thresholds."""
+    # Arrange - temp dir for restart suite
+    # Act - run restart continuity suite
     report = run_restart_continuity_suite(temp_dir=tmp_path / "restart")
+    # Assert - thresholds met
     _assert_thresholds(
         report=report,
         min_cases=RESTART_MIN_CASES,
@@ -51,7 +54,10 @@ def test_memory_phase7_restart_continuity_thresholds(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_memory_phase7_store_parity_thresholds(tmp_path: Path) -> None:
     """Store parity suite should pass configured thresholds."""
+    # Arrange - temp dir for parity suite
+    # Act - run store parity suite
     report = run_store_parity_suite(temp_dir=tmp_path / "parity")
+    # Assert - thresholds met
     _assert_thresholds(
         report=report,
         min_cases=PARITY_MIN_CASES,
@@ -62,7 +68,10 @@ def test_memory_phase7_store_parity_thresholds(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_memory_phase7_policy_redline_thresholds(tmp_path: Path) -> None:
     """Policy redline suite should pass configured thresholds."""
+    # Arrange - temp dir for policy suite
+    # Act - run policy redline suite
     report = run_policy_redline_suite(temp_dir=tmp_path / "policy")
+    # Assert - thresholds met
     _assert_thresholds(
         report=report,
         min_cases=POLICY_MIN_CASES,
@@ -73,7 +82,10 @@ def test_memory_phase7_policy_redline_thresholds(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_memory_phase7_retrieval_relevance_thresholds(tmp_path: Path) -> None:
     """Retrieval relevance suite should pass configured thresholds."""
+    # Arrange - temp dir for retrieval suite
+    # Act - run retrieval relevance suite
     report = run_retrieval_relevance_suite(temp_dir=tmp_path / "retrieval")
+    # Assert - thresholds met
     _assert_thresholds(
         report=report,
         min_cases=RETRIEVAL_MIN_CASES,
@@ -84,7 +96,10 @@ def test_memory_phase7_retrieval_relevance_thresholds(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_memory_phase7_compaction_effectiveness_thresholds(tmp_path: Path) -> None:
     """Compaction suite should pass configured thresholds."""
+    # Arrange - temp dir for compaction suite
+    # Act - run compaction effectiveness suite
     report = run_compaction_effectiveness_suite(temp_dir=tmp_path / "compaction")
+    # Assert - thresholds met
     _assert_thresholds(
         report=report,
         min_cases=COMPACTION_MIN_CASES,

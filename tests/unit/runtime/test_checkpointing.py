@@ -17,10 +17,13 @@ from lily.runtime.checkpointing import CheckpointerBuildError, build_checkpointe
 @pytest.mark.unit
 def test_build_checkpointer_memory_backend() -> None:
     """Memory backend should construct in-memory saver with no sqlite path."""
+    # Arrange - settings with memory backend
+    # Act - build checkpointer
     result = build_checkpointer(
         CheckpointerSettings(backend=CheckpointerBackend.MEMORY)
     )
 
+    # Assert - InMemorySaver and no sqlite path
     assert isinstance(result.saver, InMemorySaver)
     assert result.resolved_sqlite_path is None
 
@@ -28,7 +31,9 @@ def test_build_checkpointer_memory_backend() -> None:
 @pytest.mark.unit
 def test_build_checkpointer_sqlite_creates_file(tmp_path: Path) -> None:
     """SQLite backend should create resolved file path and saver."""
+    # Arrange - sqlite path and settings
     sqlite_path = tmp_path / "checkpoints" / "phase1.sqlite"
+    # Act - build checkpointer
     result = build_checkpointer(
         CheckpointerSettings(
             backend=CheckpointerBackend.SQLITE,
@@ -36,6 +41,7 @@ def test_build_checkpointer_sqlite_creates_file(tmp_path: Path) -> None:
         )
     )
 
+    # Assert - SqliteSaver, path resolved, file exists
     assert isinstance(result.saver, SqliteSaver)
     assert result.resolved_sqlite_path == sqlite_path
     assert sqlite_path.exists()
@@ -47,12 +53,14 @@ def test_sqlite_checkpointer_persists_history_and_replay_across_restart(
     tmp_path: Path,
 ) -> None:
     """SQLite saver should preserve checkpoints across new saver instances."""
+    # Arrange - sqlite path and settings
     sqlite_path = tmp_path / "checkpoints" / "restart.sqlite"
     settings = CheckpointerSettings(
         backend=CheckpointerBackend.SQLITE,
         sqlite_path=str(sqlite_path),
     )
 
+    # Act - build first, put two checkpoints, close; build second, list and get
     first = build_checkpointer(settings)
     saver_one = cast(SqliteSaver, first.saver)
     config = {"configurable": {"thread_id": "session-1", "checkpoint_ns": ""}}
@@ -77,6 +85,7 @@ def test_sqlite_checkpointer_persists_history_and_replay_across_restart(
     assert latest is not None
 
     history = list(saver_two.list(config))
+    # Assert - two checkpoints, replay to first checkpoint works
     assert len(history) == 2
 
     replay = saver_two.get_tuple(
@@ -95,6 +104,8 @@ def test_sqlite_checkpointer_persists_history_and_replay_across_restart(
 @pytest.mark.unit
 def test_build_checkpointer_postgres_contract_errors_until_implemented() -> None:
     """Postgres backend should fail with explicit deterministic message for now."""
+    # Arrange - settings with postgres backend
+    # Act - build (expect exception)
     try:
         build_checkpointer(
             CheckpointerSettings(
@@ -103,6 +114,7 @@ def test_build_checkpointer_postgres_contract_errors_until_implemented() -> None
             )
         )
     except CheckpointerBuildError as exc:
+        # Assert - not implemented message
         assert "not implemented" in str(exc)
         assert "Supported backends: sqlite, memory" in str(exc)
     else:  # pragma: no cover - defensive assertion

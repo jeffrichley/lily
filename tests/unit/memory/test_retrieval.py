@@ -90,6 +90,7 @@ def _record(  # noqa: PLR0913
 @pytest.mark.unit
 def test_retrieval_priority_and_confidence_threshold() -> None:
     """Retrieval should prioritize stable domains and filter low-confidence rows."""
+    # Arrange - personality/task repos and service with confidence threshold
     now = datetime.now(UTC)
     personality = _PersonalityRepo(
         rows={
@@ -153,6 +154,7 @@ def test_retrieval_priority_and_confidence_threshold() -> None:
         policy=RetrievalPolicy(confidence_threshold=0.6, max_per_domain=2, max_total=8),
     )
 
+    # Act - build memory summary
     summary = service.build_memory_summary(
         user_text="please do concise phase 3 roadmap work",
         personality_namespaces={
@@ -163,6 +165,7 @@ def test_retrieval_priority_and_confidence_threshold() -> None:
         task_namespaces=("task_memory/task:session-1",),
     )
 
+    # Assert - domain order and low-confidence excluded
     assert summary
     assert summary.index("working_rules:") < summary.index("persona_core:")
     assert summary.index("persona_core:") < summary.index("user_profile:")
@@ -173,6 +176,7 @@ def test_retrieval_priority_and_confidence_threshold() -> None:
 @pytest.mark.unit
 def test_retrieval_uses_recency_tiebreak_with_equal_lexical_score() -> None:
     """Records with equal lexical score should be ordered by recency."""
+    # Arrange - two records same namespace, different updated_at
     older = datetime(2025, 1, 1, tzinfo=UTC)
     newer = datetime(2025, 1, 2, tzinfo=UTC)
     personality = _PersonalityRepo(
@@ -204,6 +208,7 @@ def test_retrieval_uses_recency_tiebreak_with_equal_lexical_score() -> None:
         policy=RetrievalPolicy(max_per_domain=2, max_total=2),
     )
 
+    # Act - build summary
     summary = service.build_memory_summary(
         user_text="concise please",
         personality_namespaces={
@@ -214,4 +219,5 @@ def test_retrieval_uses_recency_tiebreak_with_equal_lexical_score() -> None:
         task_namespaces=(),
     )
 
+    # Assert - newer (responses) before older (answers) in summary
     assert summary.index("responses.") < summary.index("answers.")

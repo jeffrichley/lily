@@ -30,8 +30,10 @@ def _task_repo(tmp_path: Path) -> FileBackedTaskMemoryRepository:
 @pytest.mark.unit
 def test_personality_memory_roundtrip_and_dedup(tmp_path: Path) -> None:
     """Personality repository should upsert duplicate namespace/content writes."""
+    # Arrange - personality repo
     repo = _personality_repo(tmp_path)
 
+    # Act - write same content twice then query
     first = repo.remember(
         MemoryWriteRequest(namespace="global", content="User prefers concise replies.")
     )
@@ -40,6 +42,7 @@ def test_personality_memory_roundtrip_and_dedup(tmp_path: Path) -> None:
     )
     results = repo.query(MemoryQuery(query="concise", namespace="global"))
 
+    # Assert - dedup id and single hit
     assert first.id == second.id
     assert len(results) == 1
     assert results[0].store.value == "personality_memory"
@@ -48,9 +51,12 @@ def test_personality_memory_roundtrip_and_dedup(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_task_memory_requires_namespace_for_query(tmp_path: Path) -> None:
     """Task queries should fail deterministically when namespace is absent."""
+    # Arrange - task repo with one record
     repo = _task_repo(tmp_path)
     repo.remember(MemoryWriteRequest(namespace="task-1", content="Finish phase 3."))
 
+    # Act - query without namespace
+    # Assert - NAMESPACE_REQUIRED when namespace omitted
     try:
         repo.query(MemoryQuery(query="phase"))
     except MemoryError as exc:
@@ -62,6 +68,7 @@ def test_task_memory_requires_namespace_for_query(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_no_cross_store_leakage_between_personality_and_task(tmp_path: Path) -> None:
     """Split stores should not leak records across repository boundaries."""
+    # Arrange - personality and task repos
     personality = _personality_repo(tmp_path)
     task = _task_repo(tmp_path)
 
@@ -76,11 +83,13 @@ def test_no_cross_store_leakage_between_personality_and_task(tmp_path: Path) -> 
         )
     )
 
+    # Act - query each store
     personality_hits = personality.query(
         MemoryQuery(query="favorite", namespace="global")
     )
     task_hits = task.query(MemoryQuery(query="favorite", namespace="task-42"))
 
+    # Assert - each store returns only its own record
     assert len(personality_hits) == 1
     assert personality_hits[0].store.value == "personality_memory"
     assert len(task_hits) == 1
@@ -90,8 +99,11 @@ def test_no_cross_store_leakage_between_personality_and_task(tmp_path: Path) -> 
 @pytest.mark.unit
 def test_forget_missing_id_returns_deterministic_not_found(tmp_path: Path) -> None:
     """Forget should emit stable not-found memory error."""
+    # Arrange - personality repo
     repo = _personality_repo(tmp_path)
 
+    # Act - forget non-existent id
+    # Assert - NOT_FOUND when id missing
     try:
         repo.forget("mem_missing")
     except MemoryError as exc:
@@ -103,11 +115,14 @@ def test_forget_missing_id_returns_deterministic_not_found(tmp_path: Path) -> No
 @pytest.mark.unit
 def test_invalid_store_payload_returns_schema_mismatch(tmp_path: Path) -> None:
     """Invalid JSON structure should map to deterministic schema mismatch error."""
+    # Arrange - corrupt store file
     root = tmp_path / "memory"
     root.mkdir(parents=True, exist_ok=True)
     (root / "personality_memory.json").write_text('{"not":"a list"}', encoding="utf-8")
     repo = FileBackedPersonalityMemoryRepository(root_dir=root)
 
+    # Act - query
+    # Assert - SCHEMA_MISMATCH for invalid store payload
     try:
         repo.query(MemoryQuery(query="anything", namespace="global"))
     except MemoryError as exc:
@@ -119,11 +134,14 @@ def test_invalid_store_payload_returns_schema_mismatch(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_memory_policy_denied_blocks_sensitive_writes(tmp_path: Path) -> None:
     """Memory writes should fail deterministically for sensitive content."""
+    # Arrange - personality repo
     repo = _personality_repo(tmp_path)
 
+    # Act - remember sensitive content
     try:
         repo.remember(MemoryWriteRequest(namespace="global", content="api_key=sk-123"))
     except MemoryError as exc:
+        # Assert - POLICY_DENIED
         assert exc.code == MemoryErrorCode.POLICY_DENIED
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected MemoryError")
@@ -134,6 +152,7 @@ def test_query_excludes_archived_conflicted_and_expired_by_default(
     tmp_path: Path,
 ) -> None:
     """Default query should hide archived/conflicted/expired records."""
+    # Arrange - repo with verified, archived, conflicted, expired records
     repo = _personality_repo(tmp_path)
     now = datetime.now(UTC)
     repo.remember(
@@ -166,6 +185,7 @@ def test_query_excludes_archived_conflicted_and_expired_by_default(
         )
     )
 
+    # Act - default query then query with include_archived/conflicted/expired
     visible = repo.query(MemoryQuery(query="*", namespace="global", limit=20))
     all_rows = repo.query(
         MemoryQuery(
@@ -178,6 +198,7 @@ def test_query_excludes_archived_conflicted_and_expired_by_default(
         )
     )
 
+    # Assert - default hides archived/conflicted/expired; include flags expose all
     visible_contents = {row.content for row in visible}
     all_contents = {row.content for row in all_rows}
     assert visible_contents == {"active preference"}

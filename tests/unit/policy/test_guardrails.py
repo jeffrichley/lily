@@ -23,6 +23,9 @@ from tests.unit.policy.redline_fixtures import (
 @pytest.mark.unit
 def test_precedence_contract_constant_is_documented() -> None:
     """Policy precedence contract should be stable and explicit."""
+    # Arrange - PRECEDENCE_CONTRACT constant
+    # Act - (none, constant read)
+    # Assert - documented value
     assert (
         PRECEDENCE_CONTRACT
         == "safety > user_style > persona_default > stochastic_expression"
@@ -32,21 +35,30 @@ def test_precedence_contract_constant_is_documented() -> None:
 @pytest.mark.unit
 def test_resolve_effective_style_prefers_user_style() -> None:
     """User style should take precedence over persona default style."""
+    # Arrange - user_style playful
+    # Act - resolve effective style
     resolved = resolve_effective_style(user_style=PersonaStyleLevel.PLAYFUL)
+    # Assert - user style returned
     assert resolved == PersonaStyleLevel.PLAYFUL
 
 
 @pytest.mark.unit
 def test_force_safe_style_overrides_to_focus() -> None:
     """Safety override style should be focus."""
+    # Arrange - (none)
+    # Act - force_safe_style
+    # Assert - focus
     assert force_safe_style() == PersonaStyleLevel.FOCUS
 
 
 @pytest.mark.unit
 def test_pre_generation_redlines_block_policy_bypass_requests() -> None:
     """Pre-generation policy should deny known bypass prompts."""
+    # Arrange - CONVERSATION_INPUT_DENY fixtures
+    # Act - evaluate each
     for text in CONVERSATION_INPUT_DENY:
         decision = evaluate_pre_generation(text)
+        # Assert - denied with conversation_policy_denied
         assert decision.allowed is False
         assert decision.code == "conversation_policy_denied"
 
@@ -54,8 +66,11 @@ def test_pre_generation_redlines_block_policy_bypass_requests() -> None:
 @pytest.mark.unit
 def test_post_generation_redlines_block_dependency_language() -> None:
     """Post-generation policy should deny manipulative dependency output."""
+    # Arrange - CONVERSATION_OUTPUT_DENY fixtures
+    # Act - evaluate each
     for text in CONVERSATION_OUTPUT_DENY:
         decision = evaluate_post_generation(text)
+        # Assert - denied with conversation_policy_denied
         assert decision.allowed is False
         assert decision.code == "conversation_policy_denied"
 
@@ -63,8 +78,11 @@ def test_post_generation_redlines_block_dependency_language() -> None:
 @pytest.mark.unit
 def test_memory_redlines_block_sensitive_content() -> None:
     """Memory policy should deny sensitive secret-like content."""
+    # Arrange - MEMORY_DENY fixtures
+    # Act - evaluate each
     for text in MEMORY_DENY:
         decision = evaluate_memory_write(text)
+        # Assert - memory_policy_denied
         assert decision.allowed is False
         assert decision.code == "memory_policy_denied"
 
@@ -72,6 +90,9 @@ def test_memory_redlines_block_sensitive_content() -> None:
 @pytest.mark.unit
 def test_policy_allows_normal_safe_content() -> None:
     """Policy should allow normal input/output/memory content."""
+    # Arrange - normal safe strings
+    # Act - evaluate pre, post, memory
+    # Assert - all allowed
     assert (
         evaluate_pre_generation("Can you summarize today's progress?").allowed is True
     )

@@ -78,6 +78,7 @@ class _StubSchedulerControl:
 @pytest.mark.unit
 def test_jobs_list_and_run_paths_work_in_handler(tmp_path: Path) -> None:
     """`/jobs list` and `/jobs run` should succeed for valid job spec."""
+    # Arrange - workspace with nightly job spec and command
     workspace_root = tmp_path / ".lily"
     _write(
         workspace_root / "jobs" / "nightly.job.yaml",
@@ -101,6 +102,7 @@ def test_jobs_list_and_run_paths_work_in_handler(tmp_path: Path) -> None:
     command = _build_command(workspace_root)
     session = _session()
 
+    # Act - execute list then run
     listed = command.execute(
         CommandCall(name="jobs", args=("list",), raw="/jobs list"),
         session,
@@ -114,6 +116,7 @@ def test_jobs_list_and_run_paths_work_in_handler(tmp_path: Path) -> None:
         session,
     )
 
+    # Assert - list ok and run produces artifacts
     assert listed.status.value == "ok"
     assert listed.code == "jobs_listed"
     assert "nightly_security_council - Nightly security council" in listed.message
@@ -129,14 +132,17 @@ def test_jobs_list_and_run_paths_work_in_handler(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_jobs_run_missing_job_maps_to_job_not_found(tmp_path: Path) -> None:
     """Missing job id should return deterministic `job_not_found` error."""
+    # Arrange - command with empty jobs dir and session
     command = _build_command(tmp_path / ".lily")
     session = _session()
 
+    # Act - run missing job id
     result = command.execute(
         CommandCall(name="jobs", args=("run", "missing_job"), raw="/jobs run missing"),
         session,
     )
 
+    # Assert - error and job_not_found code
     assert result.status.value == "error"
     assert result.code == "job_not_found"
 
@@ -144,6 +150,7 @@ def test_jobs_run_missing_job_maps_to_job_not_found(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_jobs_tail_returns_latest_events(tmp_path: Path) -> None:
     """`/jobs tail` should return latest run events for existing job."""
+    # Arrange - workspace with job spec, run job once
     workspace_root = tmp_path / ".lily"
     _write(
         workspace_root / "jobs" / "nightly.job.yaml",
@@ -166,6 +173,7 @@ def test_jobs_tail_returns_latest_events(tmp_path: Path) -> None:
     )
     command = _build_command(workspace_root)
     session = _session()
+    # Act - run job then tail it
     _ = command.execute(
         CommandCall(
             name="jobs",
@@ -184,6 +192,7 @@ def test_jobs_tail_returns_latest_events(tmp_path: Path) -> None:
         session,
     )
 
+    # Assert - tail ok with job_id run_id and line_count
     assert tailed.status.value == "ok"
     assert tailed.code == "jobs_tailed"
     assert tailed.data is not None
@@ -195,6 +204,7 @@ def test_jobs_tail_returns_latest_events(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_jobs_history_returns_run_entries(tmp_path: Path) -> None:
     """`/jobs history` should return newest-first history payload."""
+    # Arrange - workspace with job spec, run job once
     workspace_root = tmp_path / ".lily"
     _write(
         workspace_root / "jobs" / "nightly.job.yaml",
@@ -217,6 +227,7 @@ def test_jobs_history_returns_run_entries(tmp_path: Path) -> None:
     )
     command = _build_command(workspace_root)
     session = _session()
+    # Act - run job then history with limit 1
     _ = command.execute(
         CommandCall(
             name="jobs",
@@ -235,6 +246,7 @@ def test_jobs_history_returns_run_entries(tmp_path: Path) -> None:
         session,
     )
 
+    # Assert - history ok with one entry
     assert result.status.value == "ok"
     assert result.code == "jobs_history"
     assert result.data is not None
@@ -247,6 +259,7 @@ def test_jobs_history_returns_run_entries(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_jobs_scheduler_controls_and_status(tmp_path: Path) -> None:
     """Scheduler control subcommands should route to control port."""
+    # Arrange - command with stub scheduler control and session
     workspace_root = tmp_path / ".lily"
     scheduler_control = _StubSchedulerControl()
     executor = JobExecutor(
@@ -261,6 +274,7 @@ def test_jobs_scheduler_controls_and_status(tmp_path: Path) -> None:
     )
     session = _session()
 
+    # Act - pause, resume, disable, status
     paused = command.execute(
         CommandCall(
             name="jobs",
@@ -290,6 +304,7 @@ def test_jobs_scheduler_controls_and_status(tmp_path: Path) -> None:
         session,
     )
 
+    # Assert - all control codes and stub actions recorded
     assert paused.code == "jobs_paused"
     assert resumed.code == "jobs_resumed"
     assert disabled.code == "jobs_disabled"

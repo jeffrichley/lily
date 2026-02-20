@@ -50,19 +50,26 @@ def _session() -> Session:
 @pytest.mark.unit
 def test_base_tool_defaults_allow_execute_only_override() -> None:
     """Tool should work by overriding execute only; parse/render defaults apply."""
+    # Arrange - echo tool and parsed input
     tool = _EchoTool()
     typed_input = tool.input_schema.model_validate(tool.parse_payload("hello"))
+
+    # Act - execute and render output
     raw_output = tool.execute_typed(typed_input, session=_session(), skill_name="echo")
     typed_output = tool.output_schema.model_validate(raw_output)
 
+    # Assert - rendered output is uppercased
     assert tool.render_output(typed_output) == "HELLO"
 
 
 @pytest.mark.unit
 def test_base_tool_default_execute_raises_not_implemented() -> None:
     """Default execute method should force explicit behavior declaration."""
+    # Arrange - base contract and parsed input
     tool = BaseToolContract()
     typed_input = tool.input_schema.model_validate(tool.parse_payload("hello"))
+
+    # Act - call execute_typed on base (no override)
     try:
         tool.execute_typed(
             typed_input,
@@ -70,6 +77,7 @@ def test_base_tool_default_execute_raises_not_implemented() -> None:
             skill_name="default",
         )
     except NotImplementedError as exc:
+        # Assert - message mentions override
         assert "override execute_typed" in str(exc)
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected NotImplementedError")

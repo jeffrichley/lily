@@ -99,8 +99,10 @@ def _session() -> Session:
 @pytest.mark.unit
 def test_langchain_to_lily_wrapper_invokes_with_envelope() -> None:
     """LangChain adapter should preserve deterministic Lily envelope shape."""
+    # Arrange - adapter with fake LangChain tool and session
     adapter = LangChainToLilyTool(tool=_FakeLangChainTool())
 
+    # Act - invoke with envelope
     result = invoke_langchain_wrapper_with_envelope(
         adapter=adapter,
         payload='{"text":"hello"}',
@@ -108,6 +110,7 @@ def test_langchain_to_lily_wrapper_invokes_with_envelope() -> None:
         skill_name="echo",
     )
 
+    # Assert - ok status and uppercased message
     assert result.status.value == "ok"
     assert result.code == "tool_ok"
     assert result.message == "HELLO"
@@ -116,8 +119,10 @@ def test_langchain_to_lily_wrapper_invokes_with_envelope() -> None:
 @pytest.mark.unit
 def test_langchain_to_lily_wrapper_maps_failure_to_deterministic_code() -> None:
     """Wrapper failures should map to stable LangChain wrapper error code."""
+    # Arrange - adapter with failing LangChain tool
     adapter = LangChainToLilyTool(tool=_FailingLangChainTool())
 
+    # Act - invoke with envelope
     result = invoke_langchain_wrapper_with_envelope(
         adapter=adapter,
         payload='{"text":"hello"}',
@@ -125,6 +130,7 @@ def test_langchain_to_lily_wrapper_maps_failure_to_deterministic_code() -> None:
         skill_name="echo",
     )
 
+    # Assert - error and deterministic code
     assert result.status.value == "error"
     assert result.code == "langchain_wrapper_invoke_failed"
 
@@ -132,6 +138,7 @@ def test_langchain_to_lily_wrapper_maps_failure_to_deterministic_code() -> None:
 @pytest.mark.unit
 def test_lily_to_langchain_wrapper_roundtrip() -> None:
     """Lily contract should be exposed as LangChain StructuredTool."""
+    # Arrange - add tool and Lily-to-LangChain adapter as structured tool
     tool = _AddTool()
     adapter = LilyToLangChainTool(
         contract=tool,
@@ -141,6 +148,8 @@ def test_lily_to_langchain_wrapper_roundtrip() -> None:
     )
     structured = adapter.as_structured_tool()
 
+    # Act - invoke with left and right
     output = structured.invoke({"left": 2, "right": 40})
 
+    # Assert - result is sum as string
     assert output == "42"

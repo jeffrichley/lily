@@ -18,6 +18,7 @@ def _write(path: Path, content: str) -> None:
 @pytest.mark.unit
 def test_job_repository_loads_valid_manual_job(tmp_path: Path) -> None:
     """Repository should load a valid manual job spec."""
+    # Arrange - jobs dir with valid nightly job yaml
     jobs_dir = tmp_path / ".lily" / "jobs"
     _write(
         jobs_dir / "nightly.job.yaml",
@@ -40,8 +41,10 @@ def test_job_repository_loads_valid_manual_job(tmp_path: Path) -> None:
     )
     repository = JobRepository(jobs_dir=jobs_dir)
 
+    # Act - load job by id
     loaded = repository.load("nightly_security_council")
 
+    # Assert - loaded spec matches
     assert loaded.id == "nightly_security_council"
     assert loaded.target.id == "council.v1"
     assert loaded.trigger.type.value == "manual"
@@ -50,6 +53,7 @@ def test_job_repository_loads_valid_manual_job(tmp_path: Path) -> None:
 @pytest.mark.unit
 def test_job_repository_invalid_spec_maps_to_job_invalid_spec(tmp_path: Path) -> None:
     """Malformed spec should fail with deterministic invalid spec code."""
+    # Arrange - broken job yaml and repository
     jobs_dir = tmp_path / ".lily" / "jobs"
     _write(
         jobs_dir / "broken.job.yaml",
@@ -57,9 +61,11 @@ def test_job_repository_invalid_spec_maps_to_job_invalid_spec(tmp_path: Path) ->
     )
     repository = JobRepository(jobs_dir=jobs_dir)
 
+    # Act - load broken job
     try:
         repository.load("broken")
     except JobError as exc:
+        # Assert - invalid spec code
         assert exc.code == JobErrorCode.INVALID_SPEC
         assert "invalid job spec" in str(exc)
     else:  # pragma: no cover - defensive assertion
@@ -71,6 +77,7 @@ def test_job_repository_invalid_cron_timezone_maps_trigger_invalid(
     tmp_path: Path,
 ) -> None:
     """Invalid cron timezone should map to deterministic trigger-invalid code."""
+    # Arrange - cron job yaml with invalid timezone and repository
     jobs_dir = tmp_path / ".lily" / "jobs"
     _write(
         jobs_dir / "cron.job.yaml",
@@ -92,9 +99,11 @@ def test_job_repository_invalid_cron_timezone_maps_trigger_invalid(
     )
     repository = JobRepository(jobs_dir=jobs_dir)
 
+    # Act - load cron job
     try:
         repository.load("cron_job")
     except JobError as exc:
+        # Assert - trigger invalid code
         assert exc.code == JobErrorCode.TRIGGER_INVALID
         assert "invalid trigger" in str(exc)
     else:  # pragma: no cover - defensive assertion
