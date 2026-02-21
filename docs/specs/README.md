@@ -19,6 +19,7 @@ Purpose: index active/current specifications.
 - `docs/specs/memory/memory_spec_v1.md`
 - `docs/specs/memory/memory_eval_governance.md`
 - `docs/specs/commands/persona_commands.md`
+- `docs/specs/runtime/runtime_architecture_v1.md`
 
 ## Archived Spec Packs
 

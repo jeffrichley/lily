@@ -120,11 +120,12 @@ Non-goals:
 
 - [x] Remove dead imports and redundant constructor arguments.
 - [x] Ensure facade methods are orchestration-only.
-- [ ] Add/update architecture documentation diagram.
+- [x] Add/update architecture documentation diagram in canonical architecture doc.
 
 Acceptance checks:
 - [x] `RuntimeFacade` is materially smaller and easier to reason about.
 - [x] Composition ownership is clear in code and docs.
+- Architecture source of truth: `docs/specs/runtime/runtime_architecture_v1.md`.
 
 ## Test Plan (Detailed)
 
