@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import cast
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
-from lily.blueprints import build_default_blueprint_registry
 from lily.commands.handlers._memory_support import (
     build_personality_namespace,
     build_personality_repository,
@@ -20,7 +18,6 @@ from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
 from lily.config import SecuritySettings
-from lily.jobs import JobExecutor, JobRepository, JobSchedulerRuntime
 from lily.memory import (
     ConsolidationBackend,
     ConsolidationRequest,
@@ -37,30 +34,18 @@ from lily.runtime.conversation import (
     ConversationExecutor,
     ConversationRequest,
     ConversationResponse,
-    LangChainConversationExecutor,
 )
-from lily.runtime.executors.llm_orchestration import LlmOrchestrationExecutor
-from lily.runtime.executors.tool_dispatch import (
-    AddTool,
-    BuiltinToolProvider,
-    McpToolProvider,
-    MultiplyTool,
-    PluginToolProvider,
-    SubtractTool,
-    ToolContract,
-    ToolDispatchExecutor,
+from lily.runtime.conversation_factory import ConversationRuntimeFactory
+from lily.runtime.jobs_factory import JobsFactory
+from lily.runtime.runtime_dependencies import (
+    ConversationRuntimeSpec,
+    JobsSpec,
+    RuntimeDependencies,
+    ToolingSpec,
 )
-from lily.runtime.llm_backend import LangChainBackend
-from lily.runtime.plugin_runner import DockerPluginRunner
-from lily.runtime.security import (
-    SecurityApprovalStore,
-    SecurityGate,
-    SecurityHashService,
-    SecurityPreflightScanner,
-    SecurityPrompt,
-)
+from lily.runtime.security import SecurityPrompt
 from lily.runtime.session_lanes import run_in_session_lane
-from lily.runtime.skill_invoker import SkillInvoker
+from lily.runtime.tooling_factory import ToolingFactory
 from lily.session.models import (
     HistoryCompactionBackend,
     HistoryCompactionConfig,
@@ -86,7 +71,6 @@ class RuntimeFacade:
     def __init__(  # noqa: PLR0913
         self,
         command_registry: CommandRegistry | None = None,
-        conversation_executor: ConversationExecutor | None = None,
         persona_repository: FilePersonaRepository | None = None,
         conversation_checkpointer: BaseCheckpointSaver | None = None,
         memory_tooling_enabled: bool = False,
@@ -105,15 +89,18 @@ class RuntimeFacade:
         project_root: Path | None = None,
         workspace_root: Path | None = None,
         jobs_scheduler_enabled: bool = False,
+        dependencies: RuntimeDependencies | None = None,
+        tooling_factory: ToolingFactory | None = None,
+        jobs_factory: JobsFactory | None = None,
+        conversation_factory: ConversationRuntimeFactory | None = None,
+        conversation_executor: ConversationExecutor | None = None,
     ) -> None:
         """Create facade with command and conversation dependencies.
 
         Args:
             command_registry: Optional deterministic command registry.
-            conversation_executor: Optional conversation execution adapter.
             persona_repository: Optional persona profile repository.
-            conversation_checkpointer: Optional checkpointer for default conversation
-                executor wiring.
+            conversation_checkpointer: Optional checkpointer for conversation wiring.
             memory_tooling_enabled: Whether LangMem command routes are enabled.
             memory_tooling_auto_apply: Whether standard memory routes auto-use tools.
             consolidation_enabled: Whether consolidation pipeline is enabled.
@@ -128,6 +115,11 @@ class RuntimeFacade:
             project_root: Optional project root for dependency lock hashing.
             workspace_root: Optional `.lily` workspace root for jobs/runs storage.
             jobs_scheduler_enabled: Whether cron scheduler runtime should start.
+            dependencies: Optional pre-composed runtime dependencies.
+            tooling_factory: Optional tooling composition root override.
+            jobs_factory: Optional jobs composition root override.
+            conversation_factory: Optional conversation composition root override.
+            conversation_executor: Optional conversation executor override.
         """
         self._consolidation_enabled = consolidation_enabled
         self._consolidation_backend = consolidation_backend
@@ -137,37 +129,42 @@ class RuntimeFacade:
         )
         self._compaction_backend = compaction_backend
         self._compaction_max_tokens = compaction_max_tokens
-        self._security = security or SecuritySettings()
-        self._security_prompt = security_prompt
-        self._project_root = project_root or Path.cwd()
-        self._workspace_root = workspace_root or Path.cwd() / ".lily"
+        effective_security = security or SecuritySettings()
+        effective_project_root = project_root or Path.cwd()
+        effective_workspace_root = workspace_root or Path.cwd() / ".lily"
         self._persona_repository = persona_repository or FilePersonaRepository(
             root_dir=default_persona_root()
         )
-        self._jobs_scheduler_runtime: JobSchedulerRuntime | None = None
-        if command_registry is None:
-            if jobs_scheduler_enabled:
-                self._jobs_scheduler_runtime = self._build_jobs_scheduler_runtime()
-                self._jobs_scheduler_runtime.start()
-            self._command_registry = self._build_default_registry(
-                memory_tooling_enabled=memory_tooling_enabled,
-                memory_tooling_auto_apply=memory_tooling_auto_apply,
-                consolidation_enabled=consolidation_enabled,
-                consolidation_backend=consolidation_backend,
-                consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
-                evidence_chunking=evidence_chunking,
-                security=self._security,
-                security_prompt=self._security_prompt,
-                project_root=self._project_root,
-                workspace_root=self._workspace_root,
-                jobs_scheduler_control=self._jobs_scheduler_runtime,
-            )
-        else:
-            self._command_registry = command_registry
-        self._conversation_executor = (
-            conversation_executor
-            or LangChainConversationExecutor(checkpointer=conversation_checkpointer)
+        if dependencies is not None:
+            self._command_registry = dependencies.command_registry
+            self._conversation_executor = dependencies.conversation_executor
+            self._jobs_scheduler_runtime = dependencies.jobs_scheduler_runtime
+            return
+
+        resolved = self._compose_dependencies(
+            command_registry=command_registry,
+            conversation_executor=conversation_executor,
+            conversation_checkpointer=conversation_checkpointer,
+            memory_tooling_enabled=memory_tooling_enabled,
+            memory_tooling_auto_apply=memory_tooling_auto_apply,
+            consolidation_enabled=consolidation_enabled,
+            consolidation_backend=consolidation_backend,
+            consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
+            evidence_chunking=evidence_chunking,
+            compaction_backend=compaction_backend,
+            compaction_max_tokens=compaction_max_tokens,
+            security=effective_security,
+            security_prompt=security_prompt,
+            project_root=effective_project_root,
+            workspace_root=effective_workspace_root,
+            jobs_scheduler_enabled=jobs_scheduler_enabled,
+            tooling_factory=tooling_factory or ToolingFactory(),
+            jobs_factory=jobs_factory or JobsFactory(),
+            conversation_factory=conversation_factory or ConversationRuntimeFactory(),
         )
+        self._command_registry = resolved.command_registry
+        self._conversation_executor = resolved.conversation_executor
+        self._jobs_scheduler_runtime = resolved.jobs_scheduler_runtime
 
     def handle_input(self, text: str, session: Session) -> CommandResult:
         """Route one user turn to command or conversational path.
@@ -340,109 +337,6 @@ class RuntimeFacade:
             instructions="Provide clear, accurate, and concise assistance.",
         )
 
-    def _build_default_registry(  # noqa: PLR0913
-        self,
-        *,
-        memory_tooling_enabled: bool,
-        memory_tooling_auto_apply: bool,
-        consolidation_enabled: bool,
-        consolidation_backend: ConsolidationBackend,
-        consolidation_llm_assisted_enabled: bool,
-        evidence_chunking: EvidenceChunkingSettings | None,
-        security: SecuritySettings,
-        security_prompt: SecurityPrompt | None,
-        project_root: Path,
-        workspace_root: Path,
-        jobs_scheduler_control: JobSchedulerRuntime | None,
-    ) -> CommandRegistry:
-        """Construct default command registry with hidden LLM backend wiring.
-
-        Args:
-            memory_tooling_enabled: Whether LangMem command routes are enabled.
-            memory_tooling_auto_apply: Whether standard memory routes auto-use tools.
-            consolidation_enabled: Whether consolidation pipeline is enabled.
-            consolidation_backend: Consolidation backend selection.
-            consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
-            evidence_chunking: Evidence chunking settings.
-            security: Security settings for plugin-backed tools.
-            security_prompt: Optional terminal prompt for approvals.
-            project_root: Project root for dependency lock fingerprint.
-            workspace_root: Workspace root for jobs and run artifacts.
-            jobs_scheduler_control: Optional scheduler controls for `/jobs`.
-
-        Returns:
-            Command registry with invoker and executor dependencies.
-        """
-        llm_backend = LangChainBackend()
-        tools = cast(
-            tuple[ToolContract, ...],
-            (
-                AddTool(),
-                SubtractTool(),
-                MultiplyTool(),
-            ),
-        )
-        providers = (
-            BuiltinToolProvider(tools=tools),
-            McpToolProvider(),
-            PluginToolProvider(
-                security_gate=SecurityGate(
-                    hash_service=SecurityHashService(
-                        sandbox=security.sandbox,
-                        project_root=project_root,
-                    ),
-                    preflight=SecurityPreflightScanner(),
-                    store=SecurityApprovalStore(
-                        sqlite_path=Path(security.sandbox.sqlite_path)
-                    ),
-                    prompt=security_prompt,
-                    sandbox=security.sandbox,
-                ),
-                runner=DockerPluginRunner(sandbox=security.sandbox),
-            ),
-        )
-        executors = (
-            LlmOrchestrationExecutor(llm_backend),
-            ToolDispatchExecutor(providers=providers),
-        )
-        invoker = SkillInvoker(executors=executors)
-        jobs_dir = workspace_root / "jobs"
-        runs_root = workspace_root / "runs"
-        jobs_executor = JobExecutor(
-            repository=JobRepository(jobs_dir=jobs_dir),
-            blueprint_registry=build_default_blueprint_registry(),
-            runs_root=runs_root,
-        )
-        return CommandRegistry(
-            skill_invoker=invoker,
-            persona_repository=self._persona_repository,
-            memory_tooling_enabled=memory_tooling_enabled,
-            memory_tooling_auto_apply=memory_tooling_auto_apply,
-            consolidation_enabled=consolidation_enabled,
-            consolidation_backend=consolidation_backend,
-            consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
-            evidence_chunking=evidence_chunking,
-            jobs_executor=jobs_executor,
-            jobs_runs_root=runs_root,
-            jobs_scheduler_control=jobs_scheduler_control,
-        )
-
-    def _build_jobs_scheduler_runtime(self) -> JobSchedulerRuntime:
-        """Build APScheduler runtime service for cron job execution.
-
-        Returns:
-            Scheduler runtime service.
-        """
-        jobs_dir = self._workspace_root / "jobs"
-        runs_root = self._workspace_root / "runs"
-        scheduler_db_path = self._workspace_root / "db" / "jobs_scheduler.sqlite3"
-        return JobSchedulerRuntime(
-            repository=JobRepository(jobs_dir=jobs_dir),
-            jobs_dir=jobs_dir,
-            runs_root=runs_root,
-            sqlite_path=scheduler_db_path,
-        )
-
     def _maybe_run_scheduled_consolidation(self, session: Session) -> None:
         """Run periodic consolidation when scheduled interval is met.
 
@@ -524,6 +418,102 @@ class RuntimeFacade:
         )
         session.conversation_state.append(
             Message(role=MessageRole.ASSISTANT, content=assistant_text)
+        )
+
+    def _compose_dependencies(  # noqa: PLR0913
+        self,
+        *,
+        command_registry: CommandRegistry | None,
+        conversation_executor: ConversationExecutor | None,
+        conversation_checkpointer: BaseCheckpointSaver | None,
+        memory_tooling_enabled: bool,
+        memory_tooling_auto_apply: bool,
+        consolidation_enabled: bool,
+        consolidation_backend: ConsolidationBackend,
+        consolidation_llm_assisted_enabled: bool,
+        evidence_chunking: EvidenceChunkingSettings | None,
+        compaction_backend: HistoryCompactionBackend,
+        compaction_max_tokens: int,
+        security: SecuritySettings,
+        security_prompt: SecurityPrompt | None,
+        project_root: Path,
+        workspace_root: Path,
+        jobs_scheduler_enabled: bool,
+        tooling_factory: ToolingFactory,
+        jobs_factory: JobsFactory,
+        conversation_factory: ConversationRuntimeFactory,
+    ) -> RuntimeDependencies:
+        """Compose runtime dependencies from explicit composition roots.
+
+        Args:
+            command_registry: Optional externally provided command registry.
+            conversation_executor: Optional externally provided conversation executor.
+            conversation_checkpointer: Optional conversation checkpointer.
+            memory_tooling_enabled: Whether memory tooling command routes are enabled.
+            memory_tooling_auto_apply: Whether memory routes auto-use LangMem tools.
+            consolidation_enabled: Whether consolidation pipeline is enabled.
+            consolidation_backend: Consolidation backend selection.
+            consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
+            evidence_chunking: Evidence chunking settings.
+            compaction_backend: Conversation compaction backend.
+            compaction_max_tokens: Conversation compaction token budget.
+            security: Security settings for plugin-backed tool execution.
+            security_prompt: Optional HITL security prompt.
+            project_root: Project root path.
+            workspace_root: Workspace root path.
+            jobs_scheduler_enabled: Whether jobs scheduler is enabled.
+            tooling_factory: Tooling composition root.
+            jobs_factory: Jobs composition root.
+            conversation_factory: Conversation composition root.
+
+        Returns:
+            Fully composed runtime dependencies.
+        """
+        jobs_bundle = None
+        effective_registry = command_registry
+        if effective_registry is None:
+            jobs_bundle = jobs_factory.build(
+                JobsSpec(
+                    workspace_root=workspace_root,
+                    scheduler_enabled=jobs_scheduler_enabled,
+                )
+            )
+            tooling = tooling_factory.build(
+                ToolingSpec(
+                    security=security,
+                    security_prompt=security_prompt,
+                    project_root=project_root,
+                )
+            )
+            effective_registry = CommandRegistry(
+                skill_invoker=tooling.skill_invoker,
+                persona_repository=self._persona_repository,
+                memory_tooling_enabled=memory_tooling_enabled,
+                memory_tooling_auto_apply=memory_tooling_auto_apply,
+                consolidation_enabled=consolidation_enabled,
+                consolidation_backend=consolidation_backend,
+                consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
+                evidence_chunking=evidence_chunking,
+                jobs_executor=jobs_bundle.jobs_executor if jobs_bundle else None,
+                jobs_runs_root=jobs_bundle.runs_root if jobs_bundle else None,
+                jobs_scheduler_control=(
+                    jobs_bundle.scheduler_control if jobs_bundle else None
+                ),
+            )
+        effective_conversation_executor = conversation_factory.build(
+            ConversationRuntimeSpec(
+                conversation_executor=conversation_executor,
+                conversation_checkpointer=conversation_checkpointer,
+                compaction_backend=compaction_backend,
+                compaction_max_tokens=compaction_max_tokens,
+                evidence_chunking=evidence_chunking,
+            )
+        )
+        scheduler_runtime = jobs_bundle.scheduler_runtime if jobs_bundle else None
+        return RuntimeDependencies(
+            command_registry=effective_registry,
+            conversation_executor=effective_conversation_executor,
+            jobs_scheduler_runtime=scheduler_runtime,
         )
 
 
