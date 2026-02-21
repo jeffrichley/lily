@@ -27,6 +27,7 @@ from lily.memory import (
     EvidenceChunkingSettings,
 )
 from lily.runtime.checkpointing import CheckpointerBuildError, build_checkpointer
+from lily.runtime.client_facade import ClientRuntimeFacade
 from lily.runtime.facade import RuntimeFacade
 from lily.runtime.security import ApprovalDecision, ApprovalRequest, SecurityPrompt
 from lily.session.factory import SessionFactory, SessionFactoryConfig
@@ -1086,29 +1087,28 @@ def _execute_once(  # noqa: PLR0913
     Returns:
         Process exit code.
     """
-    session = _build_session(
-        bundled_dir=bundled_dir,
-        workspace_dir=workspace_dir,
-        model_name=model_name,
-        session_file=session_file,
-    )
-    try:
-        runtime = _build_runtime_for_workspace(
+    facade = ClientRuntimeFacade(
+        session_builder=lambda: _build_session(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            model_name=model_name,
+            session_file=session_file,
+        ),
+        runtime_builder=lambda: _build_runtime_for_workspace(
             workspace_dir=workspace_dir,
             config_file=config_file,
-        )
+        ),
+        session_persistor=lambda session: _persist_session(session, session_file),
+    )
+    try:
+        result = facade.run_input(text)
+        _render_result(result)
+        return 0 if result.status == CommandStatus.OK else 1
     except CheckpointerBuildError as exc:
         _CONSOLE.print(f"[bold red]Failed to initialize checkpointer: {exc}[/bold red]")
         return 1
-    try:
-        result = runtime.handle_input(text, session)
-        _persist_session(session, session_file)
-        _render_result(result)
-        return 0 if result.status == CommandStatus.OK else 1
     finally:
-        maybe_close = getattr(runtime, "close", None)
-        if callable(maybe_close):
-            maybe_close()
+        facade.close()
 
 
 @app.command("init")
@@ -1277,22 +1277,24 @@ def repl_command(
     effective_session_file = session_file or _default_session_file(
         effective_workspace_dir
     )
-    session = _build_session(
-        bundled_dir=effective_bundled_dir,
-        workspace_dir=effective_workspace_dir,
-        model_name=model_name,
-        session_file=effective_session_file,
-    )
-    try:
-        runtime = _build_runtime_for_workspace(
+    facade = ClientRuntimeFacade(
+        session_builder=lambda: _build_session(
+            bundled_dir=effective_bundled_dir,
+            workspace_dir=effective_workspace_dir,
+            model_name=model_name,
+            session_file=effective_session_file,
+        ),
+        runtime_builder=lambda: _build_runtime_for_workspace(
             workspace_dir=effective_workspace_dir,
             config_file=config_file,
-        )
-    except CheckpointerBuildError as exc:
-        _CONSOLE.print(f"[bold red]Failed to initialize checkpointer: {exc}[/bold red]")
-        raise typer.Exit(code=1) from exc
-
+        ),
+        session_persistor=lambda session: _persist_session(
+            session,
+            effective_session_file,
+        ),
+    )
     try:
+        facade.start()
         while True:
             try:
                 raw = typer.prompt("lily")
@@ -1307,10 +1309,10 @@ def repl_command(
             if not text:
                 continue
 
-            result = runtime.handle_input(text, session)
-            _persist_session(session, effective_session_file)
+            result = facade.run_input(text)
             _render_result(result)
+    except CheckpointerBuildError as exc:
+        _CONSOLE.print(f"[bold red]Failed to initialize checkpointer: {exc}[/bold red]")
+        raise typer.Exit(code=1) from exc
     finally:
-        maybe_close = getattr(runtime, "close", None)
-        if callable(maybe_close):
-            maybe_close()
+        facade.close()
