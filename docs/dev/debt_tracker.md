@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-20"
+last_updated: "2026-02-21"
 status: "active"
 source_of_truth: true
 ---
@@ -58,15 +58,6 @@ Priority scale:
     - marker mapping aligned for existing layout: `contracts -> integration`
     - AAA enabled in `basic` mode; file-length rule configured (`max=1200`, `mode=warn`)
     - full gate run passes with plugin active via `just quality test`
-
-- [ ] Add real `/agent <name>` once agent subsystem exists
-  - Owner: `@team`
-  - Target: `TBD`
-  - Current state: deferred in punchlist until full agent subsystem is available.
-  - Exit criteria:
-    - command routes to real agent registry/state
-    - help/list/show/use flows are deterministic
-    - command and REPL coverage added
 
 ### P3
 

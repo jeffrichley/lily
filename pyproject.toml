@@ -74,7 +74,6 @@ markers = [
 filterwarnings = [
     "error::ResourceWarning",
     "ignore:Importing Send from langgraph.constants is deprecated.*:DeprecationWarning:trustcall\\._base",
-    "ignore:Test '.*' is missing '.*' section:pytest.PytestWarning",
 ]
 
 [tool.ruff]

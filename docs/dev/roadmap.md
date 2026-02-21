@@ -168,6 +168,14 @@ Execution rule:
 - use domain execution plans for phase work (for example memory/personality plans)
 - keep this roadmap focused on priority and ordering, not checkbox status
 
+## Planned Feature Tracks (Post-Core)
+
+- [ ] Real agent subsystem + `/agent` migration (Priority 4)
+  - Build an explicit agent registry/state model (not persona-compat mode).
+  - Rebind `/agent list|use|show` to real agent entities.
+  - Define deterministic migration behavior from current persona-backed commands.
+  - Add command + REPL coverage for registry/list/show/use flows.
+
 ## System Improvements (Internal Work)
 
 These are not user-facing features. They are required to make Lily robust.
@@ -195,3 +203,4 @@ For every new task:
 
 - 2026-02-14: Initial roadmap created as execution guide after Agent Mode v0 completion.
 - 2026-02-17: Pruned status ownership; active execution status moved to debt/domain plan docs.
+- 2026-02-21: Moved real `/agent` work from debt tracker into planned feature tracks.
