@@ -65,7 +65,7 @@ drill_sergeant_aaa_mode = "basic"
 drill_sergeant_aaa_severity = "error"
 drill_sergeant_enforce_file_length = true
 drill_sergeant_max_file_length = 1200
-drill_sergeant_file_length_mode = "warn"
+drill_sergeant_file_length_mode = "error"
 markers = [
     "unit: Unit tests that test individual components in isolation",
     "integration: Integration tests that test multiple components together",
