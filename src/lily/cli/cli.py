@@ -2,339 +2,49 @@
 
 from __future__ import annotations
 
-import logging
-from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 
 import click
 import typer
-import yaml
 from rich.console import Console
-from rich.json import JSON
-from rich.logging import RichHandler
-from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
+from lily.cli.bootstrap import (
+    bootstrap_workspace as _bootstrap_workspace,
+)
+from lily.cli.bootstrap import (
+    build_runtime_for_workspace as _build_runtime_for_workspace_impl,
+)
+from lily.cli.bootstrap import (
+    build_session as _build_session,
+)
+from lily.cli.bootstrap import (
+    configure_logging as _configure_logging,
+)
+from lily.cli.bootstrap import (
+    default_bundled_dir as _default_bundled_dir,
+)
+from lily.cli.bootstrap import (
+    default_session_file as _default_session_file,
+)
+from lily.cli.bootstrap import (
+    default_workspace_dir as _default_workspace_dir,
+)
+from lily.cli.bootstrap import (
+    persist_session as _persist_session_impl,
+)
+from lily.cli.rendering import CliRenderer
 from lily.commands.types import CommandResult, CommandStatus
-from lily.config import GlobalConfigError, LilyGlobalConfig, load_global_config
-from lily.memory import ConsolidationBackend as MemoryConsolidationBackend
-from lily.memory import (
-    EvidenceChunkingMode as MemoryEvidenceChunkingMode,
-)
-from lily.memory import (
-    EvidenceChunkingSettings,
-)
-from lily.runtime.checkpointing import CheckpointerBuildError, build_checkpointer
+from lily.runtime.checkpointing import CheckpointerBuildError
 from lily.runtime.client_facade import ClientRuntimeFacade
 from lily.runtime.facade import RuntimeFacade
-from lily.runtime.security import ApprovalDecision, ApprovalRequest, SecurityPrompt
-from lily.session.factory import SessionFactory, SessionFactoryConfig
-from lily.session.models import HistoryCompactionBackend, ModelConfig, Session
-from lily.session.store import (
-    SessionDecodeError,
-    SessionSchemaVersionError,
-    load_session,
-    recover_corrupt_session,
-    save_session,
-)
+from lily.session.models import Session
 
 app = typer.Typer(help="Lily CLI")
 _CONSOLE = Console()
-_LOGGING_CONFIGURED = False
-_HIDE_DATA_CODES = {
-    "persona_listed",
-    "persona_set",
-    "persona_shown",
-    "persona_reloaded",
-    "persona_exported",
-    "persona_imported",
-    "agent_listed",
-    "agent_set",
-    "agent_shown",
-    "style_set",
-    "memory_listed",
-    "memory_empty",
-    "memory_saved",
-    "memory_deleted",
-    "memory_langmem_saved",
-    "memory_langmem_listed",
-    "memory_evidence_ingested",
-    "jobs_listed",
-    "jobs_empty",
-    "job_run_completed",
-    "jobs_tailed",
-    "jobs_tail_empty",
-    "jobs_history",
-    "jobs_history_empty",
-    "jobs_scheduler_status",
-    "jobs_paused",
-    "jobs_resumed",
-    "jobs_disabled",
-}
-_SECURITY_ALERT_CODES = {
-    "provider_policy_denied",
-    "skill_capability_denied",
-    "security_policy_denied",
-    "plugin_contract_invalid",
-    "plugin_container_unavailable",
-    "plugin_timeout",
-    "plugin_runtime_failed",
-    "security_preflight_denied",
-    "security_hash_mismatch",
-    "approval_required",
-    "approval_denied",
-    "approval_persist_failed",
-}
-_BLUEPRINT_DIAGNOSTIC_CODES = {
-    "blueprint_not_found",
-    "blueprint_bindings_invalid",
-    "blueprint_compile_failed",
-    "blueprint_execution_failed",
-    "blueprint_contract_invalid",
-}
-
-
-class _TerminalSecurityPrompt(SecurityPrompt):
-    """Terminal HITL prompt for plugin security approvals."""
-
-    def request_approval(self, request: ApprovalRequest) -> ApprovalDecision | None:
-        """Prompt operator for deterministic run_once/always_allow/deny decision.
-
-        Args:
-            request: Security approval context for current invocation.
-
-        Returns:
-            Selected approval decision, or ``None`` when unavailable.
-        """
-        hash_note = "YES" if request.hash_changed else "NO"
-        write_note = "YES" if request.write_access else "NO"
-        _CONSOLE.print(
-            Panel(
-                (
-                    f"Agent: {request.agent_id}\n"
-                    f"Skill: {request.skill_name}\n"
-                    f"Security Hash: {request.security_hash}\n"
-                    f"Hash Changed Since Prior Grant: {hash_note}\n"
-                    f"Write Access Requested: {write_note}\n\n"
-                    "Choose approval mode: run_once | always_allow | deny"
-                ),
-                title="Security Approval Required",
-                border_style="bold yellow",
-                expand=True,
-            )
-        )
-        choice = typer.prompt(
-            "approval",
-            type=click.Choice(
-                ["run_once", "always_allow", "deny"], case_sensitive=False
-            ),
-        ).strip()
-        if choice == "run_once":
-            return ApprovalDecision.RUN_ONCE
-        if choice == "always_allow":
-            return ApprovalDecision.ALWAYS_ALLOW
-        return ApprovalDecision.DENY
-
-
-def _configure_logging() -> None:
-    """Configure Rich-backed logging once for CLI commands."""
-    global _LOGGING_CONFIGURED  # noqa: PLW0603
-    if _LOGGING_CONFIGURED:
-        return
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(message)s",
-        handlers=[RichHandler(show_path=False, rich_tracebacks=True)],
-    )
-    _LOGGING_CONFIGURED = True
-
-
-def _project_root() -> Path:
-    """Resolve project root from this module location.
-
-    Returns:
-        Project root path.
-    """
-    return Path(__file__).resolve().parents[3]
-
-
-def _default_bundled_dir() -> Path:
-    """Return default bundled skills directory.
-
-    Returns:
-        Bundled skills path.
-    """
-    return _project_root() / "skills"
-
-
-def _default_workspace_dir() -> Path:
-    """Return default workspace skills directory.
-
-    Returns:
-        Workspace skills path.
-    """
-    workspace = Path.cwd() / ".lily" / "skills"
-    workspace.mkdir(parents=True, exist_ok=True)
-    return workspace
-
-
-def _default_session_file(workspace_dir: Path) -> Path:
-    """Return default persisted session file path.
-
-    Args:
-        workspace_dir: Workspace skills directory path.
-
-    Returns:
-        Session persistence file path.
-    """
-    workspace_dir.mkdir(parents=True, exist_ok=True)
-    return workspace_dir.parent / "session.json"
-
-
-def _default_global_config_file(workspace_dir: Path) -> Path:
-    """Return default global config path for current workspace root.
-
-    Args:
-        workspace_dir: Workspace skills directory path.
-
-    Returns:
-        Global config file path.
-    """
-    workspace_dir.mkdir(parents=True, exist_ok=True)
-    yaml_path = workspace_dir.parent / "config.yaml"
-    json_path = workspace_dir.parent / "config.json"
-    if yaml_path.exists():
-        return yaml_path
-    if json_path.exists():
-        return json_path
-    return yaml_path
-
-
-def _bootstrap_workspace(
-    *,
-    workspace_dir: Path,
-    config_file: Path | None = None,
-    overwrite_config: bool = False,
-) -> tuple[Path, Path, tuple[tuple[str, str], ...]]:
-    """Bootstrap local Lily workspace artifacts.
-
-    Args:
-        workspace_dir: Workspace skills directory path.
-        config_file: Optional global config path override.
-        overwrite_config: Whether to overwrite existing config payload.
-
-    Returns:
-        Effective workspace dir, config file path, and action rows.
-    """
-    effective_workspace_dir = workspace_dir
-    effective_config_file = config_file or _default_global_config_file(
-        effective_workspace_dir
-    )
-    targets = {
-        "workspace_skills_dir": effective_workspace_dir,
-        "checkpoints_dir": effective_workspace_dir.parent / "checkpoints",
-        "memory_dir": effective_workspace_dir.parent / "memory",
-    }
-    actions: list[tuple[str, str]] = []
-    for name, path in targets.items():
-        existed = path.exists()
-        path.mkdir(parents=True, exist_ok=True)
-        actions.append((name, "exists" if existed else "created"))
-    config_existed = effective_config_file.exists()
-    if not config_existed or overwrite_config:
-        effective_config_file.parent.mkdir(parents=True, exist_ok=True)
-        payload = LilyGlobalConfig().model_dump(mode="json")
-        effective_config_file.write_text(
-            yaml.safe_dump(payload, sort_keys=False),
-            encoding="utf-8",
-        )
-        actions.append(
-            (
-                "config_file",
-                "overwritten" if config_existed and overwrite_config else "created",
-            )
-        )
-    else:
-        actions.append(("config_file", "exists"))
-    return effective_workspace_dir, effective_config_file, tuple(actions)
-
-
-def _build_session(
-    *,
-    bundled_dir: Path,
-    workspace_dir: Path,
-    model_name: str,
-    session_file: Path,
-) -> Session:
-    """Build runtime session for CLI command handling.
-
-    Args:
-        bundled_dir: Bundled skills root.
-        workspace_dir: Workspace skills root.
-        model_name: Session model name.
-        session_file: Session persistence file path.
-
-    Returns:
-        Initialized session (loaded from disk when possible).
-    """
-    workspace_dir.mkdir(parents=True, exist_ok=True)
-    factory = SessionFactory(
-        SessionFactoryConfig(
-            bundled_dir=bundled_dir,
-            workspace_dir=workspace_dir,
-            reserved_commands={
-                "skills",
-                "skill",
-                "help",
-                "reload_skills",
-                "persona",
-                "reload_persona",
-                "agent",
-                "style",
-                "remember",
-                "forget",
-                "memory",
-                "jobs",
-            },
-        )
-    )
-    try:
-        return load_session(session_file)
-    except FileNotFoundError:
-        session = factory.create(model_config=ModelConfig(model_name=model_name))
-        save_session(session, session_file)
-        return session
-    except (SessionDecodeError, SessionSchemaVersionError) as exc:
-        backup = recover_corrupt_session(session_file)
-        if backup is not None:
-            _CONSOLE.print(
-                f"[yellow]Session file was invalid. Moved to {backup}.[/yellow]"
-            )
-        else:
-            _CONSOLE.print(
-                "[yellow]Session file was invalid. Creating a new session.[/yellow]"
-            )
-        _CONSOLE.print(f"[yellow]Reason: {exc}[/yellow]")
-        session = factory.create(model_config=ModelConfig(model_name=model_name))
-        save_session(session, session_file)
-        return session
-
-
-def _persist_session(session: Session, session_file: Path) -> None:
-    """Persist session with best-effort user-visible error reporting.
-
-    Args:
-        session: Session to persist.
-        session_file: Persistence target path.
-    """
-    try:
-        save_session(session, session_file)
-    except OSError as exc:
-        _CONSOLE.print(
-            f"[bold red]Failed to persist session to {session_file}: {exc}[/bold red]"
-        )
+_RENDERER = CliRenderer(console=_CONSOLE)
 
 
 def _build_runtime_for_workspace(
@@ -342,727 +52,39 @@ def _build_runtime_for_workspace(
     workspace_dir: Path,
     config_file: Path | None,
 ) -> RuntimeFacade:
-    """Build runtime facade with configured checkpointer backend.
+    """Compatibility wrapper for tests and CLI runtime construction.
 
     Args:
         workspace_dir: Workspace skills directory path.
-        config_file: Optional global config override path.
+        config_file: Optional global config file path.
 
     Returns:
-        Runtime facade wired with configured checkpointer.
+        Configured runtime facade.
     """
-    effective_config_file = config_file or _default_global_config_file(workspace_dir)
-    config: LilyGlobalConfig
-    try:
-        config = load_global_config(effective_config_file)
-    except GlobalConfigError as exc:
-        _CONSOLE.print(
-            f"[yellow]Global config at {effective_config_file} is invalid; "
-            "falling back to defaults.[/yellow]"
-        )
-        _CONSOLE.print(f"[yellow]Reason: {exc}[/yellow]")
-        config = LilyGlobalConfig()
-    result = build_checkpointer(config.checkpointer)
-    return RuntimeFacade(
-        conversation_checkpointer=result.saver,
-        memory_tooling_enabled=config.memory_tooling.enabled,
-        memory_tooling_auto_apply=config.memory_tooling.auto_apply,
-        consolidation_enabled=config.consolidation.enabled,
-        consolidation_backend=MemoryConsolidationBackend(
-            config.consolidation.backend.value
-        ),
-        consolidation_llm_assisted_enabled=config.consolidation.llm_assisted_enabled,
-        consolidation_auto_run_every_n_turns=config.consolidation.auto_run_every_n_turns,
-        evidence_chunking=EvidenceChunkingSettings(
-            mode=MemoryEvidenceChunkingMode(config.evidence.chunking_mode.value),
-            chunk_size=config.evidence.chunk_size,
-            chunk_overlap=config.evidence.chunk_overlap,
-            token_encoding_name=config.evidence.token_encoding_name,
-        ),
-        compaction_backend=HistoryCompactionBackend(config.compaction.backend.value),
-        compaction_max_tokens=config.compaction.max_tokens,
-        security=config.security,
-        security_prompt=_TerminalSecurityPrompt(),
-        project_root=_project_root(),
-        workspace_root=workspace_dir.parent,
-        jobs_scheduler_enabled=True,
+    return _build_runtime_for_workspace_impl(
+        workspace_dir=workspace_dir,
+        config_file=config_file,
+        console=_CONSOLE,
     )
+
+
+def _persist_session(session: Session, session_file: Path) -> None:
+    """Compatibility wrapper for tests and CLI session persistence.
+
+    Args:
+        session: Session to persist.
+        session_file: Persistence target path.
+    """
+    _persist_session_impl(session, session_file, console=_CONSOLE)
 
 
 def _render_result(result: CommandResult) -> None:
     """Render command result with Rich styles.
 
     Args:
-        result: Structured command output envelope.
+        result: Structured command result envelope.
     """
-    if result.status == CommandStatus.OK:
-        if _render_rich_success(result):
-            return
-        _CONSOLE.print(
-            Panel(
-                Markdown(result.message),
-                title=f"Lily [{result.code}]",
-                border_style="green",
-                expand=True,
-            )
-        )
-        if result.data and result.code not in _HIDE_DATA_CODES:
-            _CONSOLE.print(
-                Panel(
-                    JSON.from_data(result.data),
-                    title="Data",
-                    border_style="cyan",
-                    expand=True,
-                )
-            )
-        return
-    if _render_blueprint_diagnostic(result):
-        return
-    _CONSOLE.print(
-        Panel(
-            (
-                "[bold white on red] SECURITY ALERT [/bold white on red]\n"
-                f"Code: {result.code}\n{result.message}"
-            )
-            if result.code in _SECURITY_ALERT_CODES
-            else result.message,
-            title=(
-                "SECURITY ALERT"
-                if result.code in _SECURITY_ALERT_CODES
-                else f"Error [{result.code}]"
-            ),
-            border_style=(
-                "bold bright_red"
-                if result.code in _SECURITY_ALERT_CODES
-                else "bold red"
-            ),
-            expand=True,
-        )
-    )
-    if result.data:
-        _CONSOLE.print(
-            Panel(
-                JSON.from_data(result.data),
-                title="Data",
-                border_style="cyan",
-                expand=True,
-            )
-        )
-
-
-def _render_blueprint_diagnostic(result: CommandResult) -> bool:
-    """Render high-visibility diagnostics for blueprint runtime failures.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when blueprint diagnostic panel was rendered.
-    """
-    if result.code not in _BLUEPRINT_DIAGNOSTIC_CODES:
-        return False
-    guidance = (
-        "Check blueprint id, bindings schema, and registered dependencies.\n"
-        "Review compile/execute logs and re-run after contract fixes."
-    )
-    _CONSOLE.print(
-        Panel(
-            (
-                "[bold black on yellow] BLUEPRINT DIAGNOSTIC [/bold black on yellow]\n"
-                f"Code: {result.code}\n"
-                f"{result.message}\n\n"
-                f"{guidance}"
-            ),
-            title="Blueprint Diagnostic",
-            border_style="bold yellow",
-            expand=True,
-        )
-    )
-    if result.data:
-        _CONSOLE.print(
-            Panel(
-                JSON.from_data(result.data),
-                title="Data",
-                border_style="cyan",
-                expand=True,
-            )
-        )
-    return True
-
-
-def _render_rich_success(result: CommandResult) -> bool:
-    """Render specialized success view for selected command result codes.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when a specialized render path handled output.
-    """
-    renderers: dict[str, Callable[[CommandResult], bool]] = {
-        "persona_listed": _render_persona_list,
-        "persona_set": _render_persona_set,
-        "persona_shown": _render_persona_show,
-        "agent_listed": _render_agent_list,
-        "agent_set": _render_agent_set,
-        "agent_shown": _render_agent_show,
-        "memory_listed": _render_memory_list,
-        "memory_langmem_listed": _render_memory_list,
-        "memory_evidence_listed": _render_evidence_list,
-        "jobs_listed": _render_jobs_list,
-        "jobs_empty": _render_jobs_list,
-        "job_run_completed": _render_job_run,
-        "jobs_tailed": _render_jobs_tail,
-        "jobs_tail_empty": _render_jobs_tail,
-        "jobs_history": _render_jobs_history,
-        "jobs_history_empty": _render_jobs_history,
-        "jobs_scheduler_status": _render_jobs_scheduler_status,
-        "jobs_paused": _render_jobs_scheduler_action,
-        "jobs_resumed": _render_jobs_scheduler_action,
-        "jobs_disabled": _render_jobs_scheduler_action,
-    }
-    renderer = renderers.get(result.code)
-    if renderer is None:
-        return False
-    return renderer(result)
-
-
-def _render_persona_list(result: CommandResult) -> bool:
-    """Render `/persona list` in table form.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when table render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    raw_rows = data.get("personas") if data is not None else None
-    if not isinstance(raw_rows, list):
-        return False
-
-    table = Table(title="Personas", show_header=True, header_style="bold cyan")
-    table.add_column("Active", style="green", no_wrap=True)
-    table.add_column("Persona", style="bold")
-    table.add_column("Default Style", style="magenta")
-    table.add_column("Summary")
-    for row in raw_rows:
-        if not isinstance(row, dict):
-            continue
-        active = "yes" if bool(row.get("active")) else ""
-        table.add_row(
-            active,
-            str(row.get("persona", "")),
-            str(row.get("default_style", "")),
-            str(row.get("summary", "")),
-        )
-    _CONSOLE.print(table)
-    return True
-
-
-def _render_persona_set(result: CommandResult) -> bool:
-    """Render `/persona use` confirmation in concise panel.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when panel render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    if data is None:
-        return False
-    persona = str(data.get("persona", "")).strip()
-    style = str(data.get("style", "")).strip()
-    if not persona or not style:
-        return False
-    _CONSOLE.print(
-        Panel(
-            f"Active Persona: [bold]{persona}[/bold]\nStyle: [bold]{style}[/bold]",
-            title="Persona Updated",
-            border_style="green",
-            expand=True,
-        )
-    )
-    return True
-
-
-def _render_persona_show(result: CommandResult) -> bool:
-    """Render `/persona show` details as fields + instructions panel.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when rich render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    if data is None:
-        return False
-    persona = str(data.get("persona", "")).strip()
-    summary = str(data.get("summary", "")).strip()
-    default_style = str(data.get("default_style", "")).strip()
-    effective_style = str(data.get("effective_style", "")).strip()
-    instructions = str(data.get("instructions", "")).strip()
-    if not persona:
-        return False
-
-    details = Table(show_header=False, box=None, expand=True)
-    details.add_column("Field", style="bold cyan", no_wrap=True)
-    details.add_column("Value")
-    details.add_row("Persona", persona)
-    details.add_row("Summary", summary)
-    details.add_row("Default Style", default_style)
-    details.add_row("Effective Style", effective_style)
-    _CONSOLE.print(Panel(details, title="Persona", border_style="green", expand=True))
-    if instructions:
-        _CONSOLE.print(
-            Panel(
-                instructions,
-                title="Instructions",
-                border_style="cyan",
-                expand=True,
-            )
-        )
-    return True
-
-
-def _render_memory_list(result: CommandResult) -> bool:
-    """Render `/memory show` records in table form.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when table render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    raw_records = data.get("records") if data is not None else None
-    if not isinstance(raw_records, list):
-        return False
-    table = Table(
-        title=f"Memory ({len(raw_records)} records)",
-        show_header=True,
-        header_style="bold cyan",
-    )
-    table.add_column("ID", style="green")
-    table.add_column("Namespace", style="magenta", no_wrap=True)
-    table.add_column("Content")
-    for record in raw_records:
-        if not isinstance(record, dict):
-            continue
-        table.add_row(
-            str(record.get("id", "")),
-            str(record.get("namespace", "")),
-            str(record.get("content", "")),
-        )
-    _CONSOLE.print(table)
-    return True
-
-
-def _render_evidence_list(result: CommandResult) -> bool:
-    """Render `/memory evidence show` records with citation + score.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when table render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    raw_records = data.get("records") if data is not None else None
-    if not isinstance(raw_records, list):
-        return False
-    table = Table(
-        title=f"Semantic Evidence ({len(raw_records)} hits)",
-        show_header=True,
-        header_style="bold cyan",
-    )
-    table.add_column("Score", style="green", no_wrap=True)
-    table.add_column("Citation", style="magenta")
-    table.add_column("Snippet")
-    for record in raw_records:
-        if not isinstance(record, dict):
-            continue
-        score = float(record.get("score", 0.0))
-        table.add_row(
-            f"{score:.3f}",
-            str(record.get("citation", "")),
-            str(record.get("content", "")),
-        )
-    _CONSOLE.print(table)
-    _CONSOLE.print(
-        Panel(
-            "Evidence results are non-canonical context. "
-            "Structured long-term memory remains the source of truth.",
-            title="Evidence Policy",
-            border_style="yellow",
-            expand=True,
-        )
-    )
-    return True
-
-
-def _render_agent_list(result: CommandResult) -> bool:
-    """Render `/agent list` in table form.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when table render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    raw_rows = data.get("agents") if data is not None else None
-    if not isinstance(raw_rows, list):
-        return False
-    table = Table(title="Agents", show_header=True, header_style="bold cyan")
-    table.add_column("Active", style="green", no_wrap=True)
-    table.add_column("Agent", style="bold")
-    table.add_column("Summary")
-    for row in raw_rows:
-        if not isinstance(row, dict):
-            continue
-        table.add_row(
-            "yes" if bool(row.get("active")) else "",
-            str(row.get("agent", "")),
-            str(row.get("summary", "")),
-        )
-    _CONSOLE.print(table)
-    return True
-
-
-def _render_agent_set(result: CommandResult) -> bool:
-    """Render `/agent use` confirmation in concise panel.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when panel render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    if data is None:
-        return False
-    agent = str(data.get("agent", "")).strip()
-    if not agent:
-        return False
-    _CONSOLE.print(
-        Panel(
-            f"Active Agent: [bold]{agent}[/bold]",
-            title="Agent Updated",
-            border_style="green",
-            expand=True,
-        )
-    )
-    return True
-
-
-def _render_agent_show(result: CommandResult) -> bool:
-    """Render `/agent show` details panel.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when panel render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    if data is None:
-        return False
-    agent = str(data.get("agent", "")).strip()
-    summary = str(data.get("summary", "")).strip()
-    if not agent:
-        return False
-    _CONSOLE.print(
-        Panel(
-            f"Agent: [bold]{agent}[/bold]\nSummary: {summary}",
-            title="Agent",
-            border_style="green",
-            expand=True,
-        )
-    )
-    return True
-
-
-def _render_jobs_list(result: CommandResult) -> bool:
-    """Render `/jobs list` output as table with optional diagnostics panel.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when rich render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    raw_jobs = data.get("jobs") if data is not None else None
-    if not isinstance(raw_jobs, list):
-        return False
-    _render_jobs_table(raw_jobs)
-    _render_job_diagnostics(data)
-    return True
-
-
-def _render_jobs_table(raw_jobs: list[object]) -> None:
-    """Render jobs list table or empty-state panel.
-
-    Args:
-        raw_jobs: Raw jobs list payload from command result data.
-    """
-    if not raw_jobs:
-        _CONSOLE.print(
-            Panel(
-                "No jobs found in `.lily/jobs`.",
-                title="Jobs",
-                border_style="yellow",
-                expand=True,
-            )
-        )
-        return
-    table = Table(title="Jobs", show_header=True, header_style="bold cyan")
-    table.add_column("Job ID", style="bold")
-    table.add_column("Title")
-    table.add_column("Target", style="magenta")
-    table.add_column("Trigger", style="green")
-    for row in raw_jobs:
-        if not isinstance(row, dict):
-            continue
-        table.add_row(
-            str(row.get("id", "")),
-            str(row.get("title", "")),
-            str(row.get("target_id", "")),
-            str(row.get("trigger", "")),
-        )
-    _CONSOLE.print(table)
-
-
-def _render_job_diagnostics(data: dict[str, object] | None) -> None:
-    """Render diagnostics panel for job repository scan results.
-
-    Args:
-        data: Command result data payload.
-    """
-    raw_diagnostics = data.get("diagnostics") if data is not None else None
-    if not isinstance(raw_diagnostics, list) or not raw_diagnostics:
-        return
-    lines = []
-    for diag in raw_diagnostics:
-        if not isinstance(diag, dict):
-            continue
-        lines.append(
-            f"- {diag.get('path', '')} [{diag.get('code', '')}] "
-            f"{diag.get('message', '')}"
-        )
-    _CONSOLE.print(
-        Panel(
-            "\n".join(lines) if lines else "No diagnostics.",
-            title="Job Diagnostics",
-            border_style="yellow",
-            expand=True,
-        )
-    )
-
-
-def _render_job_run(result: CommandResult) -> bool:
-    """Render `/jobs run` success payload in concise panel.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when panel render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    if data is None:
-        return False
-    job_id = str(data.get("job_id", "")).strip()
-    run_id = str(data.get("run_id", "")).strip()
-    status = str(data.get("status", "")).strip()
-    run_path = str(data.get("run_path", "")).strip()
-    if not job_id or not run_id:
-        return False
-    _CONSOLE.print(
-        Panel(
-            (
-                f"Job: [bold]{job_id}[/bold]\n"
-                f"Run: [bold]{run_id}[/bold]\n"
-                f"Status: [bold]{status}[/bold]\n"
-                f"Artifacts: {run_path}"
-            ),
-            title="Job Run",
-            border_style="green",
-            expand=True,
-        )
-    )
-    return True
-
-
-def _render_jobs_tail(result: CommandResult) -> bool:
-    """Render `/jobs tail` output in structured panel form.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when panel render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    if data is None:
-        return False
-    job_id = str(data.get("job_id", "")).strip()
-    run_id = data.get("run_id")
-    lines = data.get("lines")
-    if not job_id:
-        return False
-    if run_id is None:
-        _CONSOLE.print(
-            Panel(
-                f"Job: [bold]{job_id}[/bold]\nNo runs found yet.",
-                title="Job Tail",
-                border_style="yellow",
-                expand=True,
-            )
-        )
-        return True
-    if not isinstance(lines, list):
-        return False
-    text = (
-        "\n".join(str(line) for line in lines) if lines else "(events.jsonl is empty)"
-    )
-    _CONSOLE.print(
-        Panel(
-            f"Job: [bold]{job_id}[/bold]\nRun: [bold]{run_id}[/bold]\n\n{text}",
-            title="Job Tail",
-            border_style="cyan",
-            expand=True,
-        )
-    )
-    return True
-
-
-def _render_jobs_history(result: CommandResult) -> bool:
-    """Render `/jobs history` output in table form.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    if data is None:
-        return False
-    job_id = str(data.get("job_id", "")).strip()
-    raw_entries = data.get("entries")
-    if not job_id or not isinstance(raw_entries, list):
-        return False
-    if not raw_entries:
-        _CONSOLE.print(
-            Panel(
-                f"Job: [bold]{job_id}[/bold]\nNo runs found yet.",
-                title="Job History",
-                border_style="yellow",
-                expand=True,
-            )
-        )
-        return True
-    table = Table(
-        title=f"Job History: {job_id}",
-        show_header=True,
-        header_style="bold cyan",
-    )
-    table.add_column("Run ID", style="bold")
-    table.add_column("Status", style="green")
-    table.add_column("Attempts", style="magenta", no_wrap=True)
-    table.add_column("Started (UTC)")
-    table.add_column("Ended (UTC)")
-    for entry in raw_entries:
-        if not isinstance(entry, dict):
-            continue
-        table.add_row(
-            str(entry.get("run_id", "")),
-            str(entry.get("status", "")),
-            str(entry.get("attempt_count", "")),
-            str(entry.get("started_at", "")),
-            str(entry.get("ended_at", "")),
-        )
-    _CONSOLE.print(table)
-    return True
-
-
-def _render_jobs_scheduler_status(result: CommandResult) -> bool:
-    """Render `/jobs status` diagnostics in table/panel form.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    if data is None:
-        return False
-    started = "yes" if bool(data.get("started")) else "no"
-    registered_jobs = str(data.get("registered_jobs", "0"))
-    sqlite_path = str(data.get("sqlite_path", ""))
-    _CONSOLE.print(
-        Panel(
-            (
-                f"Started: [bold]{started}[/bold]\n"
-                f"Registered Jobs: [bold]{registered_jobs}[/bold]\n"
-                f"State DB: [bold]{sqlite_path}[/bold]"
-            ),
-            title="Scheduler Status",
-            border_style="cyan",
-            expand=True,
-        )
-    )
-    raw_states = data.get("states")
-    if not isinstance(raw_states, list) or not raw_states:
-        return True
-    table = Table(
-        title="Scheduler Job States", show_header=True, header_style="bold cyan"
-    )
-    table.add_column("Job ID", style="bold")
-    table.add_column("State", style="green")
-    table.add_column("Updated (UTC)")
-    for row in raw_states:
-        if not isinstance(row, dict):
-            continue
-        table.add_row(
-            str(row.get("job_id", "")),
-            str(row.get("state", "")),
-            str(row.get("updated_at", "")),
-        )
-    _CONSOLE.print(table)
-    return True
-
-
-def _render_jobs_scheduler_action(result: CommandResult) -> bool:
-    """Render scheduler lifecycle action confirmation panel.
-
-    Args:
-        result: Command result payload.
-
-    Returns:
-        True when render succeeded.
-    """
-    data = result.data if isinstance(result.data, dict) else None
-    if data is None:
-        return False
-    job_id = str(data.get("job_id", "")).strip()
-    action = str(data.get("action", "")).strip()
-    if not job_id or not action:
-        return False
-    _CONSOLE.print(
-        Panel(
-            f"Job: [bold]{job_id}[/bold]\nAction: [bold]{action}[/bold]",
-            title="Scheduler Updated",
-            border_style="green",
-            expand=True,
-        )
-    )
-    return True
+    _RENDERER.render(result)
 
 
 def _execute_once(  # noqa: PLR0913
@@ -1077,12 +99,12 @@ def _execute_once(  # noqa: PLR0913
     """Execute one input line through runtime facade.
 
     Args:
-        text: Raw input text.
+        text: Raw input line.
         bundled_dir: Bundled skills root.
         workspace_dir: Workspace skills root.
-        model_name: Model name for session construction.
+        model_name: Session model name.
         session_file: Session persistence file path.
-        config_file: Optional global config path.
+        config_file: Optional global config file path.
 
     Returns:
         Process exit code.
@@ -1093,6 +115,7 @@ def _execute_once(  # noqa: PLR0913
             workspace_dir=workspace_dir,
             model_name=model_name,
             session_file=session_file,
+            console=_CONSOLE,
         ),
         runtime_builder=lambda: _build_runtime_for_workspace(
             workspace_dir=workspace_dir,
@@ -1137,8 +160,8 @@ def init_command(
 
     Args:
         workspace_dir: Optional workspace skills root override.
-        config_file: Optional global config file path override.
-        overwrite_config: Whether to overwrite existing config payload.
+        config_file: Optional global config path override.
+        overwrite_config: Whether to overwrite existing config.
     """
     _configure_logging()
     effective_workspace_dir = workspace_dir or _default_workspace_dir()
@@ -1201,12 +224,12 @@ def run_command(  # noqa: PLR0913
         text: Raw input line.
         bundled_dir: Optional bundled skills root override.
         workspace_dir: Optional workspace skills root override.
-        model_name: Model identifier for session execution.
-        session_file: Optional persisted session file path override.
-        config_file: Optional global Lily config file path override.
+        model_name: Model identifier for execution.
+        session_file: Optional session file path override.
+        config_file: Optional global config file path override.
 
     Raises:
-        Exit: Raised with command status code for shell integration.
+        Exit: Raised with process-style exit code.
     """
     _configure_logging()
     effective_bundled_dir = bundled_dir or _default_bundled_dir()
@@ -1261,12 +284,12 @@ def repl_command(
     Args:
         bundled_dir: Optional bundled skills root override.
         workspace_dir: Optional workspace skills root override.
-        model_name: Model identifier for session execution.
-        session_file: Optional persisted session file path override.
-        config_file: Optional global Lily config file path override.
+        model_name: Model identifier for execution.
+        session_file: Optional session file path override.
+        config_file: Optional global config file path override.
 
     Raises:
-        Exit: Raised when configured checkpointer cannot be initialized.
+        Exit: Raised when runtime initialization fails.
     """
     _configure_logging()
     _CONSOLE.print(
@@ -1283,6 +306,7 @@ def repl_command(
             workspace_dir=effective_workspace_dir,
             model_name=model_name,
             session_file=effective_session_file,
+            console=_CONSOLE,
         ),
         runtime_builder=lambda: _build_runtime_for_workspace(
             workspace_dir=effective_workspace_dir,
