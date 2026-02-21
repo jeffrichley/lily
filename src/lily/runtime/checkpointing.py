@@ -42,22 +42,6 @@ def _build_memory_backend(settings: CheckpointerSettings) -> CheckpointerBuildRe
     return CheckpointerBuildResult(saver=InMemorySaver(), resolved_sqlite_path=None)
 
 
-def _build_postgres_backend(settings: CheckpointerSettings) -> CheckpointerBuildResult:
-    """Raise explicit contract-only error for unimplemented postgres backend.
-
-    Args:
-        settings: Checkpointer settings payload (unused for current behavior).
-
-    Raises:
-        CheckpointerBuildError: Always, until postgres backend is implemented.
-    """
-    del settings
-    raise CheckpointerBuildError(
-        "Checkpointer backend 'postgres' is a configured profile contract but "
-        "is not implemented in this build. Supported backends: sqlite, memory."
-    )
-
-
 def _build_sqlite_backend(settings: CheckpointerSettings) -> CheckpointerBuildResult:
     """Build sqlite checkpointer backend with deterministic path resolution.
 
@@ -88,7 +72,6 @@ def _build_sqlite_backend(settings: CheckpointerSettings) -> CheckpointerBuildRe
 _STRATEGY_REGISTRY: dict[CheckpointerBackend, CheckpointerStrategy] = {
     CheckpointerBackend.MEMORY: _build_memory_backend,
     CheckpointerBackend.SQLITE: _build_sqlite_backend,
-    CheckpointerBackend.POSTGRES: _build_postgres_backend,
 }
 
 

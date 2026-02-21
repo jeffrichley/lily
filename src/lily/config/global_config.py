@@ -17,7 +17,6 @@ class CheckpointerBackend(StrEnum):
 
     SQLITE = "sqlite"
     MEMORY = "memory"
-    POSTGRES = "postgres"
 
 
 class CheckpointerSettings(BaseModel):
@@ -27,7 +26,6 @@ class CheckpointerSettings(BaseModel):
 
     backend: CheckpointerBackend = CheckpointerBackend.SQLITE
     sqlite_path: str = ".lily/checkpoints/checkpointer.sqlite"
-    postgres_dsn: str | None = None
 
 
 class MemoryToolingSettings(BaseModel):

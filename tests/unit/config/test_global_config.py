@@ -61,25 +61,27 @@ def test_load_global_config_reads_custom_backend(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-def test_load_global_config_reads_postgres_contract_fields(tmp_path: Path) -> None:
-    """Config loader should parse postgres contract fields when provided."""
-    # Arrange - config file with postgres checkpointer and dsn
+def test_load_global_config_rejects_postgres_checkpointer_backend(
+    tmp_path: Path,
+) -> None:
+    """Config loader should reject unsupported postgres checkpointer backend."""
+    # Arrange - config file using removed postgres backend identifier
     config_path = tmp_path / "config.json"
     config_path.write_text(
-        (
-            "{"
-            '"checkpointer":{"backend":"postgres","postgres_dsn":"postgresql://x:y@z/db"}'
-            "}"
-        ),
+        ('{"checkpointer":{"backend":"postgres"}}'),
         encoding="utf-8",
     )
 
     # Act - load config
-    config = load_global_config(config_path)
-
-    # Assert - postgres backend and dsn
-    assert config.checkpointer.backend == CheckpointerBackend.POSTGRES
-    assert config.checkpointer.postgres_dsn == "postgresql://x:y@z/db"
+    try:
+        load_global_config(config_path)
+    except GlobalConfigError as exc:
+        # Assert - deterministic enum validation mentioning allowed values
+        assert "checkpointer.backend" in str(exc)
+        assert "sqlite" in str(exc)
+        assert "memory" in str(exc)
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("Expected GlobalConfigError")
 
 
 @pytest.mark.unit

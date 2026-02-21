@@ -11,7 +11,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from lily.config import CheckpointerBackend, CheckpointerSettings
-from lily.runtime.checkpointing import CheckpointerBuildError, build_checkpointer
+from lily.runtime.checkpointing import build_checkpointer
 
 
 @pytest.mark.unit
@@ -99,23 +99,3 @@ def test_sqlite_checkpointer_persists_history_and_replay_across_restart(
     )
     assert replay is not None
     saver_two.conn.close()
-
-
-@pytest.mark.unit
-def test_build_checkpointer_postgres_contract_errors_until_implemented() -> None:
-    """Postgres backend should fail with explicit deterministic message for now."""
-    # Arrange - settings with postgres backend
-    # Act - build (expect exception)
-    try:
-        build_checkpointer(
-            CheckpointerSettings(
-                backend=CheckpointerBackend.POSTGRES,
-                postgres_dsn="postgresql://user:pass@localhost/lily",
-            )
-        )
-    except CheckpointerBuildError as exc:
-        # Assert - not implemented message
-        assert "not implemented" in str(exc)
-        assert "Supported backends: sqlite, memory" in str(exc)
-    else:  # pragma: no cover - defensive assertion
-        raise AssertionError("Expected CheckpointerBuildError")

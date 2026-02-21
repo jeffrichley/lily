@@ -68,7 +68,7 @@ Goal: replace ephemeral `InMemorySaver` runtime behavior with persistent checkpo
 - [x] Add persistent checkpointer adapter selection (`sqlite` first).
 - [x] Define backend profile policy:
   - [x] local profile (`sqlite`)
-  - [x] production-ready profile contract (`postgres`/managed saver)
+  - [x] keep runtime scope to implemented backends only (`sqlite`, `memory`)
 - [x] Keep `thread_id = session_id` invariant.
 - [x] Add config contract wiring from global Lily config to runtime construction.
 - [x] Add restart/resume support tests for checkpointer continuity.
