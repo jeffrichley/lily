@@ -8,6 +8,10 @@ set shell := ["sh", "-cu"]
 test:
     uv run pytest
 
+# Run end-to-end tests only
+e2e:
+    uv run pytest tests/e2e
+
 # Run personality quality gates (Gate C / Phase 7)
 eval-gates:
     uv run pytest tests/unit/evals/test_baseline.py tests/unit/evals/test_phase7_quality.py
@@ -107,8 +111,8 @@ quality: format lint types complexity vulture darglint audit bandit radon find-d
 # Same gates as quality but check-only (no format write, no lint fix). Use in CI so PR fails if not clean.
 quality-check: format-check lint-check types complexity vulture darglint audit bandit radon find-dupes docstr-coverage docs-check
 
-# CI-ready aggregate gates: static checks + eval thresholds.
-ci-gates: quality-check contract-conformance eval-gates
+# CI-ready aggregate gates: static checks + eval thresholds + e2e coverage.
+ci-gates: quality-check contract-conformance eval-gates e2e
 
 # Contract conformance lane (typed envelopes + wrapper compatibility).
 contract-conformance:
