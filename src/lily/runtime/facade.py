@@ -2,41 +2,22 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
-from lily.commands.handlers._memory_support import (
-    build_personality_namespace,
-    build_personality_repository,
-    build_task_namespace,
-    build_task_repository,
-    resolve_store_file,
-)
 from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
 from lily.config import SecuritySettings
-from lily.memory import (
-    ConsolidationBackend,
-    ConsolidationRequest,
-    EvidenceChunkingSettings,
-    LangMemManagerConsolidationEngine,
-    LangMemToolingAdapter,
-    PromptMemoryRetrievalService,
-    RuleBasedConsolidationEngine,
-)
-from lily.persona import FilePersonaRepository, PersonaProfile, default_persona_root
-from lily.prompting import PersonaContext, PersonaStyleLevel, PromptMode
-from lily.runtime.conversation import (
-    ConversationExecutionError,
-    ConversationExecutor,
-    ConversationRequest,
-    ConversationResponse,
-)
+from lily.memory import ConsolidationBackend, EvidenceChunkingSettings
+from lily.persona import FilePersonaRepository, default_persona_root
+from lily.runtime.consolidation_scheduler import ConsolidationScheduler
+from lily.runtime.conversation import ConversationExecutor
 from lily.runtime.conversation_factory import ConversationRuntimeFactory
+from lily.runtime.conversation_orchestrator import ConversationOrchestrator
 from lily.runtime.jobs_factory import JobsFactory
+from lily.runtime.memory_summary_provider import MemorySummaryProvider
 from lily.runtime.runtime_dependencies import (
     ConversationRuntimeSpec,
     JobsSpec,
@@ -46,23 +27,7 @@ from lily.runtime.runtime_dependencies import (
 from lily.runtime.security import SecurityPrompt
 from lily.runtime.session_lanes import run_in_session_lane
 from lily.runtime.tooling_factory import ToolingFactory
-from lily.session.models import (
-    HistoryCompactionBackend,
-    HistoryCompactionConfig,
-    Message,
-    MessageRole,
-    Session,
-)
-
-_FOCUS_HINT_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(
-        r"\b(urgent|asap|critical|incident|prod|production|outage)\b", re.IGNORECASE
-    ),
-    re.compile(r"\b(error|failure|broken|fix now)\b", re.IGNORECASE),
-)
-_PLAYFUL_HINT_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"\b(fun|joke|playful|celebrate|party|lighten up)\b", re.IGNORECASE),
-)
+from lily.session.models import HistoryCompactionBackend, Message, MessageRole, Session
 
 
 class RuntimeFacade:
@@ -121,50 +86,58 @@ class RuntimeFacade:
             conversation_factory: Optional conversation composition root override.
             conversation_executor: Optional conversation executor override.
         """
-        self._consolidation_enabled = consolidation_enabled
-        self._consolidation_backend = consolidation_backend
-        self._consolidation_llm_assisted_enabled = consolidation_llm_assisted_enabled
-        self._consolidation_auto_run_every_n_turns = (
-            consolidation_auto_run_every_n_turns
-        )
-        self._compaction_backend = compaction_backend
-        self._compaction_max_tokens = compaction_max_tokens
-        effective_security = security or SecuritySettings()
-        effective_project_root = project_root or Path.cwd()
-        effective_workspace_root = workspace_root or Path.cwd() / ".lily"
         self._persona_repository = persona_repository or FilePersonaRepository(
             root_dir=default_persona_root()
         )
+        self._memory_summary_provider = MemorySummaryProvider()
+        self._consolidation_scheduler = ConsolidationScheduler(
+            enabled=consolidation_enabled,
+            backend=consolidation_backend,
+            llm_assisted_enabled=consolidation_llm_assisted_enabled,
+            auto_run_every_n_turns=consolidation_auto_run_every_n_turns,
+        )
+
         if dependencies is not None:
             self._command_registry = dependencies.command_registry
             self._conversation_executor = dependencies.conversation_executor
             self._jobs_scheduler_runtime = dependencies.jobs_scheduler_runtime
-            return
+        else:
+            effective_security = security or SecuritySettings()
+            effective_project_root = project_root or Path.cwd()
+            effective_workspace_root = workspace_root or Path.cwd() / ".lily"
+            resolved = self._compose_dependencies(
+                command_registry=command_registry,
+                conversation_executor=conversation_executor,
+                conversation_checkpointer=conversation_checkpointer,
+                memory_tooling_enabled=memory_tooling_enabled,
+                memory_tooling_auto_apply=memory_tooling_auto_apply,
+                consolidation_enabled=consolidation_enabled,
+                consolidation_backend=consolidation_backend,
+                consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
+                evidence_chunking=evidence_chunking,
+                compaction_backend=compaction_backend,
+                compaction_max_tokens=compaction_max_tokens,
+                security=effective_security,
+                security_prompt=security_prompt,
+                project_root=effective_project_root,
+                workspace_root=effective_workspace_root,
+                jobs_scheduler_enabled=jobs_scheduler_enabled,
+                tooling_factory=tooling_factory or ToolingFactory(),
+                jobs_factory=jobs_factory or JobsFactory(),
+                conversation_factory=conversation_factory
+                or ConversationRuntimeFactory(),
+            )
+            self._command_registry = resolved.command_registry
+            self._conversation_executor = resolved.conversation_executor
+            self._jobs_scheduler_runtime = resolved.jobs_scheduler_runtime
 
-        resolved = self._compose_dependencies(
-            command_registry=command_registry,
-            conversation_executor=conversation_executor,
-            conversation_checkpointer=conversation_checkpointer,
-            memory_tooling_enabled=memory_tooling_enabled,
-            memory_tooling_auto_apply=memory_tooling_auto_apply,
-            consolidation_enabled=consolidation_enabled,
-            consolidation_backend=consolidation_backend,
-            consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
-            evidence_chunking=evidence_chunking,
+        self._conversation_orchestrator = ConversationOrchestrator(
+            conversation_executor=self._conversation_executor,
+            persona_repository=self._persona_repository,
+            memory_summary_provider=self._memory_summary_provider,
             compaction_backend=compaction_backend,
             compaction_max_tokens=compaction_max_tokens,
-            security=effective_security,
-            security_prompt=security_prompt,
-            project_root=effective_project_root,
-            workspace_root=effective_workspace_root,
-            jobs_scheduler_enabled=jobs_scheduler_enabled,
-            tooling_factory=tooling_factory or ToolingFactory(),
-            jobs_factory=jobs_factory or JobsFactory(),
-            conversation_factory=conversation_factory or ConversationRuntimeFactory(),
         )
-        self._command_registry = resolved.command_registry
-        self._conversation_executor = resolved.conversation_executor
-        self._jobs_scheduler_runtime = resolved.jobs_scheduler_runtime
 
     def handle_input(self, text: str, session: Session) -> CommandResult:
         """Route one user turn to command or conversational path.
@@ -213,196 +186,10 @@ class RuntimeFacade:
             self._record_turn(session, user_text=text, assistant_text=result.message)
             return result
 
-        result = self._run_conversation(text=text, session=session)
+        result = self._conversation_orchestrator.run_turn(text=text, session=session)
         self._record_turn(session, user_text=text, assistant_text=result.message)
-        self._maybe_run_scheduled_consolidation(session)
+        self._consolidation_scheduler.maybe_run(session)
         return result
-
-    def _run_conversation(self, *, text: str, session: Session) -> CommandResult:
-        """Run non-command conversational turn through conversation executor.
-
-        Args:
-            text: Raw conversation input text.
-            session: Active session context.
-
-        Returns:
-            Deterministic conversation command result envelope.
-        """
-        persona = self._resolve_persona(session.active_agent)
-        style_level = (
-            session.active_style or _derive_context_style(text) or persona.default_style
-        )
-        request = ConversationRequest(
-            session_id=session.session_id,
-            user_text=text,
-            model_name=session.model_settings.model_name,
-            history=tuple(session.conversation_state),
-            limits=session.model_settings.conversation_limits.model_copy(
-                update={
-                    "compaction": HistoryCompactionConfig(
-                        backend=self._compaction_backend,
-                        max_tokens=self._compaction_max_tokens,
-                    )
-                }
-            ),
-            memory_summary=self._build_memory_summary(
-                session=session,
-                user_text=text,
-            ),
-            persona_context=PersonaContext(
-                active_persona_id=persona.persona_id,
-                style_level=style_level,
-                persona_summary=persona.summary,
-                persona_instructions=persona.instructions,
-                session_hints=(
-                    f"conversation_events={len(session.conversation_state)}",
-                    f"style={style_level.value}",
-                ),
-            ),
-            prompt_mode=PromptMode.FULL,
-        )
-        try:
-            response = self._conversation_executor.run(request)
-        except ConversationExecutionError as exc:
-            return CommandResult.error(
-                f"Error: {exc}",
-                code=exc.code,
-            )
-        return self._conversation_result(response)
-
-    @staticmethod
-    def _conversation_result(response: ConversationResponse) -> CommandResult:
-        """Convert conversation response to deterministic command envelope.
-
-        Args:
-            response: Normalized conversation response.
-
-        Returns:
-            Deterministic successful command result.
-        """
-        return CommandResult.ok(
-            response.text,
-            code="conversation_reply",
-            data={"route": "conversation"},
-        )
-
-    def _build_memory_summary(self, *, session: Session, user_text: str) -> str:
-        """Build repository-backed memory summary for prompt injection.
-
-        Args:
-            session: Active session state.
-            user_text: Current user turn text.
-
-        Returns:
-            Retrieved memory summary string, or empty when unavailable.
-        """
-        personality_repository = build_personality_repository(session)
-        task_repository = build_task_repository(session)
-        if personality_repository is None or task_repository is None:
-            return ""
-        retrieval = PromptMemoryRetrievalService(
-            personality_repository=personality_repository,
-            task_repository=task_repository,
-        )
-        personality_namespaces = {
-            domain: build_personality_namespace(session=session, domain=domain)
-            for domain in ("working_rules", "persona_core", "user_profile")
-        }
-        task_namespaces = (build_task_namespace(task=session.session_id),)
-        try:
-            return retrieval.build_memory_summary(
-                user_text=user_text,
-                personality_namespaces=personality_namespaces,
-                task_namespaces=task_namespaces,
-            )
-        except Exception:  # pragma: no cover - defensive fallback
-            return ""
-
-    def _resolve_persona(self, persona_id: str) -> PersonaProfile:
-        """Resolve active persona profile with deterministic fallback.
-
-        Args:
-            persona_id: Session active persona identifier.
-
-        Returns:
-            Loaded persona profile or safe fallback profile.
-        """
-        profile = self._persona_repository.get(persona_id)
-        if profile is not None:
-            return profile
-        return PersonaProfile(
-            persona_id=persona_id,
-            summary="Fallback persona profile.",
-            default_style=PersonaStyleLevel.BALANCED,
-            instructions="Provide clear, accurate, and concise assistance.",
-        )
-
-    def _maybe_run_scheduled_consolidation(self, session: Session) -> None:
-        """Run periodic consolidation when scheduled interval is met.
-
-        Args:
-            session: Active session.
-        """
-        if not self._should_run_scheduled_consolidation(session):
-            return
-        self._run_scheduled_consolidation(session)
-
-    def _should_run_scheduled_consolidation(self, session: Session) -> bool:
-        """Check whether scheduled consolidation should run for this turn.
-
-        Args:
-            session: Active session.
-
-        Returns:
-            Whether scheduled consolidation should run now.
-        """
-        if not self._consolidation_enabled:
-            return False
-        interval = self._consolidation_auto_run_every_n_turns
-        if interval < 1:
-            return False
-        user_turns = sum(
-            1 for event in session.conversation_state if event.role == MessageRole.USER
-        )
-        return user_turns > 0 and user_turns % interval == 0
-
-    def _run_scheduled_consolidation(self, session: Session) -> None:
-        """Run scheduled consolidation once for current session state.
-
-        Args:
-            session: Active session.
-        """
-        request = ConsolidationRequest(
-            session_id=session.session_id,
-            history=tuple(session.conversation_state),
-            personality_namespace=build_personality_namespace(
-                session=session,
-                domain="user_profile",
-            ),
-            enabled=True,
-            backend=self._consolidation_backend,
-            llm_assisted_enabled=self._consolidation_llm_assisted_enabled,
-            dry_run=False,
-        )
-        try:
-            if self._consolidation_backend == ConsolidationBackend.RULE_BASED:
-                personality_repository = build_personality_repository(session)
-                task_repository = build_task_repository(session)
-                if personality_repository is None:
-                    return
-                RuleBasedConsolidationEngine(
-                    personality_repository=personality_repository,
-                    task_repository=task_repository,
-                ).run(request)
-                return
-            store_file = resolve_store_file(session)
-            if store_file is None:
-                return
-            LangMemManagerConsolidationEngine(
-                tooling_adapter=LangMemToolingAdapter(store_file=store_file)
-            ).run(request)
-        except Exception:  # pragma: no cover - best effort scheduling
-            return
 
     @staticmethod
     def _record_turn(session: Session, *, user_text: str, assistant_text: str) -> None:
@@ -515,22 +302,3 @@ class RuntimeFacade:
             conversation_executor=effective_conversation_executor,
             jobs_scheduler_runtime=scheduler_runtime,
         )
-
-
-def _derive_context_style(user_text: str) -> PersonaStyleLevel | None:
-    """Derive style hint from user turn content.
-
-    Args:
-        user_text: Raw user input text.
-
-    Returns:
-        Suggested style level when a context marker is detected.
-    """
-    text = user_text.strip()
-    for pattern in _FOCUS_HINT_PATTERNS:
-        if pattern.search(text):
-            return PersonaStyleLevel.FOCUS
-    for pattern in _PLAYFUL_HINT_PATTERNS:
-        if pattern.search(text):
-            return PersonaStyleLevel.PLAYFUL
-    return None
