@@ -7,7 +7,7 @@ import pytest
 from lily.commands.types import CommandResult
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_tool_dispatch_success_e2e(e2e_env: object) -> None:
     """Builtin tool-dispatch should execute add skill deterministically."""
     # Arrange - bundled add skill configured for tool_dispatch
@@ -34,7 +34,7 @@ def test_tool_dispatch_success_e2e(e2e_env: object) -> None:
     assert "12" in result.stdout
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_tool_dispatch_validation_failure_e2e(e2e_env: object) -> None:
     """Invalid tool payload should return deterministic validation error."""
     # Arrange - bundled add skill configured for tool_dispatch
@@ -61,7 +61,7 @@ def test_tool_dispatch_validation_failure_e2e(e2e_env: object) -> None:
     assert "invalid input for tool 'add'" in result.stdout
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_tool_dispatch_provider_error_path_e2e(e2e_env: object) -> None:
     """Unbound provider should return deterministic provider error."""
     # Arrange - bundled skill with unknown provider binding
@@ -88,7 +88,7 @@ def test_tool_dispatch_provider_error_path_e2e(e2e_env: object) -> None:
     assert "tool provider 'unknown'" in result.stdout
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_conversation_happy_path_e2e(
     monkeypatch: pytest.MonkeyPatch, e2e_env: object
 ) -> None:
@@ -120,7 +120,7 @@ def test_conversation_happy_path_e2e(
     assert "hello human" in result.stdout
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_conversation_guardrail_denial_e2e(
     monkeypatch: pytest.MonkeyPatch, e2e_env: object
 ) -> None:
@@ -154,7 +154,7 @@ def test_conversation_guardrail_denial_e2e(
     assert "Policy denied." in result.stdout
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_multi_client_parity_run_vs_repl(
     monkeypatch: pytest.MonkeyPatch, e2e_env: object
 ) -> None:

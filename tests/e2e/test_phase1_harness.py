@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_init_run_and_session_persisted(e2e_env: object) -> None:
     """`init -> run` should create deterministic persisted session artifacts."""
     # Arrange - one bundled skill and initialized environment

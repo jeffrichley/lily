@@ -5,6 +5,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
 from langchain.agents import create_agent
@@ -149,6 +150,33 @@ class AgentRunner(Protocol):
         """Release runner resources when supported."""
 
 
+@dataclass(frozen=True)
+class _AgentBuildKey:
+    """Deterministic key for cached LangChain graph bundles."""
+
+    model_name: str
+    middleware_profile: str
+
+
+class _InvokableAgent(Protocol):
+    """Protocol for cached agent graph objects."""
+
+    def invoke(
+        self,
+        payload: object,
+        *,
+        config: object,
+        context: object,
+    ) -> object:
+        """Invoke one agent turn.
+
+        Args:
+            payload: Invocation payload (messages state).
+            config: LangGraph invoke config.
+            context: Runtime context payload.
+        """
+
+
 class _LangChainAgentRunner:
     """Default LangChain v1/graph runner with in-memory checkpointer."""
 
@@ -166,6 +194,10 @@ class _LangChainAgentRunner:
         """
         self._checkpointer = checkpointer or InMemorySaver()
         self._prompt_builder = prompt_builder or PromptBuilder()
+        self._middleware_profile = "lily.prompt.before.after.tool_guardrail.v1"
+        self._agent_cache: dict[_AgentBuildKey, _InvokableAgent] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
 
     def run(self, *, request: ConversationRequest) -> object:
         """Invoke LangChain agent for one conversation turn.
@@ -176,15 +208,8 @@ class _LangChainAgentRunner:
         Returns:
             Raw LangChain invocation payload.
         """
-        middleware = self._build_middleware()
-        agent = create_agent(
-            model=request.model_name,
-            tools=[],
-            system_prompt=_DEFAULT_SYSTEM_PROMPT,
-            checkpointer=self._checkpointer,
-            context_schema=ConversationRuntimeContext,
-            middleware=middleware,
-        )
+        key = self._resolve_build_key(request)
+        agent = self._get_or_build_agent(key)
         messages = _build_messages(request)
         payload: dict[str, Any] = {"messages": messages}
         config = _build_agent_invoke_config(request)
@@ -199,6 +224,72 @@ class _LangChainAgentRunner:
             cast(Any, payload),
             config=cast(Any, config),
             context=runtime_context,
+        )
+
+    def _resolve_build_key(self, request: ConversationRequest) -> _AgentBuildKey:
+        """Resolve deterministic cache key for graph-shaping runtime inputs.
+
+        Args:
+            request: Normalized request.
+
+        Returns:
+            Stable key used for cache lookup.
+        """
+        return _AgentBuildKey(
+            model_name=request.model_name.strip(),
+            middleware_profile=self._middleware_profile,
+        )
+
+    def _get_or_build_agent(self, key: _AgentBuildKey) -> _InvokableAgent:
+        """Get cached agent graph or build one for provided key.
+
+        Args:
+            key: Deterministic graph build key.
+
+        Returns:
+            Cached or newly built agent instance.
+        """
+        cached = self._agent_cache.get(key)
+        if cached is not None:
+            self._cache_hits += 1
+            _LOGGER.debug(
+                "conversation.agent_cache hit model=%s hits=%s misses=%s",
+                key.model_name,
+                self._cache_hits,
+                self._cache_misses,
+            )
+            return cached
+        self._cache_misses += 1
+        _LOGGER.debug(
+            "conversation.agent_cache miss model=%s hits=%s misses=%s",
+            key.model_name,
+            self._cache_hits,
+            self._cache_misses,
+        )
+        agent = self._build_agent(model_name=key.model_name)
+        self._agent_cache[key] = agent
+        return agent
+
+    def _build_agent(self, *, model_name: str) -> _InvokableAgent:
+        """Build one LangChain agent graph instance for a model.
+
+        Args:
+            model_name: Resolved model identifier.
+
+        Returns:
+            LangChain agent graph instance.
+        """
+        middleware = self._build_middleware()
+        return cast(
+            _InvokableAgent,
+            create_agent(
+                model=model_name,
+                tools=[],
+                system_prompt=_DEFAULT_SYSTEM_PROMPT,
+                checkpointer=self._checkpointer,
+                context_schema=ConversationRuntimeContext,
+                middleware=middleware,
+            ),
         )
 
     def _build_middleware(self) -> tuple[Any, ...]:
@@ -216,6 +307,7 @@ class _LangChainAgentRunner:
 
     def close(self) -> None:
         """Close underlying checkpointer resources when available."""
+        self.invalidate_cache(reason="runner_close")
         maybe_close = getattr(self._checkpointer, "close", None)
         if callable(maybe_close):
             maybe_close()
@@ -224,6 +316,32 @@ class _LangChainAgentRunner:
         conn_close = getattr(conn, "close", None)
         if callable(conn_close):
             conn_close()
+
+    def invalidate_cache(self, *, reason: str) -> None:
+        """Invalidate cached agent graphs.
+
+        Args:
+            reason: Deterministic invalidation reason for observability.
+        """
+        size = len(self._agent_cache)
+        self._agent_cache.clear()
+        _LOGGER.debug(
+            "conversation.agent_cache invalidated reason=%s cleared=%s",
+            reason,
+            size,
+        )
+
+    def cache_metrics(self) -> dict[str, int]:
+        """Return deterministic cache counters for diagnostics/tests.
+
+        Returns:
+            Cache metrics payload.
+        """
+        return {
+            "size": len(self._agent_cache),
+            "hits": self._cache_hits,
+            "misses": self._cache_misses,
+        }
 
 
 class ToolGuardrailMiddleware(

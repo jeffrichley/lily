@@ -7,7 +7,7 @@ import pytest
 from lily.commands.types import CommandResult
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_security_approval_required_and_deny_paths(
     monkeypatch: pytest.MonkeyPatch, e2e_env: object
 ) -> None:
@@ -54,7 +54,7 @@ def test_security_approval_required_and_deny_paths(
     assert "approval_denied" in denied.stdout
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_security_run_once_always_allow_and_hash_changed_lifecycle(
     monkeypatch: pytest.MonkeyPatch, e2e_env: object
 ) -> None:

@@ -33,7 +33,7 @@ def _write_job_spec(workspace_root: Path, *, trigger_type: str = "manual") -> No
     )
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_memory_long_and_evidence_e2e(e2e_env: object) -> None:
     """Memory show/evidence ingest/evidence show should work end-to-end."""
     # Arrange - initialized workspace and evidence source text file
@@ -61,7 +61,7 @@ def test_memory_long_and_evidence_e2e(e2e_env: object) -> None:
     assert "Semantic Evidence" in evidence.stdout
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_jobs_lifecycle_and_artifacts_e2e(e2e_env: object) -> None:
     """Jobs list/run/tail/history should execute and emit artifacts."""
     # Arrange - initialized workspace with one manual job spec
@@ -90,7 +90,7 @@ def test_jobs_lifecycle_and_artifacts_e2e(e2e_env: object) -> None:
     assert (latest / "events.jsonl").exists()
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_scheduler_controls_e2e(e2e_env: object) -> None:
     """Scheduler status/pause/resume/disable flows should run end-to-end."""
     # Arrange - initialized workspace with one cron job spec

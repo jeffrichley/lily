@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_repl_restart_continuity(e2e_env: object) -> None:
     """Persona/style changes should persist across REPL restarts."""
     # Arrange - initialized workspace and first REPL session
@@ -23,7 +23,7 @@ def test_repl_restart_continuity(e2e_env: object) -> None:
     assert "playful" in second.stdout
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_slash_alias_command_e2e(e2e_env: object) -> None:
     """Frontmatter `command` alias should execute its mapped skill."""
     # Arrange - bundled alias skill
@@ -50,7 +50,7 @@ def test_slash_alias_command_e2e(e2e_env: object) -> None:
     assert "62" in result.stdout
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_reload_skills_after_filesystem_change(e2e_env: object) -> None:
     """`/reload_skills` should pick up newly added workspace skills."""
     # Arrange - initialized workspace with no adder skill yet
@@ -80,7 +80,7 @@ def test_reload_skills_after_filesystem_change(e2e_env: object) -> None:
     assert "adder - Workspace add" in after.stdout
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_reload_persona_command_e2e(e2e_env: object) -> None:
     """`/reload_persona` should execute successfully for active persona repository."""
     # Arrange - initialized workspace
@@ -94,7 +94,7 @@ def test_reload_persona_command_e2e(e2e_env: object) -> None:
     assert result.exit_code == 0
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_corrupt_session_recovery_e2e(e2e_env: object) -> None:
     """Corrupt session should be recovered with backup and new session payload."""
     # Arrange - corrupt persisted session payload
@@ -113,7 +113,7 @@ def test_corrupt_session_recovery_e2e(e2e_env: object) -> None:
     assert env.session_file.exists()
 
 
-@pytest.mark.integration
+@pytest.mark.e2e
 def test_invalid_config_falls_back_to_defaults(e2e_env: object) -> None:
     """Invalid config should warn and continue with defaults."""
     # Arrange - invalid config and one bundled skill

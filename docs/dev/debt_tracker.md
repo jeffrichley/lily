@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-21"
+last_updated: "2026-02-22"
 status: "active"
 source_of_truth: true
 ---
@@ -59,6 +59,17 @@ Priority scale:
     - AAA enabled in `basic` mode; file-length rule configured (`max=1200`, `mode=warn`)
     - full gate run passes with plugin active via `just quality test`
 
+- [ ] Unify duplicated memory repository behavior across file/store backends
+  - Owner: `@team`
+  - Target: `2026-03-20`
+  - Current state:
+    - `src/lily/memory/file_repository.py` and `src/lily/memory/store_repository.py` each implement similar validation/policy/upsert logic and read/filter/sort/metrics paths.
+    - drift risk remains when fixes land in one backend but not the other.
+  - Exit criteria:
+    - shared repository-core service (or equivalent) owns common policy/validation/upsert/filter/sort behavior
+    - file/store repositories are thin adapters over backend I/O
+    - cross-backend parity tests validate equivalent behavior for core operations
+
 ### P3
 
 - [ ] Add scheduled jobs for run-artifact cleanup and self-learning pipelines
@@ -87,6 +98,18 @@ Priority scale:
     - documented lock strategy for session/checkpoint/memory paths
     - conflict/failure behavior defined
     - concurrency tests include multi-process cases
+
+- [ ] Split oversized test modules into focused suites
+  - Owner: `@team`
+  - Target: `2026-03-10`
+  - Current state:
+    - `tests/unit/commands/test_command_surface.py` is large (~1142 LOC)
+    - `tests/unit/cli/test_cli.py` is large (~708 LOC)
+    - reviewability and targeted refactors are harder than necessary
+  - Exit criteria:
+    - command-surface tests are split by domain (for example skills/persona/memory/jobs)
+    - CLI tests are split by concern (bootstrap/run/repl/rendering)
+    - no behavior contract coverage is lost during split
 
 - [x] Consolidate planning docs to reduce stale duplication
   - Owner: `@team`

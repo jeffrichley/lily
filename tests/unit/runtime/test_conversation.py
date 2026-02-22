@@ -7,6 +7,7 @@ import time
 import pytest
 from langgraph.errors import GraphRecursionError
 
+from lily.commands.types import CommandResult
 from lily.runtime.conversation import (
     ConversationExecutionError,
     ConversationRequest,
@@ -194,6 +195,37 @@ class _ConversationCaptureExecutor:
         """Capture request and return deterministic response."""
         self.last_request = request
         return ConversationResponse(text="ok")
+
+
+class _ConversationInvalidationCaptureExecutor:
+    """Conversation executor fixture that records cache invalidation reasons."""
+
+    def __init__(self) -> None:
+        """Initialize invalidation reason capture."""
+        self.reasons: list[str] = []
+
+    def run(self, request: ConversationRequest) -> ConversationResponse:
+        """Return deterministic response."""
+        del request
+        return ConversationResponse(text="ok")
+
+    def invalidate_cache(self, *, reason: str) -> None:
+        """Capture invalidation reason invoked by runtime facade."""
+        self.reasons.append(reason)
+
+
+class _CommandRegistryFixedResult:
+    """Command registry fixture that returns one fixed command result."""
+
+    def __init__(self, result: CommandResult) -> None:
+        """Store deterministic command result."""
+        self._result = result
+
+    def dispatch(self, command: object, session: object) -> CommandResult:
+        """Return fixed command result regardless of command payload."""
+        del command
+        del session
+        return self._result
 
 
 def _session() -> Session:
@@ -435,6 +467,105 @@ def test_langchain_runner_builds_tool_guardrail_middleware() -> None:
 
 
 @pytest.mark.unit
+def test_langchain_runner_reuses_agent_graph_for_same_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Runner should build once and reuse graph for same-model turns."""
+    # Arrange - runner and create_agent spy
+    calls = {"count": 0}
+
+    class _FakeAgent:
+        def invoke(self, payload: object, *, config: object, context: object) -> object:
+            del payload
+            del config
+            del context
+            return {"messages": [{"role": "assistant", "content": "ok"}]}
+
+    def _fake_create_agent(**kwargs: object) -> object:
+        del kwargs
+        calls["count"] += 1
+        return _FakeAgent()
+
+    monkeypatch.setattr("lily.runtime.conversation.create_agent", _fake_create_agent)
+    runner = _LangChainAgentRunner()
+
+    # Act - run two turns with same model
+    _ = runner.run(request=_request(user_text="first"))
+    _ = runner.run(request=_request(user_text="second"))
+
+    # Assert - graph built once and cache hit recorded
+    assert calls["count"] == 1
+    assert runner.cache_metrics()["hits"] >= 1
+
+
+@pytest.mark.unit
+def test_langchain_runner_rebuilds_agent_graph_for_model_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Runner should rebuild agent graph when model identifier changes."""
+    # Arrange - runner and create_agent spy
+    calls = {"count": 0}
+
+    class _FakeAgent:
+        def invoke(self, payload: object, *, config: object, context: object) -> object:
+            del payload
+            del config
+            del context
+            return {"messages": [{"role": "assistant", "content": "ok"}]}
+
+    def _fake_create_agent(**kwargs: object) -> object:
+        del kwargs
+        calls["count"] += 1
+        return _FakeAgent()
+
+    monkeypatch.setattr("lily.runtime.conversation.create_agent", _fake_create_agent)
+    runner = _LangChainAgentRunner()
+
+    # Act - run with two different models
+    _ = runner.run(request=_request(user_text="first"))
+    _ = runner.run(
+        request=_request(user_text="second").model_copy(update={"model_name": "other"})
+    )
+
+    # Assert - graph built once per model
+    assert calls["count"] == 2
+    assert runner.cache_metrics()["size"] == 2
+
+
+@pytest.mark.unit
+def test_langchain_runner_cache_invalidation_forces_rebuild(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explicit cache invalidation should force rebuild on next same-model turn."""
+    # Arrange - runner and create_agent spy
+    calls = {"count": 0}
+
+    class _FakeAgent:
+        def invoke(self, payload: object, *, config: object, context: object) -> object:
+            del payload
+            del config
+            del context
+            return {"messages": [{"role": "assistant", "content": "ok"}]}
+
+    def _fake_create_agent(**kwargs: object) -> object:
+        del kwargs
+        calls["count"] += 1
+        return _FakeAgent()
+
+    monkeypatch.setattr("lily.runtime.conversation.create_agent", _fake_create_agent)
+    runner = _LangChainAgentRunner()
+
+    # Act - run, invalidate, then rerun same model
+    _ = runner.run(request=_request(user_text="first"))
+    runner.invalidate_cache(reason="skills_reloaded")
+    _ = runner.run(request=_request(user_text="second"))
+
+    # Assert - rebuild happened after invalidation
+    assert calls["count"] == 2
+    assert runner.cache_metrics()["size"] == 1
+
+
+@pytest.mark.unit
 def test_conversation_executor_rejects_empty_user_text() -> None:
     """Conversation executor should reject empty normalized turn text."""
     # Arrange - executor, request with whitespace-only user text
@@ -485,6 +616,38 @@ def test_runtime_maps_conversation_errors_to_deterministic_result() -> None:
     assert result.status.value == "error"
     assert result.code == "conversation_backend_unavailable"
     assert result.message == "Error: Conversation backend is unavailable."
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("command_text", "result_code", "expected_reason"),
+    [
+        ("/reload_skills", "skills_reloaded", "skills_reloaded"),
+        ("/reload_persona", "persona_reloaded", "persona_reloaded"),
+    ],
+)
+def test_runtime_invalidates_conversation_cache_on_reload_commands(
+    command_text: str,
+    result_code: str,
+    expected_reason: str,
+) -> None:
+    """Runtime should invalidate conversation cache after reload-style commands."""
+    # Arrange - runtime with fixed command result and invalidation-capable executor
+    executor = _ConversationInvalidationCaptureExecutor()
+    runtime = RuntimeFacade(
+        command_registry=_CommandRegistryFixedResult(
+            CommandResult.ok("done", code=result_code)
+        ),
+        conversation_executor=executor,
+    )
+    session = _session()
+
+    # Act - execute command
+    result = runtime.handle_input(command_text, session)
+
+    # Assert - result succeeds and cache invalidation reason captured
+    assert result.status.value == "ok"
+    assert executor.reasons == [expected_reason]
 
 
 @pytest.mark.unit

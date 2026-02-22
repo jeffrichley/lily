@@ -69,6 +69,7 @@ drill_sergeant_file_length_mode = "error"
 markers = [
     "unit: Unit tests that test individual components in isolation",
     "integration: Integration tests that test multiple components together",
+    "e2e: End-to-end tests that exercise full user journeys",
     "slow: Tests that take a long time to run",
 ]
 filterwarnings = [
@@ -172,4 +173,4 @@ version_provider = "pep621"
 update_changelog_on_bump = true
 
 [tool.drill_sergeant]
-marker_mappings = { contracts = "integration" }
+marker_mappings = { contracts = "integration", e2e = "e2e" }

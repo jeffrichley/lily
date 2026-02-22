@@ -183,6 +183,7 @@ class RuntimeFacade:
 
         if parsed.kind == ParsedInputKind.COMMAND and parsed.command is not None:
             result = self._command_registry.dispatch(parsed.command, session)
+            self._maybe_invalidate_conversation_cache(result)
             self._record_turn(session, user_text=text, assistant_text=result.message)
             return result
 
@@ -190,6 +191,24 @@ class RuntimeFacade:
         self._record_turn(session, user_text=text, assistant_text=result.message)
         self._consolidation_scheduler.maybe_run(session)
         return result
+
+    def _maybe_invalidate_conversation_cache(self, result: CommandResult) -> None:
+        """Invalidate conversation graph cache on configuration-changing commands.
+
+        Args:
+            result: Command result envelope from dispatched command.
+        """
+        reasons = {
+            "skills_reloaded": "skills_reloaded",
+            "persona_reloaded": "persona_reloaded",
+            "model_set": "model_config_updated",
+        }
+        reason = reasons.get(result.code or "")
+        if reason is None:
+            return
+        invalidate = getattr(self._conversation_executor, "invalidate_cache", None)
+        if callable(invalidate):
+            invalidate(reason=reason)
 
     @staticmethod
     def _record_turn(session: Session, *, user_text: str, assistant_text: str) -> None:
