@@ -5,7 +5,7 @@ status: "active"
 source_of_truth: false
 ---
 
-# [Debt][P1] Eliminate third-party deprecation warning workaround (`trustcall`)
+# [Debt][P2] Eliminate third-party deprecation warning workaround (`trustcall`)
 
 ## Source
 - Debt tracker: `docs/dev/debt/debt_tracker.md` (Active Debt → P1)
@@ -32,6 +32,6 @@ source_of_truth: false
 - Targeted pytest invocation covering paths that previously emitted the warning.
 
 ## Metadata
-- Priority: `P1`
+- Priority: `P2`
 - Owner: `@team`
 - Target: `2026-03-15`
