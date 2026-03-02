@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
 import re
 import subprocess
+from dataclasses import dataclass
+from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-
 
 ROOT = Path(__file__).resolve().parents[1]
 STATUS_FILE = ROOT / "docs" / "dev" / "status.md"
@@ -111,17 +110,33 @@ def main() -> int:
         )
     )
 
-    docs_table = Table(title="Canonical Docs", show_header=True, header_style="bold cyan")
+    docs_table = Table(
+        title="Canonical Docs", show_header=True, header_style="bold cyan"
+    )
     docs_table.add_column("Surface")
     docs_table.add_column("Path")
     docs_table.add_column("Status")
     docs_table.add_column("Last Updated")
-    docs_table.add_row("Status Diary", "docs/dev/status.md", status_meta.status, status_meta.last_updated)
-    docs_table.add_row("Roadmap", "docs/dev/roadmap.md", roadmap_meta.status, roadmap_meta.last_updated)
-    docs_table.add_row("Debt Tracker", "docs/dev/debt/debt_tracker.md", debt_meta.status, debt_meta.last_updated)
+    docs_table.add_row(
+        "Status Diary",
+        "docs/dev/status.md",
+        status_meta.status,
+        status_meta.last_updated,
+    )
+    docs_table.add_row(
+        "Roadmap", "docs/dev/roadmap.md", roadmap_meta.status, roadmap_meta.last_updated
+    )
+    docs_table.add_row(
+        "Debt Tracker",
+        "docs/dev/debt/debt_tracker.md",
+        debt_meta.status,
+        debt_meta.last_updated,
+    )
     console.print(docs_table)
 
-    plan_table = Table(title="Execution Plans", show_header=True, header_style="bold cyan")
+    plan_table = Table(
+        title="Execution Plans", show_header=True, header_style="bold cyan"
+    )
     plan_table.add_column("Plan")
     plan_table.add_column("Lifecycle")
     plan_table.add_column("Open Tasks")
@@ -131,8 +146,14 @@ def main() -> int:
     console.print(plan_table)
 
     focus = _current_focus_items()
-    focus_text = "\n".join(f"- {item}" for item in focus) if focus else "No `Current Focus` entries found."
-    console.print(Panel(focus_text, title="Current Focus", border_style="green", expand=True))
+    focus_text = (
+        "\n".join(f"- {item}" for item in focus)
+        if focus
+        else "No `Current Focus` entries found."
+    )
+    console.print(
+        Panel(focus_text, title="Current Focus", border_style="green", expand=True)
+    )
     return 0
 
 
