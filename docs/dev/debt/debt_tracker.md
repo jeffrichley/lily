@@ -89,6 +89,19 @@ Priority scale:
     - AAA enabled in `basic` mode; file-length rule configured (`max=1200`, `mode=warn`)
     - full gate run passes with plugin active via `just quality test`
 
+- [ ] Add configurable safe-runtime ruleset profiles
+  - Issue draft: `TBD`
+  - Owner: `@team`
+  - Target: `2026-03-22`
+  - Current state:
+    - language restriction behavior is code-defined and not managed via a first-class ruleset/profile contract
+    - operators cannot declaratively select, version, and audit policy profiles for safe-runtime enforcement
+  - Exit criteria:
+    - explicit ruleset/profile configuration model is defined (for example baseline/strict/paranoid/custom)
+    - runtime selects ruleset from deterministic config sources with clear precedence
+    - active ruleset identity/version is observable in runtime status/evidence surfaces
+    - tests cover profile selection, precedence, and safe fallback/error behavior for invalid profiles
+
 - [ ] Unify duplicated memory repository behavior across file/store backends
   - Issue draft: `docs/dev/debt/issues/debt-p2-unify-memory-repository-core.md`
   - Owner: `@team`
