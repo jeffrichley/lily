@@ -24,6 +24,7 @@ Priority scale:
 ### P1
 
 - [ ] Eliminate third-party deprecation warning workaround (`trustcall`)
+  - Issue draft: `docs/dev/issues/debt/debt-p1-trustcall-warning.md`
   - Owner: `@team`
   - Target: `2026-03-15`
   - Current state: pytest suppresses `trustcall._base` deprecation warning about `Send` import path.
@@ -33,6 +34,7 @@ Priority scale:
     - quality/test runs remain warning-clean
 
 - [ ] Add pre-execution language restriction layer (RestrictedPython or equivalent AST policy)
+  - Issue draft: `docs/dev/issues/debt/debt-p1-language-restriction-layer.md`
   - Owner: `@team`
   - Target: `2026-03-08`
   - Current state: V1 security relies on container isolation + hard-deny preflight patterns; no RestrictedPython-style language restriction is enforced before plugin execution.
@@ -60,6 +62,7 @@ Priority scale:
     - full gate run passes with plugin active via `just quality test`
 
 - [ ] Unify duplicated memory repository behavior across file/store backends
+  - Issue draft: `docs/dev/issues/debt/debt-p2-unify-memory-repository-core.md`
   - Owner: `@team`
   - Target: `2026-03-20`
   - Current state:
@@ -73,6 +76,7 @@ Priority scale:
 ### P3
 
 - [ ] Add scheduled jobs for run-artifact cleanup and self-learning pipelines
+  - Issue draft: `docs/dev/issues/debt/debt-p3-scheduled-jobs-cleanup-self-learning.md`
   - Owner: `@team`
   - Target: `TBD`
   - Current state: V0 jobs retain all artifacts by default; no periodic cleanup/self-learning orchestration jobs are defined.
@@ -82,6 +86,7 @@ Priority scale:
     - runbook covers enabling/disabling and observing these scheduled jobs
 
 - [ ] Consolidate runtime SQLite locations under `.lily/db/`
+  - Issue draft: `docs/dev/issues/debt/debt-p3-consolidate-runtime-sqlite-location.md`
   - Owner: `@team`
   - Target: `TBD`
   - Current state: SQLite artifacts are split across directories (for example `.lily/checkpoints/checkpointer.sqlite` and planned `.lily/db/security.sqlite`).
@@ -91,6 +96,7 @@ Priority scale:
     - docs/config defaults are updated and tested for migration safety
 
 - [ ] Add multi-process persistence safety strategy
+  - Issue draft: `docs/dev/issues/debt/debt-p3-multiprocess-persistence-safety.md`
   - Owner: `@team`
   - Target: `TBD`
   - Current state: per-session serialization exists, but multi-process locking strategy is not finalized.
@@ -100,6 +106,7 @@ Priority scale:
     - concurrency tests include multi-process cases
 
 - [ ] Split oversized test modules into focused suites
+  - Issue draft: `docs/dev/issues/debt/debt-p3-split-oversized-test-modules.md`
   - Owner: `@team`
   - Target: `2026-03-10`
   - Current state:
