@@ -69,6 +69,7 @@ Priority scale:
 
 - [ ] Eliminate third-party deprecation warning workaround (`trustcall`)
   - Issue draft: `docs/dev/debt/issues/debt-p1-trustcall-warning.md`
+  - Execution plan: `.ai/PLANS/004-p1-trustcall-warning-removal.md`
   - Owner: `@team`
   - Target: `2026-03-15`
   - Current state:

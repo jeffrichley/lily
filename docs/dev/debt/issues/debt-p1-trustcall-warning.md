@@ -8,7 +8,8 @@ source_of_truth: false
 # [Debt][P2] Eliminate third-party deprecation warning workaround (`trustcall`)
 
 ## Source
-- Debt tracker: `docs/dev/debt/debt_tracker.md` (Active Debt → P1)
+- Debt tracker: `docs/dev/debt/debt_tracker.md` (Active Debt → P2)
+- Implementation plan: `.ai/PLANS/004-p1-trustcall-warning-removal.md`
 
 ## Internal engineering tasks
 - Upgrade/fix dependency path so no suppression is required.
