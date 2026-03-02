@@ -39,6 +39,7 @@ This document is not authoritative for:
 
 ## Diary Log
 
+- 2026-03-02: Completed language restriction layer implementation phases (AST policy contract, SecurityGate integration, deterministic scan cache) and related tests; debt closure intentionally deferred pending review conversation.
 - 2026-03-02: Docs cleanup pass started. Reconciled stale status references and aligned tracker roles.
 - 2026-03-02: Pulled upstream docs updates for debt issue drafts (PR #14).
 - 2026-02-22: Runtime refactor and e2e coverage landed on `main` (`9b2e1b7`, `39d9d5a`).

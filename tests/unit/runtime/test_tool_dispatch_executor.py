@@ -476,3 +476,52 @@ def test_tool_dispatch_maps_plugin_runtime_error(tmp_path: Path) -> None:
     # Assert - plugin_runtime_failed
     assert result.status.value == "error"
     assert result.code == "plugin_runtime_failed"
+
+
+@pytest.mark.unit
+def test_tool_dispatch_maps_language_policy_denial(tmp_path: Path) -> None:
+    """Language policy denials should map through tool dispatch deterministically."""
+    # Arrange - plugin source with import node and plugin provider dependencies.
+    skill_root = tmp_path / "skills" / "echo_plugin"
+    skill_root.mkdir(parents=True, exist_ok=True)
+    (skill_root / "SKILL.md").write_text("# plugin", encoding="utf-8")
+    (skill_root / "plugin.py").write_text("import os\n", encoding="utf-8")
+    entry = SkillEntry(
+        name="echo_plugin",
+        source=SkillSource.BUNDLED,
+        path=skill_root / "SKILL.md",
+        invocation_mode=InvocationMode.TOOL_DISPATCH,
+        command_tool_provider="plugin",
+        command_tool="execute",
+        capabilities=SkillCapabilitySpec(declared_tools=("plugin:execute",)),
+        plugin=SkillPluginSpec(entrypoint="plugin.py", source_files=("plugin.py",)),
+    )
+    providers = (
+        PluginToolProvider(
+            security_gate=SecurityGate(
+                hash_service=SecurityHashService(
+                    sandbox=SkillSandboxSettings(),
+                    project_root=Path.cwd(),
+                ),
+                preflight=SecurityPreflightScanner(),
+                store=SecurityApprovalStore(sqlite_path=tmp_path / "security.sqlite"),
+                prompt=_ApprovalPromptStub(),
+                sandbox=SkillSandboxSettings(),
+            ),
+            runner=_PluginRunnerStub(),
+        ),
+    )
+    executor = ToolDispatchExecutor(providers=providers)
+    session = _session().model_copy(
+        update={"skill_snapshot": SkillSnapshot(version="v-test", skills=(entry,))}
+    )
+
+    # Act - execute plugin-backed tool.
+    result = executor.execute(entry, session, "hello")
+
+    # Assert - security language denial is bridged to tool error envelope.
+    assert result.status.value == "error"
+    assert result.code == "security_language_policy_denied"
+    assert result.data is not None
+    assert result.data["path"] == "plugin.py"
+    assert result.data["signature"] == "node_import"

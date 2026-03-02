@@ -15,6 +15,12 @@ from typing import Protocol
 from pydantic import BaseModel, ConfigDict
 
 from lily.config import SkillSandboxSettings
+from lily.runtime.security_language_policy import (
+    LanguagePolicyCache,
+    LanguagePolicyCacheResult,
+    LanguagePolicyDeniedError,
+    SecurityLanguagePolicy,
+)
 from lily.skills.types import SkillEntry
 
 
@@ -359,6 +365,73 @@ class SecurityApprovalStore:
                 ),
             )
 
+    def lookup_language_policy_result(
+        self,
+        *,
+        file_sha256: str,
+        policy_fingerprint: str,
+    ) -> LanguagePolicyCacheResult | None:
+        """Lookup cached language-policy result for one file fingerprint.
+
+        Args:
+            file_sha256: SHA256 of file bytes.
+            policy_fingerprint: Policy fingerprint string.
+
+        Returns:
+            Cached policy result, or None on miss.
+        """
+        sql = (
+            "SELECT allowed, rule_id, line, column FROM language_policy_cache "
+            "WHERE file_sha256=? AND policy_fingerprint=?"
+        )
+        with self._open_connection() as conn:
+            row = conn.execute(sql, (file_sha256, policy_fingerprint)).fetchone()
+        if row is None:
+            return None
+        return LanguagePolicyCacheResult(
+            allowed=bool(row[0]),
+            rule_id=row[1],
+            line=row[2],
+            column=row[3],
+        )
+
+    def upsert_language_policy_result(
+        self,
+        *,
+        file_sha256: str,
+        policy_fingerprint: str,
+        result: LanguagePolicyCacheResult,
+    ) -> None:
+        """Persist cached language-policy result for one file fingerprint.
+
+        Args:
+            file_sha256: SHA256 of file bytes.
+            policy_fingerprint: Policy fingerprint string.
+            result: Cached policy result envelope.
+        """
+        sql = (
+            "INSERT INTO language_policy_cache("
+            "file_sha256, policy_fingerprint, allowed, rule_id, line, column, "
+            "updated_at) VALUES(?,?,?,?,?,?,?) "
+            "ON CONFLICT(file_sha256, policy_fingerprint) DO UPDATE SET "
+            "allowed=excluded.allowed, rule_id=excluded.rule_id, "
+            "line=excluded.line, column=excluded.column, "
+            "updated_at=excluded.updated_at"
+        )
+        with self._open_connection() as conn:
+            conn.execute(
+                sql,
+                (
+                    file_sha256,
+                    policy_fingerprint,
+                    int(result.allowed),
+                    result.rule_id,
+                    result.line,
+                    result.column,
+                    _utc_iso(),
+                ),
+            )
+
     def _init_schema(self) -> None:
         """Initialize SQLite schema idempotently."""
         self._sqlite_path.parent.mkdir(parents=True, exist_ok=True)
@@ -386,6 +459,20 @@ class SecurityApprovalStore:
                     security_hash TEXT NOT NULL,
                     outcome TEXT NOT NULL,
                     details_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS language_policy_cache (
+                    file_sha256 TEXT NOT NULL,
+                    policy_fingerprint TEXT NOT NULL,
+                    allowed INTEGER NOT NULL,
+                    rule_id TEXT,
+                    line INTEGER,
+                    column INTEGER,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (file_sha256, policy_fingerprint)
                 )
                 """
             )
@@ -428,6 +515,9 @@ class SecurityGate:
             sandbox: Global sandbox settings.
         """
         self._hash_service = hash_service
+        self._language_policy = SecurityLanguagePolicy(
+            cache=_StoreBackedLanguagePolicyCache(store=store)
+        )
         self._preflight = preflight
         self._store = store
         self._prompt = prompt
@@ -449,6 +539,14 @@ class SecurityGate:
             SecurityAuthorizationError: On deny/approval failure.
         """
         security_hash, payload = self._hash_service.compute(entry)
+        try:
+            self._language_policy.scan(entry)
+        except LanguagePolicyDeniedError as exc:
+            raise SecurityAuthorizationError(
+                code=exc.code,
+                message=exc.message,
+                data=exc.data,
+            ) from exc
         self._preflight.scan(entry)
 
         write_access = entry.plugin.write_access
@@ -592,6 +690,58 @@ class SecurityGate:
                 data={"skill": skill_name},
             )
         return decision
+
+
+class _StoreBackedLanguagePolicyCache(LanguagePolicyCache):
+    """Language-policy cache adapter backed by security approval store."""
+
+    def __init__(self, *, store: SecurityApprovalStore) -> None:
+        """Store cache persistence dependency.
+
+        Args:
+            store: Security approval store with cache persistence APIs.
+        """
+        self._store = store
+
+    def get(
+        self,
+        *,
+        file_sha256: str,
+        policy_fingerprint: str,
+    ) -> LanguagePolicyCacheResult | None:
+        """Lookup cached language-policy result from sqlite store.
+
+        Args:
+            file_sha256: SHA256 hash of source file bytes.
+            policy_fingerprint: Deterministic policy fingerprint.
+
+        Returns:
+            Cached policy result when available, else ``None``.
+        """
+        return self._store.lookup_language_policy_result(
+            file_sha256=file_sha256,
+            policy_fingerprint=policy_fingerprint,
+        )
+
+    def put(
+        self,
+        *,
+        file_sha256: str,
+        policy_fingerprint: str,
+        result: LanguagePolicyCacheResult,
+    ) -> None:
+        """Persist cached language-policy result into sqlite store.
+
+        Args:
+            file_sha256: SHA256 hash of source file bytes.
+            policy_fingerprint: Deterministic policy fingerprint.
+            result: Cached allow/deny result payload.
+        """
+        self._store.upsert_language_policy_result(
+            file_sha256=file_sha256,
+            policy_fingerprint=policy_fingerprint,
+            result=result,
+        )
 
 
 def _sha256_bytes(data: bytes) -> str:

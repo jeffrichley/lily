@@ -45,11 +45,23 @@ Priority scale:
     - warning filter entry removed from `pyproject.toml`
     - quality/test runs remain warning-clean
 
+- [ ] Harden language-policy file-read/decode failure path to deterministic deny envelope
+  - Issue draft: `TBD`
+  - Owner: `@team`
+  - Target: `2026-03-12`
+  - Current state:
+    - language-policy scan decodes plugin source with UTF-8 directly
+    - decode/read failures can escape as non-security runtime errors instead of deterministic `SecurityAuthorizationError` envelopes
+  - Exit criteria:
+    - plugin file read/decode/parsing failures are converted to deterministic security denial codes/messages/data
+    - tests cover non-UTF8 and unreadable plugin file scenarios through the security gate + tool-dispatch bridge
+    - no unexpected raw decode/read exceptions leak to command/tool surfaces
+
 - [ ] Add pre-execution language restriction layer (RestrictedPython or equivalent AST policy)
   - Issue draft: `docs/dev/debt/issues/debt-p1-language-restriction-layer.md`
   - Owner: `@team`
   - Target: `2026-03-08`
-  - Current state: V1 security relies on container isolation + hard-deny preflight patterns; no RestrictedPython-style language restriction is enforced before plugin execution.
+  - Current state: AST restriction layer is implemented and integrated before preflight in plugin authorization flow with deterministic deny envelopes and store-backed scan caching; debt item remains open pending explicit closure review/signoff.
   - Why this matters:
     - container isolation is the primary boundary, but language restriction is valuable defense-in-depth
     - catches risky constructs earlier with clearer deterministic denials
@@ -58,6 +70,10 @@ Priority scale:
     - deterministic pre-execution restriction layer is active for plugin code
     - denial codes/messages are stable and covered by tests
     - docs explicitly describe layered security model (language restriction + container isolation)
+  - Latest evidence (not yet closed):
+    - `tests/unit/runtime/test_security_language_policy.py` (policy + cache matrix)
+    - `tests/unit/runtime/test_security.py` (SecurityGate integration + store cache roundtrip)
+    - `tests/unit/runtime/test_tool_dispatch_executor.py` (deterministic tool-envelope mapping)
 
 ### P2
 

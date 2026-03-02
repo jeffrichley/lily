@@ -17,6 +17,7 @@ from lily.runtime.security import (
     SecurityPreflightScanner,
     SecurityPrompt,
 )
+from lily.runtime.security_language_policy import LanguagePolicyCacheResult
 from lily.skills.types import (
     InvocationMode,
     SkillCapabilitySpec,
@@ -160,3 +161,56 @@ def test_security_gate_reuses_always_allow_grant(tmp_path: Path) -> None:
     # Assert - same hash, prompt called once (cached)
     assert first_hash == second_hash
     assert prompt.calls == 1
+
+
+@pytest.mark.unit
+def test_security_gate_denies_language_policy_violation(tmp_path: Path) -> None:
+    """Security gate should deny plugins that violate AST language policy."""
+    # Arrange - plugin source with import node and normal gate dependencies.
+    skill_root = tmp_path / "skills" / "echo_plugin"
+    _write_skill(skill_root, "import os\n")
+    entry = _entry(skill_root)
+    sandbox = SkillSandboxSettings()
+    gate = SecurityGate(
+        hash_service=SecurityHashService(sandbox=sandbox, project_root=tmp_path),
+        preflight=SecurityPreflightScanner(),
+        store=SecurityApprovalStore(sqlite_path=tmp_path / "security.sqlite"),
+        prompt=_PromptStub(ApprovalDecision.RUN_ONCE),
+        sandbox=sandbox,
+    )
+
+    # Act - authorize and capture policy denial.
+    try:
+        gate.authorize(entry=entry, agent_id="default")
+    except SecurityAuthorizationError as exc:
+        # Assert - deterministic language policy denial payload is surfaced.
+        assert exc.code == "security_language_policy_denied"
+        assert exc.data["skill"] == "echo_plugin"
+        assert exc.data["path"] == "plugin.py"
+        assert exc.data["signature"] == "node_import"
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("Expected SecurityAuthorizationError")
+
+
+@pytest.mark.unit
+def test_security_store_language_policy_cache_roundtrip(tmp_path: Path) -> None:
+    """Security store should persist and reload policy cache rows deterministically."""
+    # Arrange - create store and deterministic cache key/result payload.
+    store = SecurityApprovalStore(sqlite_path=tmp_path / "security.sqlite")
+    key = {
+        "file_sha256": "a" * 64,
+        "policy_fingerprint": "b" * 64,
+    }
+    expected = LanguagePolicyCacheResult(
+        allowed=False,
+        rule_id="node_import",
+        line=1,
+        column=0,
+    )
+
+    # Act - write and read back language-policy cache row.
+    store.upsert_language_policy_result(result=expected, **key)
+    actual = store.lookup_language_policy_result(**key)
+
+    # Assert - roundtrip preserves deterministic payload fields.
+    assert actual == expected
