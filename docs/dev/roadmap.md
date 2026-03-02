@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-17"
+last_updated: "2026-03-02"
 status: "active"
 source_of_truth: true
 ---
@@ -11,12 +11,22 @@ Purpose: define what we build, in what order, and why.
 
 This roadmap is the source of truth for prioritization.
 If something is not on this list (or not promoted on this list), we do not build it yet.
-Debt tracking lives in `docs/dev/debt_tracker.md`.
+Debt tracking lives in `docs/dev/debt/debt_tracker.md`.
 Live weekly execution status lives in `docs/dev/status.md`.
+
+## Authority
+
+This document is authoritative for:
+- priority and sequencing decisions
+- story-level feature tracks and system improvements
+
+This document is not authoritative for:
+- weekly/daily execution diary updates (`docs/dev/status.md`)
+- phase-level implementation checklist state (`docs/dev/plans/`)
 
 Status snapshot (2026-02-17):
 - The original core hardening phases in this roadmap are complete.
-- Current active work should be selected from `docs/dev/debt_tracker.md` and domain plans.
+- Current active work should be selected from `docs/dev/debt/debt_tracker.md` and domain plans.
 
 ## Priority Scale
 
@@ -164,7 +174,7 @@ Exit criteria:
 Current active target: **Debt-driven follow-through and next-phase features**.
 
 Execution rule:
-- use `docs/dev/debt_tracker.md` for active open engineering debt
+- use `docs/dev/debt/debt_tracker.md` for active open engineering debt
 - use domain execution plans for phase work (for example memory/personality plans)
 - keep this roadmap focused on priority and ordering, not checkbox status
 
@@ -180,16 +190,16 @@ Execution rule:
 
 These are not user-facing features. They are required to make Lily robust.
 
-| Improvement | Priority | Enables |
-|---|---:|---|
-| Remove skill-specific prototype branches (for example `echo` special-casing). | 5 | Real extensibility from skill files |
-| Pass skill artifact content (`SKILL.md`) into execution paths. | 5 | Skill-driven behavior |
-| Implement strict `command_tool` validation for direct command skills. | 5 | Deterministic/safe command execution |
-| Add per-session lane/queue serialization primitives. | 5 | Reliable concurrent behavior |
-| Add restart, snapshot drift, and concurrency reliability tests. | 5 | Confidence in core stability |
-| Session persistence schema versioning and migration stubs. | 4 | Safe evolution over time |
-| Structured loader/command/executor trace events. | 4 | Operability and debugging |
-| File-locking strategy for multi-process persistence safety. | 3 | Correctness in advanced deployments |
+| Improvement | Priority | Status | Enables |
+|---|---:|---|---|
+| Remove skill-specific prototype branches (for example `echo` special-casing). | 5 | Completed | Real extensibility from skill files |
+| Pass skill artifact content (`SKILL.md`) into execution paths. | 5 | Completed | Skill-driven behavior |
+| Implement strict `command_tool` validation for direct command skills. | 5 | Completed | Deterministic/safe command execution |
+| Add per-session lane/queue serialization primitives. | 5 | Completed | Reliable concurrent behavior |
+| Add restart, snapshot drift, and concurrency reliability tests. | 5 | Completed | Confidence in core stability |
+| Session persistence schema versioning and migration stubs. | 4 | Open | Safe evolution over time |
+| Structured loader/command/executor trace events. | 4 | Open | Operability and debugging |
+| File-locking strategy for multi-process persistence safety. | 3 | Open | Correctness in advanced deployments |
 
 ## How We Use This Document
 

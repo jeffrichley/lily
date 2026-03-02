@@ -141,6 +141,10 @@ quality-dev: format lint types darglint
 repl:
     uv run lily repl
 
+# Show one-command project/docs execution status summary.
+status:
+    uv run python scripts/status_report.py
+
 # Validate docs frontmatter values and active-doc staleness.
 docs-check:
     uv run python scripts/validate_docs_frontmatter.py --max-active-age-days 21

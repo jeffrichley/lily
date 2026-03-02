@@ -210,3 +210,6 @@ __marimo__/
 #  Kernel run store and state - project-specific and should not be committed
 .lily/
 .iris/
+
+# macOS Finder metadata
+.DS_Store

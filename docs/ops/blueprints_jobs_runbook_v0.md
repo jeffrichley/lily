@@ -14,7 +14,7 @@ Purpose: operator runbook for creating, running, and troubleshooting blueprint-b
 - Lily environment initialized.
 - Skills platform security policy configured.
 - Job specs stored at configured jobs path.
-- Blueprint implementations follow `docs/dev/blueprint_authoring_constraints.md`.
+- Blueprint implementations follow `docs/dev/references/blueprint_authoring_constraints.md`.
 
 ## 2. Define a Job (Blueprint-Backed)
 
@@ -160,7 +160,7 @@ Use receipt as source of truth for:
 
 ## 9. Related Docs
 
-- Authoring constraints: `docs/dev/blueprint_authoring_constraints.md`
-- Blueprint execution plan: `docs/dev/blueprints_execution_plan.md`
-- Jobs execution plan: `docs/dev/jobs_execution_plan.md`
+- Authoring constraints: `docs/dev/references/blueprint_authoring_constraints.md`
+- Blueprint execution plan: `docs/dev/plans/blueprints_execution_plan.md`
+- Jobs execution plan: `docs/dev/plans/jobs_execution_plan.md`
 - APScheduler user guide (3.x): `https://apscheduler.readthedocs.io/en/3.x/userguide.html`
