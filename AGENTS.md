@@ -1,5 +1,29 @@
 # AGENTS
 
+## Canonical Sources of Truth
+
+Read these first, in this order:
+
+1. `.ai/RULES.md`  
+   Global non-negotiable rules for coding agents in this repo.
+
+2. `.ai/COMMANDS/`  
+   Standard workflows for prime/plan/execute/validate/review/commit/push/retro/handoff and related steps.
+
+3. `.ai/REF/`  
+   On-demand reference (“skills”) for deeper context on typing, testing, style, stack, and project-specific guidance.
+
+## Workflow Contract (High-Level)
+
+For detailed workflows, follow the `.ai/COMMANDS/*` documents. At a high level:
+
+- **Prime**: Use `.ai/COMMANDS/prime.md` at the start of a session to get the repo map and current build/test commands.
+- **Plan**: Use `.ai/COMMANDS/plan.md` to write `.ai/PLANS/<NNN>-<feature>.md` before coding.
+- **Execute**: Use `.ai/COMMANDS/execute.md` to implement the plan step-by-step.
+- **Validate**: Use `.ai/COMMANDS/validate.md` and run the required quality gates before commit/PR.
+- **Review + Commit**: Use `.ai/COMMANDS/review.md` and `.ai/COMMANDS/commit.md` to produce clean, reviewable commits.
+- **Retro + Handoff**: Use `.ai/COMMANDS/retro.md` and `.ai/COMMANDS/handoff.md` after meaningful work to keep context and rules up to date.
+
 ## Feature vs Internal Work Separation
 
 - Keep roadmap and punchlist items split into:

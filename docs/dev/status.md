@@ -1,84 +1,55 @@
 ---
 owner: "@team"
-last_updated: "2026-02-19"
+last_updated: "2026-03-02"
 status: "active"
 source_of_truth: true
 ---
 
-# Weekly Status
+# Dev Status Diary
 
-Purpose: one-page operational snapshot of what is done, in progress, next, and blocked.
+Purpose: single running diary for what changed, what is active now, and what risks are open.
 
-Update cadence:
-- Update weekly (or when priority materially changes).
-- Keep this page concise and decision-relevant.
-- Link to execution plans and debt items; do not duplicate details.
+## Authority
 
-## Snapshot
+This document is authoritative for:
+- current work focus
+- chronological development diary entries
+- high-level active risks/blockers
 
-- Week of: `2026-02-17`
-- Editor: `@team`
+This document is not authoritative for:
+- feature prioritization/order (`docs/dev/roadmap.md`)
+- phase-level implementation checklists (`docs/dev/plans/`)
+- debt item definitions/ownership (`docs/dev/debt/debt_tracker.md`)
 
-## Done This Week
+## Current Focus
 
-- [x] Phase 1 docs governance delivered and committed (`41871ac`).
-- [x] Canonical map and frontmatter contract established (`docs/README.md`).
-- [x] Phase 2 docs consolidation delivered and committed (`b81f851`).
-- [x] Phase 3 docs cadence and PR docs-impact workflow delivered.
-- [x] Phase 4 docs automation implemented (`docs-check` + auto-frontmatter fix tooling).
-- [x] Placeholder frontmatter values replaced and docs quality gate is green (`c6dfd41`).
-- [x] Docs organization program closed by explicit owner decision on `2026-02-17`.
-- [x] Skills Platform V1 completed through Phase 4 (`77eb4df`).
-- [x] Contract conformance gate added and wired into CI (`just contract-conformance`, `ci-gates`).
-- [x] Skills runbook and authoring workflow docs added and promoted to canonical docs map.
-- [x] Blueprints + jobs planning docs published (specs, architecture, execution plans, runbook).
-- [x] Blueprints Phase B0 and B1 completed (`council.v1` compile/execute + typed contracts + tests + gates).
-- [x] Blueprints Phase B2 completed (authoring constraints, diagnostic UX, runbook/docs discoverability, docs/quality gates).
-- [x] Blueprints Phase B3 completed (deterministic + llm synth strategy, fallback/error mapping, test/gate coverage).
+- Debt-driven follow-through from `docs/dev/debt/debt_tracker.md`.
+- Priority-4 feature planning for real agent subsystem migration (`docs/dev/roadmap.md`).
 
-## In Progress
+## Recently Completed
 
-- [ ] Execute Jobs Phase J0 (`docs/dev/jobs_execution_plan.md`).
+- Jobs execution phases J0-J3 completed (`docs/dev/plans/jobs_execution_plan.md`).
+- E2E execution phases 1-5 completed (`docs/dev/plans/e2e_execution_plan.md`).
+- RuntimeFacade decomposition plan delivered (`docs/dev/plans/runtime_facade_refactor_plan.md`).
 
-## Next Up
+## Open Risks
 
-- [ ] Execute Jobs Phase J0 (`docs/dev/jobs_execution_plan.md`).
+- Risk: documentation drift between weekly status and plan trackers.
+  - Mitigation: on every phase completion, update plan checklist first, then append diary entry here.
 
-## Blockers and Risks
+## Diary Log
 
-- [ ] No active blockers.
-- [ ] Risk: stale status updates could reintroduce drift.
-  Mitigation: keep this page as the only weekly status source and enforce update cadence.
+- 2026-03-02: Docs cleanup pass started. Reconciled stale status references and aligned tracker roles.
+- 2026-03-02: Pulled upstream docs updates for debt issue drafts (PR #14).
+- 2026-02-22: Runtime refactor and e2e coverage landed on `main` (`9b2e1b7`, `39d9d5a`).
+- 2026-02-21: CLI/runtime modularization landed (`6841688`, `6a076c9`).
+- 2026-02-19: Blueprints plan completed through B3 (`docs/dev/plans/blueprints_execution_plan.md`).
+- 2026-02-19: Jobs plan delivered through J3 (`docs/dev/plans/jobs_execution_plan.md`).
 
-## Active Work Traceability
+## Update Workflow
 
-| Work item | Type | Canonical trace |
-|---|---|---|
-| Docs governance rollout (closed) | Internal engineering task | `docs/archive/dev/docs_organization_plan.md` |
-| Skills platform execution (closed) | User-visible + internal | `docs/dev/skills_platform_execution_plan.md` |
-| Skills authoring workflow | Internal engineering task | `docs/dev/skills_tool_authoring.md` |
-| Skills platform exercise runbook | Internal engineering task | `docs/ops/skills_platform_v1_exercise_guide.md` |
-| Blueprints execution plan | User-visible + internal | `docs/dev/blueprints_execution_plan.md` |
-| Blueprint authoring constraints | Internal engineering task | `docs/dev/blueprint_authoring_constraints.md` |
-| Jobs execution plan | User-visible + internal | `docs/dev/jobs_execution_plan.md` |
-| Blueprints/jobs implementation patterns (GoF + framework mapping) | Internal engineering task | `docs/dev/blueprints_jobs_langgraph_langchain_patterns.md` |
-| Blueprints + jobs runbook | Internal engineering task | `docs/ops/blueprints_jobs_runbook_v0.md` |
-| Memory migration scope/status | User-visible + internal | `docs/dev/memory_execution_plan.md` |
-| Personality subsystem scope/status | User-visible + internal | `docs/dev/personality_execution_plan.md` |
-| Feature priority order | User-visible features + internal engineering tasks | `docs/dev/roadmap.md` |
-
-## Canonical Links
-
-- Roadmap: `docs/dev/roadmap.md`
-- Debt tracker: `docs/dev/debt_tracker.md`
-- Skills platform execution plan: `docs/dev/skills_platform_execution_plan.md`
-- Skills tool authoring: `docs/dev/skills_tool_authoring.md`
-- Skills exercise runbook: `docs/ops/skills_platform_v1_exercise_guide.md`
-- Blueprints execution plan: `docs/dev/blueprints_execution_plan.md`
-- Blueprint authoring constraints: `docs/dev/blueprint_authoring_constraints.md`
-- Jobs execution plan: `docs/dev/jobs_execution_plan.md`
-- Blueprints/jobs implementation patterns: `docs/dev/blueprints_jobs_langgraph_langchain_patterns.md`
-- Blueprints + jobs runbook: `docs/ops/blueprints_jobs_runbook_v0.md`
-- Memory execution plan: `docs/dev/memory_execution_plan.md`
-- Personality execution plan: `docs/dev/personality_execution_plan.md`
-- Archive index: `docs/archive/README.md`
+When implementation phase work completes:
+1. Update the relevant plan in `docs/dev/plans/` (checklist + acceptance status).
+2. Append a dated entry in this diary.
+3. Update `docs/dev/roadmap.md` only if priorities/story ordering changed.
+4. Update `docs/dev/debt/debt_tracker.md` if debt was created or closed.

@@ -14,8 +14,8 @@ Status:
 - Open follow-on items moved to canonical trackers to avoid duplicate status drift.
 
 Canonical trackers:
-- Active debt: `docs/dev/debt_tracker.md`
-- Memory migration phases/history: `docs/dev/memory_execution_plan.md`
+- Active debt: `docs/dev/debt/debt_tracker.md`
+- Memory migration phases/history: `docs/dev/plans/memory_execution_plan.md`
 - Feature prioritization and user-story direction: `docs/dev/roadmap.md`
 
 Archived completion summary:

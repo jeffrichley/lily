@@ -12,9 +12,9 @@ Date: 2026-02-17
 Scope: skill capability contracts, provider registry, isolated code-backed skills, security policy, and typed I/O governance.
 
 Implementation trace:
-- execution plan: `docs/dev/skills_platform_execution_plan.md`
+- execution plan: `docs/dev/plans/skills_platform_execution_plan.md`
 - exercise runbook: `docs/ops/skills_platform_v1_exercise_guide.md`
-- tool authoring workflow: `docs/dev/skills_tool_authoring.md`
+- tool authoring workflow: `docs/dev/references/skills_tool_authoring.md`
 
 ## 1. Why This Feature Exists
 

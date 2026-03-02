@@ -19,22 +19,22 @@ Who:
 
 Steps:
 1. Update `docs/dev/status.md`:
-   - `Done This Week`
-   - `In Progress`
-   - `Next Up`
-   - `Blockers and Risks`
+   - `Current Focus`
+   - `Recently Completed`
+   - `Open Risks`
+   - `Diary Log`
 2. Confirm each in-progress item links to one canonical source:
    - `docs/dev/roadmap.md` or
-   - `docs/dev/debt_tracker.md` or
-   - an active `docs/dev/*_execution_plan.md`
+   - `docs/dev/debt/debt_tracker.md` or
+   - an active plan in `docs/dev/plans/`
 3. If priorities changed, update `docs/dev/roadmap.md` in the same PR.
-4. If debt ownership/target/exit criteria changed, update `docs/dev/debt_tracker.md` in the same PR.
+4. If debt ownership/target/exit criteria changed, update `docs/dev/debt/debt_tracker.md` in the same PR.
 5. If a tracker becomes stale, move it to `docs/archive/` and leave a pointer stub.
 
 Definition of done:
-- `docs/dev/status.md` has current week/date and editor.
+- `docs/dev/status.md` has a current date and meaningful diary entry updates.
 - Every active item in status is traceable to a canonical source.
-- No duplicate active status tracker exists outside `docs/dev/status.md` and active execution plans.
+- No duplicate active status tracker exists outside `docs/dev/status.md` and active plan files in `docs/dev/plans/`.
 
 ## PR Docs-Impact Rule
 

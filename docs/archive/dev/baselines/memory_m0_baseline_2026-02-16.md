@@ -8,7 +8,7 @@ source_of_truth: false
 # Memory Gate M0 Baseline Snapshot
 
 Date: 2026-02-16  
-Scope: baseline capture required by `docs/dev/memory_execution_plan.md` Gate M0.
+Scope: baseline capture required by `docs/dev/plans/memory_execution_plan.md` Gate M0.
 
 ## Command Contract Freeze
 
