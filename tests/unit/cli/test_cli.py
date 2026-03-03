@@ -559,6 +559,46 @@ def test_repl_recovers_corrupt_session_file(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_repl_recovers_unsupported_schema_session_file(tmp_path: Path) -> None:
+    """REPL should recover when persisted session schema version is unsupported."""
+    # Arrange - temp dirs, unsupported schema session file, echo skill
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    session_file = tmp_path / "session.json"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    _write_echo_skill(bundled_dir)
+    session_file.write_text(
+        json.dumps({"schema_version": 999, "session": {}}),
+        encoding="utf-8",
+    )
+
+    # Act - start repl with unsupported schema payload
+    result = _RUNNER.invoke(
+        app,
+        [
+            "repl",
+            "--bundled-dir",
+            str(bundled_dir),
+            "--workspace-dir",
+            str(workspace_dir),
+            "--session-file",
+            str(session_file),
+        ],
+        input="exit\n",
+    )
+
+    # Assert - recovery message, reason, backup created, new valid session
+    assert result.exit_code == 0
+    assert "Session file was invalid." in result.stdout
+    assert "Unsupported session schema version" in result.stdout
+    backups = list(tmp_path.glob("session.json.corrupt-*"))
+    assert backups
+    payload = json.loads(session_file.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 1
+
+
+@pytest.mark.unit
 def test_run_creates_default_sqlite_checkpointer_file(tmp_path: Path) -> None:
     """`lily run` should initialize default sqlite checkpointer file in local mode."""
     # Arrange - workspace dirs, config with sqlite checkpointer path, echo skill

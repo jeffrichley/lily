@@ -23,8 +23,8 @@ This document is not authoritative for:
 
 ## Current Focus
 
-- Close P2 debt to align `tech-debt` command with canonical debt tracker workflow (`docs/dev/debt/debt_tracker.md`).
-- Reduce P2 warning-debt follow-through for third-party `trustcall` deprecation suppression (`docs/dev/debt/debt_tracker.md`).
+- Advance structured loader/command/executor trace events for runtime operability (Priority 4 system improvement) (`docs/dev/roadmap.md`).
+- Define file-locking strategy for multi-process persistence safety (Priority 3 system improvement) (`docs/dev/roadmap.md`).
 
 ## Focus Quality Criteria
 
@@ -50,6 +50,7 @@ Use this rubric when updating `## Current Focus`.
 
 ## Recently Completed
 
+- Session persistence schema versioning and deterministic recovery coverage delivered (`.ai/PLANS/011-session-persistence-schema-versioning.md`).
 - Seedling Copier template planning phase finalized and synced as complete (`.ai/PLANS/008-seedling-copier-template.md`).
 - Closed P1 debt item for deterministic language-policy read/decode/parse denial handling (`docs/dev/debt/debt_tracker.md`).
 - Closed P1 debt item for pre-execution language restriction layer with closure evidence (`docs/dev/debt/debt_tracker.md`).
@@ -66,6 +67,8 @@ Use this rubric when updating `## Current Focus`.
 
 ## Diary Log
 
+- 2026-03-03: Completed session persistence schema-version contract hardening with explicit migration dispatch scaffolding, unsupported-version recovery coverage, and deterministic bootstrap reason messaging (`.ai/PLANS/011-session-persistence-schema-versioning.md`).
+- 2026-03-03: Updated `Current Focus` to remove P2 debt items per current-focus priority guardrails and shifted active focus to roadmap-prioritized open system improvements.
 - 2026-03-03: Completed status sync for seedling Copier template planning (`.ai/PLANS/008-seedling-copier-template.md`) and moved the work item from active focus to completed.
 - 2026-03-03: Created the seedling Copier template execution plan (`.ai/PLANS/008-seedling-copier-template.md`) with locked phase intent and status-sync-compatible output expectations for next implementation work.
 - 2026-03-03: Closed the remaining P1 language-policy read/decode failure debt item after implementing deterministic `file_read_error`/`file_decode_error` denials and adding scanner + SecurityGate + tool-dispatch coverage.

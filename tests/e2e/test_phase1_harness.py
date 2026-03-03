@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from lily.session.store import SESSION_SCHEMA_VERSION
+
 
 @pytest.mark.e2e
 def test_init_run_and_session_persisted(e2e_env: object) -> None:
@@ -29,7 +31,7 @@ def test_init_run_and_session_persisted(e2e_env: object) -> None:
     assert run_result.exit_code == 0
     assert env.session_file.exists()
     payload = env.read_session_payload()
-    assert payload.get("schema_version") == 1
+    assert payload.get("schema_version") == SESSION_SCHEMA_VERSION
     session = payload.get("session")
     assert isinstance(session, dict)
     assert isinstance(session.get("session_id"), str)

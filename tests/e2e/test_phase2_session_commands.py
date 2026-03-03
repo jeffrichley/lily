@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 
@@ -108,6 +110,29 @@ def test_corrupt_session_recovery_e2e(e2e_env: object) -> None:
     # Assert - recovery message, backup file, and new session file
     assert result.exit_code == 0
     assert "Session file was invalid." in result.stdout
+    backups = tuple(env.session_file.parent.glob("session.json.corrupt-*"))
+    assert backups
+    assert env.session_file.exists()
+
+
+@pytest.mark.e2e
+def test_unsupported_schema_session_recovery_e2e(e2e_env: object) -> None:
+    """Unsupported session schema should recover with deterministic reason message."""
+    # Arrange - persisted payload with unsupported schema version
+    env = e2e_env
+    env.session_file.parent.mkdir(parents=True, exist_ok=True)
+    env.session_file.write_text(
+        json.dumps({"schema_version": 999, "session": {}}),
+        encoding="utf-8",
+    )
+
+    # Act - start REPL so schema-recovery path executes
+    result = env.repl("exit\n")
+
+    # Assert - recovery message, schema reason, backup file, and new session file
+    assert result.exit_code == 0
+    assert "Session file was invalid." in result.stdout
+    assert "Unsupported session schema version" in result.stdout
     backups = tuple(env.session_file.parent.glob("session.json.corrupt-*"))
     assert backups
     assert env.session_file.exists()
