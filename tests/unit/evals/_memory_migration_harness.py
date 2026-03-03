@@ -319,6 +319,7 @@ def run_compaction_effectiveness_suite(*, temp_dir: Path) -> EvalSuiteReport:
 
 def run_memory_phase7_observability_sample(*, temp_dir: Path) -> dict[str, object]:
     """Run representative memory operations and return observability snapshot."""
+    fixed_now = datetime(2026, 1, 15, 12, 0, tzinfo=UTC)
     memory_metrics.reset()
     bundled_dir = temp_dir / "bundled"
     workspace_dir = temp_dir / "workspace"
@@ -348,7 +349,7 @@ def run_memory_phase7_observability_sample(*, temp_dir: Path) -> dict[str, objec
     if listed.data is not None:
         for row in listed.data.get("records", []):
             if isinstance(row, dict) and row.get("last_verified") is not None:
-                memory_metrics.record_last_verified(last_verified=datetime.now(UTC))
+                memory_metrics.record_last_verified(last_verified=fixed_now)
     return memory_metrics.snapshot().to_dict()
 
 

@@ -91,3 +91,64 @@ def test_skill_invoke_forces_exact_snapshot_match() -> None:
     assert result.message == "captured"
     assert invoker.skill_name == "echo"
     assert invoker.payload == "hello world"
+
+
+@pytest.mark.unit
+def test_skill_invoke_returns_invalid_args_when_name_missing() -> None:
+    """Handler should fail with stable invalid-args envelope for empty args."""
+    # Arrange - handler and session with one skill
+    invoker = _CapturingInvoker()
+    handler = SkillInvokeCommand(invoker)
+    session = _session(skills=(_skill("echo"),))
+    call = CommandCall(name="skill", args=(), raw="/skill")
+
+    # Act - execute without required skill name arg
+    result = handler.execute(call, session)
+
+    # Assert - deterministic invalid-args envelope
+    assert result.status.value == "error"
+    assert result.code == "invalid_args"
+    assert result.data == {"command": "skill"}
+    assert "requires a skill name" in result.message
+    assert invoker.skill_name is None
+    assert invoker.payload is None
+
+
+@pytest.mark.unit
+def test_skill_invoke_returns_not_found_when_name_absent() -> None:
+    """Handler should return stable not-found error for unknown skill name."""
+    # Arrange - handler and session with one non-matching skill
+    invoker = _CapturingInvoker()
+    handler = SkillInvokeCommand(invoker)
+    session = _session(skills=(_skill("echo"),))
+    call = CommandCall(name="skill", args=("missing",), raw="/skill missing")
+
+    # Act - execute for missing skill
+    result = handler.execute(call, session)
+
+    # Assert - deterministic not-found envelope and no invocation
+    assert result.status.value == "error"
+    assert result.code == "skill_not_found"
+    assert result.data == {"skill": "missing"}
+    assert "not found in snapshot" in result.message
+    assert invoker.skill_name is None
+    assert invoker.payload is None
+
+
+@pytest.mark.unit
+def test_skill_invoke_uses_case_sensitive_exact_name_lookup() -> None:
+    """Handler should not match differently cased names."""
+    # Arrange - handler with lowercase snapshot skill, uppercase request
+    invoker = _CapturingInvoker()
+    handler = SkillInvokeCommand(invoker)
+    session = _session(skills=(_skill("echo"),))
+    call = CommandCall(name="skill", args=("ECHO", "hello"), raw="/skill ECHO hello")
+
+    # Act - execute with mismatched case
+    result = handler.execute(call, session)
+
+    # Assert - case-sensitive lookup yields not found
+    assert result.status.value == "error"
+    assert result.code == "skill_not_found"
+    assert result.data == {"skill": "ECHO"}
+    assert invoker.skill_name is None

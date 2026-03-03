@@ -61,44 +61,49 @@ def test_load_global_config_reads_custom_backend(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-def test_load_global_config_rejects_postgres_checkpointer_backend(
+@pytest.mark.parametrize(
+    ("filename", "content", "expected_fragments"),
+    [
+        (
+            "config.json",
+            '{"checkpointer":{"backend":"postgres"}}',
+            ("checkpointer.backend", "sqlite", "memory"),
+        ),
+        (
+            "config.json",
+            "{not-json",
+            ("Invalid global config JSON",),
+        ),
+        (
+            "config.yaml",
+            "checkpointer: [unclosed",
+            ("Invalid global config YAML",),
+        ),
+        (
+            "config.json",
+            '{"security":{"sandbox":{"image":"python:3.13-slim"}}}',
+            ("pinned by sha256 digest",),
+        ),
+    ],
+)
+def test_load_global_config_rejects_invalid_payloads(
     tmp_path: Path,
+    filename: str,
+    content: str,
+    expected_fragments: tuple[str, ...],
 ) -> None:
-    """Config loader should reject unsupported postgres checkpointer backend."""
-    # Arrange - config file using removed postgres backend identifier
-    config_path = tmp_path / "config.json"
-    config_path.write_text(
-        ('{"checkpointer":{"backend":"postgres"}}'),
-        encoding="utf-8",
-    )
+    """Invalid payloads should raise deterministic global config errors."""
+    # Arrange - config file with invalid payload.
+    config_path = tmp_path / filename
+    config_path.write_text(content, encoding="utf-8")
 
-    # Act - load config
-    try:
+    # Act - load config and capture deterministic error.
+    with pytest.raises(GlobalConfigError) as exc_info:
         load_global_config(config_path)
-    except GlobalConfigError as exc:
-        # Assert - deterministic enum validation mentioning allowed values
-        assert "checkpointer.backend" in str(exc)
-        assert "sqlite" in str(exc)
-        assert "memory" in str(exc)
-    else:  # pragma: no cover - defensive assertion
-        raise AssertionError("Expected GlobalConfigError")
-
-
-@pytest.mark.unit
-def test_load_global_config_rejects_invalid_json(tmp_path: Path) -> None:
-    """Invalid JSON should raise deterministic global config error."""
-    # Arrange - config file with invalid json
-    config_path = tmp_path / "config.json"
-    config_path.write_text("{not-json", encoding="utf-8")
-
-    # Act - load config
-    try:
-        load_global_config(config_path)
-    except GlobalConfigError as exc:
-        # Assert - error message mentions invalid JSON
-        assert "Invalid global config JSON" in str(exc)
-    else:  # pragma: no cover - defensive assertion
-        raise AssertionError("Expected GlobalConfigError")
+    # Assert - all expected message fragments are present.
+    message = str(exc_info.value)
+    for fragment in expected_fragments:
+        assert fragment in message
 
 
 @pytest.mark.unit
@@ -221,40 +226,3 @@ def test_load_global_config_reads_yaml_payload(tmp_path: Path) -> None:
 
     # Assert - checkpointer backend memory
     assert config.checkpointer.backend == CheckpointerBackend.MEMORY
-
-
-@pytest.mark.unit
-def test_load_global_config_rejects_invalid_yaml(tmp_path: Path) -> None:
-    """Invalid YAML should raise deterministic global config error."""
-    # Arrange - yaml file with invalid syntax
-    config_path = tmp_path / "config.yaml"
-    config_path.write_text("checkpointer: [unclosed", encoding="utf-8")
-
-    # Act - load config
-    try:
-        load_global_config(config_path)
-    except GlobalConfigError as exc:
-        # Assert - error message mentions invalid YAML
-        assert "Invalid global config YAML" in str(exc)
-    else:  # pragma: no cover - defensive assertion
-        raise AssertionError("Expected GlobalConfigError")
-
-
-@pytest.mark.unit
-def test_load_global_config_rejects_unpinned_security_image(tmp_path: Path) -> None:
-    """Security sandbox image must be pinned by sha256 digest."""
-    # Arrange - config with unpinned security image
-    config_path = tmp_path / "config.json"
-    config_path.write_text(
-        '{"security":{"sandbox":{"image":"python:3.13-slim"}}}',
-        encoding="utf-8",
-    )
-
-    # Act - load config
-    try:
-        load_global_config(config_path)
-    except GlobalConfigError as exc:
-        # Assert - error mentions sha256 pinning
-        assert "pinned by sha256 digest" in str(exc)
-    else:  # pragma: no cover - defensive assertion
-        raise AssertionError("Expected GlobalConfigError")

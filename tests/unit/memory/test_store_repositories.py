@@ -19,6 +19,8 @@ from lily.memory import (
     store_repository,
 )
 
+_FIXED_NOW = datetime(2026, 1, 15, 12, 0, tzinfo=UTC)
+
 
 @pytest.mark.unit
 def test_store_personality_roundtrip_matches_file_behavior(tmp_path: Path) -> None:
@@ -164,7 +166,7 @@ def test_store_query_excludes_archived_conflicted_and_expired_by_default(
     repo = StoreBackedPersonalityMemoryRepository(
         store_file=tmp_path / "memory" / "store.sqlite"
     )
-    now = datetime.now(UTC)
+    now = _FIXED_NOW
     repo.remember(
         MemoryWriteRequest(
             namespace="user_profile/workspace:workspace/persona:lily",

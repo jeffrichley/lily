@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import time
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -12,7 +12,24 @@ from _pytest.monkeypatch import MonkeyPatch
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, JobExecutionEvent
 from apscheduler.triggers.interval import IntervalTrigger
 
+import lily.jobs.scheduler_runtime as scheduler_runtime_module
 from lily.jobs import JobRepository, JobSchedulerRuntime
+
+_ORIGINAL_RUN_SCHEDULED_JOB_CALLBACK = (
+    scheduler_runtime_module.run_scheduled_job_callback
+)
+_SCHEDULER_EXECUTION_STATE: dict[str, threading.Event | None] = {"event": None}
+
+
+def _run_scheduled_job_callback_and_signal(
+    job_id: str, jobs_dir: str, runs_root: str
+) -> str:
+    """Proxy scheduled callback and signal deterministic execution event."""
+    run_id = _ORIGINAL_RUN_SCHEDULED_JOB_CALLBACK(job_id, jobs_dir, runs_root)
+    event = _SCHEDULER_EXECUTION_STATE["event"]
+    if event is not None:
+        event.set()
+    return run_id
 
 
 def _write(path: Path, content: str) -> None:
@@ -153,16 +170,24 @@ def test_scheduler_executes_registered_job_via_aps_runtime(
         ),
     )
     runtime = _build_runtime(workspace)
+    executed = threading.Event()
+    _SCHEDULER_EXECUTION_STATE["event"] = executed
+
+    monkeypatch.setattr(
+        "lily.jobs.scheduler_runtime.run_scheduled_job_callback",
+        _run_scheduled_job_callback_and_signal,
+    )
     monkeypatch.setattr(
         "lily.jobs.scheduler_runtime.CronTrigger.from_crontab",
         lambda *_args, **_kwargs: IntervalTrigger(seconds=0.2),
     )
 
-    # Act - start and wait for interval trigger
+    # Act - start and wait for first execution callback
     runtime.start()
     try:
-        time.sleep(0.6)
+        assert executed.wait(timeout=2.0)
     finally:
+        _SCHEDULER_EXECUTION_STATE["event"] = None
         runtime.shutdown()
 
     # Assert - run dirs created

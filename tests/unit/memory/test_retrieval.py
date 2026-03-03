@@ -14,6 +14,8 @@ from lily.memory import (
     RetrievalPolicy,
 )
 
+_FIXED_NOW = datetime(2026, 1, 15, 12, 0, tzinfo=UTC)
+
 
 class _PersonalityRepo:
     """Test repository fixture for personality memory."""
@@ -91,7 +93,7 @@ def _record(  # noqa: PLR0913
 def test_retrieval_priority_and_confidence_threshold() -> None:
     """Retrieval should prioritize stable domains and filter low-confidence rows."""
     # Arrange - personality/task repos and service with confidence threshold
-    now = datetime.now(UTC)
+    now = _FIXED_NOW
     personality = _PersonalityRepo(
         rows={
             "working_rules/a": (

@@ -120,19 +120,6 @@ Priority scale:
     - conflict/failure behavior defined
     - concurrency tests include multi-process cases
 
-- [ ] Split oversized test modules into focused suites
-  - Issue draft: `docs/dev/debt/issues/debt-p3-split-oversized-test-modules.md`
-  - Owner: `@team`
-  - Target: `2026-03-10`
-  - Current state:
-    - `tests/unit/commands/test_command_surface.py` is large (~1142 LOC)
-    - `tests/unit/cli/test_cli.py` is large (~708 LOC)
-    - reviewability and targeted refactors are harder than necessary
-  - Exit criteria:
-    - command-surface tests are split by domain (for example skills/persona/memory/jobs)
-    - CLI tests are split by concern (bootstrap/run/repl/rendering)
-    - no behavior contract coverage is lost during split
-
 ## Recently Closed Debt
 
 - [x] Harden language-policy file-read/decode failure path to deterministic deny envelope
@@ -182,6 +169,22 @@ Priority scale:
     - marker mapping aligned for existing layout: `contracts -> integration`
     - AAA enabled in `basic` mode; file-length rule configured (`max=1200`, `mode=warn`)
     - full gate run passes with plugin active via `just quality test`
+
+- [x] Split oversized test modules into focused suites
+  - Issue draft: `docs/dev/debt/issues/debt-p3-split-oversized-test-modules.md`
+  - Owner: `@team`
+  - Closed: `2026-03-03`
+  - Exit criteria:
+    - command-surface tests are split by domain (for example skills/persona/memory/jobs)
+    - CLI tests are split by concern (bootstrap/run/repl/rendering)
+    - no behavior contract coverage is lost during split
+  - Closure evidence:
+    - `tests/unit/commands/test_command_surface.py` + `tests/unit/commands/test_command_surface_stateful.py`
+    - `tests/unit/cli/test_cli.py` + `tests/unit/cli/test_cli_recovery_init.py`
+    - shared fixture extraction in `tests/unit/commands/command_surface_shared.py` and `tests/unit/cli/cli_shared.py`
+    - runtime conversation split into `tests/unit/runtime/test_conversation.py` + `tests/unit/runtime/test_conversation_executor.py`
+    - matrix deduplication in `tests/unit/config/test_global_config.py`, `tests/unit/runtime/test_security_language_policy.py`, and `tests/unit/runtime/test_tool_dispatch_executor.py`
+    - `just quality` passes warning-clean after refactor set
 
 - [x] Add typed skill/tool contracts (input/output schemas)
   - Closed: `2026-02-17`

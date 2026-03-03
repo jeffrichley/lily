@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import threading
-import time
 from dataclasses import dataclass, field
 
 import pytest
@@ -22,6 +21,9 @@ class _TrackingRegistry:
     active: int = 0
     max_active: int = 0
     lock: threading.Lock = field(default_factory=threading.Lock)
+    entered_event: threading.Event | None = None
+    release_event: threading.Event | None = None
+    dispatch_barrier: threading.Barrier | None = None
 
     def dispatch(self, call: object, session: Session) -> CommandResult:
         del call
@@ -29,8 +31,14 @@ class _TrackingRegistry:
         with self.lock:
             self.active += 1
             self.max_active = max(self.max_active, self.active)
+        if self.entered_event is not None:
+            self.entered_event.set()
         try:
-            time.sleep(0.05)
+            if self.dispatch_barrier is not None:
+                self.dispatch_barrier.wait(timeout=1.0)
+            if self.release_event is not None:
+                released = self.release_event.wait(timeout=1.0)
+                assert released
             return CommandResult.ok("ok")
         finally:
             with self.lock:
@@ -52,7 +60,9 @@ def test_runtime_serializes_same_session_inputs() -> None:
     """Same session should execute one dispatch at a time."""
     # Arrange - reset lanes, tracking registry, runtime, single session
     reset_session_lanes()
-    registry = _TrackingRegistry()
+    entered = threading.Event()
+    release = threading.Event()
+    registry = _TrackingRegistry(entered_event=entered, release_event=release)
     runtime = RuntimeFacade(command_registry=registry)  # type: ignore[arg-type]
     session = _session("session-a")
 
@@ -66,6 +76,9 @@ def test_runtime_serializes_same_session_inputs() -> None:
     )
     t1.start()
     t2.start()
+    assert entered.wait(timeout=1.0)
+    assert registry.max_active == 1
+    release.set()
     t1.join()
     t2.join()
     # Assert - at most one active at a time for same session
@@ -77,7 +90,7 @@ def test_runtime_allows_parallel_inputs_across_sessions() -> None:
     """Different sessions should be able to run in parallel lanes."""
     # Arrange - reset lanes, registry, runtime, two sessions
     reset_session_lanes()
-    registry = _TrackingRegistry()
+    registry = _TrackingRegistry(dispatch_barrier=threading.Barrier(2))
     runtime = RuntimeFacade(command_registry=registry)  # type: ignore[arg-type]
     session_a = _session("session-a")
     session_b = _session("session-b")

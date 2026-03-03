@@ -50,6 +50,7 @@ Use this rubric when updating `## Current Focus`.
 
 ## Recently Completed
 
+- Closed P3 debt item for test-suite maintainability via module splits and repetitive-case parameterization (`docs/dev/debt/debt_tracker.md`).
 - Session persistence schema versioning and deterministic recovery coverage delivered (`.ai/PLANS/011-session-persistence-schema-versioning.md`).
 - Seedling Copier template planning phase finalized and synced as complete (`.ai/PLANS/008-seedling-copier-template.md`).
 - Closed P1 debt item for deterministic language-policy read/decode/parse denial handling (`docs/dev/debt/debt_tracker.md`).
@@ -67,6 +68,7 @@ Use this rubric when updating `## Current Focus`.
 
 ## Diary Log
 
+- 2026-03-03: Completed test-suite rejiggering pass: split oversized command/CLI/runtime conversation modules, added shared test helpers, and parameterized repetitive config/security/tool-dispatch matrices; closed related P3 debt item (`docs/dev/debt/debt_tracker.md`).
 - 2026-03-03: Completed session persistence schema-version contract hardening with explicit migration dispatch scaffolding, unsupported-version recovery coverage, and deterministic bootstrap reason messaging (`.ai/PLANS/011-session-persistence-schema-versioning.md`).
 - 2026-03-03: Updated `Current Focus` to remove P2 debt items per current-focus priority guardrails and shifted active focus to roadmap-prioritized open system improvements.
 - 2026-03-03: Completed status sync for seedling Copier template planning (`.ai/PLANS/008-seedling-copier-template.md`) and moved the work item from active focus to completed.
