@@ -87,6 +87,28 @@ class TerminalSecurityPrompt(SecurityPrompt):
         return ApprovalDecision.DENY
 
 
+def _render_invalid_session_notice(
+    *,
+    console: Console,
+    backup: Path | None,
+    reason: SessionDecodeError | SessionSchemaVersionError,
+) -> None:
+    """Render deterministic invalid-session recovery messaging.
+
+    Args:
+        console: Rich console for operator-facing output.
+        backup: Backup path produced by corrupt-session recovery, if any.
+        reason: Deterministic decode/schema failure reason.
+    """
+    if backup is not None:
+        console.print(f"[yellow]Session file was invalid. Moved to {backup}.[/yellow]")
+    else:
+        console.print(
+            "[yellow]Session file was invalid. Creating a new session.[/yellow]"
+        )
+    console.print(f"[yellow]Reason: {reason}[/yellow]")
+
+
 def configure_logging() -> None:
     """Configure Rich-backed logging once for CLI commands."""
     global _LOGGING_CONFIGURED  # noqa: PLW0603
@@ -259,15 +281,7 @@ def build_session(
         return session
     except (SessionDecodeError, SessionSchemaVersionError) as exc:
         backup = recover_corrupt_session(session_file)
-        if backup is not None:
-            console.print(
-                f"[yellow]Session file was invalid. Moved to {backup}.[/yellow]"
-            )
-        else:
-            console.print(
-                "[yellow]Session file was invalid. Creating a new session.[/yellow]"
-            )
-        console.print(f"[yellow]Reason: {exc}[/yellow]")
+        _render_invalid_session_notice(console=console, backup=backup, reason=exc)
         session = factory.create(model_config=ModelConfig(model_name=model_name))
         save_session(session, session_file)
         return session

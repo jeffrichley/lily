@@ -67,6 +67,37 @@ def test_load_unsupported_schema_version_raises(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_load_missing_schema_version_raises(tmp_path: Path) -> None:
+    """Missing schema_version should raise explicit version error."""
+    # Arrange - file without schema_version field
+    path = tmp_path / "session.json"
+    path.write_text(json.dumps({"session": {}}), encoding="utf-8")
+
+    # Act - load session with missing schema version
+    with pytest.raises(SessionSchemaVersionError) as exc_info:
+        load_session(path)
+    # Assert - version error is deterministic
+    assert "Unsupported session schema version" in str(exc_info.value)
+
+
+@pytest.mark.unit
+def test_load_non_numeric_schema_version_raises(tmp_path: Path) -> None:
+    """Non-numeric schema_version should raise explicit version error."""
+    # Arrange - file with string schema_version
+    path = tmp_path / "session.json"
+    path.write_text(
+        json.dumps({"schema_version": "1", "session": {}}),
+        encoding="utf-8",
+    )
+
+    # Act - load session with non-numeric schema version
+    with pytest.raises(SessionSchemaVersionError) as exc_info:
+        load_session(path)
+    # Assert - version error is deterministic
+    assert "Unsupported session schema version" in str(exc_info.value)
+
+
+@pytest.mark.unit
 def test_recover_corrupt_session_moves_file_aside(tmp_path: Path) -> None:
     """Recovery should move invalid session to .corrupt backup path."""
     # Arrange - corrupt session file

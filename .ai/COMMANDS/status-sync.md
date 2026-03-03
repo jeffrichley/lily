@@ -37,6 +37,8 @@ Use these rules whenever `## Current Focus` is edited in `docs/dev/status.md`.
    - Include only items expected to be actively executed in the next 3-7 days.
    - Keep 2-4 bullets maximum.
    - Every bullet must map to a canonical source (`docs/dev/roadmap.md`, `docs/dev/debt/debt_tracker.md`, or a specific plan path).
+   - If any open `P1` debt exists, include at least one `P1` debt outcome from `docs/dev/debt/debt_tracker.md`.
+   - AI agents must not add `P2`/`P3` debt items unless a human explicitly prioritizes that exact item for current focus.
 2. Bullet quality:
    - Write each bullet as `outcome + source path`.
    - Prefer concrete outcomes ("close P1 decode failure path") over activity labels ("work on docs").
