@@ -23,8 +23,8 @@ This document is not authoritative for:
 
 ## Current Focus
 
-- Progress P2 warning-clean follow-through (`docs/dev/debt/debt_tracker.md`).
-- Priority-4 feature planning for real agent subsystem migration (`docs/dev/roadmap.md`).
+- Close P2 debt to align `tech-debt` command with canonical debt tracker workflow (`docs/dev/debt/debt_tracker.md`).
+- Reduce P2 warning-debt follow-through for third-party `trustcall` deprecation suppression (`docs/dev/debt/debt_tracker.md`).
 
 ## Focus Quality Criteria
 
@@ -50,6 +50,7 @@ Use this rubric when updating `## Current Focus`.
 
 ## Recently Completed
 
+- Seedling Copier template planning phase finalized and synced as complete (`.ai/PLANS/008-seedling-copier-template.md`).
 - Closed P1 debt item for deterministic language-policy read/decode/parse denial handling (`docs/dev/debt/debt_tracker.md`).
 - Closed P1 debt item for pre-execution language restriction layer with closure evidence (`docs/dev/debt/debt_tracker.md`).
 - Status sync workflow and runbook/command enforcement delivered (`.ai/PLANS/006-status-sync-system.md`).
@@ -65,6 +66,8 @@ Use this rubric when updating `## Current Focus`.
 
 ## Diary Log
 
+- 2026-03-03: Completed status sync for seedling Copier template planning (`.ai/PLANS/008-seedling-copier-template.md`) and moved the work item from active focus to completed.
+- 2026-03-03: Created the seedling Copier template execution plan (`.ai/PLANS/008-seedling-copier-template.md`) with locked phase intent and status-sync-compatible output expectations for next implementation work.
 - 2026-03-03: Closed the remaining P1 language-policy read/decode failure debt item after implementing deterministic `file_read_error`/`file_decode_error` denials and adding scanner + SecurityGate + tool-dispatch coverage.
 - 2026-03-03: Closed the P1 language-restriction-layer debt item after re-validating policy/security/dispatch tests and confirming layered security model documentation.
 - 2026-03-03: Delivered status-sync system (`status-sync`, `phase-intent-check`, PR polling loop, runbook cadence, `status-ready`, and status report coverage for `.ai/PLANS`) and validated with docs/status gates.
