@@ -213,3 +213,6 @@ __marimo__/
 
 # macOS Finder metadata
 .DS_Store
+
+# Local scratch output
+tmp/
