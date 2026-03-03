@@ -128,6 +128,55 @@ def test_language_policy_denies_syntax_errors_deterministically(tmp_path: Path) 
 
 
 @pytest.mark.unit
+def test_language_policy_denies_non_utf8_source_deterministically(
+    tmp_path: Path,
+) -> None:
+    """Policy should deny non-UTF8 plugin source deterministically."""
+    # Arrange - write plugin source bytes that are invalid UTF-8.
+    skill_root = tmp_path / "skills" / "echo_plugin"
+    skill_root.mkdir(parents=True, exist_ok=True)
+    (skill_root / "SKILL.md").write_text("# test", encoding="utf-8")
+    (skill_root / "plugin.py").write_bytes(b"\xff\xfe\x00")
+    entry = _entry(skill_root, source_files=("plugin.py",))
+    scanner = SecurityLanguagePolicy()
+
+    # Act - scan and capture deterministic deny error.
+    with pytest.raises(LanguagePolicyDeniedError) as exc_info:
+        scanner.scan(entry)
+    # Assert - denial maps to non-UTF8 decode failure rule.
+    assert exc_info.value.data["rule_id"] == "file_decode_error"
+    assert exc_info.value.data["path"] == "plugin.py"
+
+
+@pytest.mark.unit
+def test_language_policy_denies_file_read_errors_deterministically(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Policy should deny file read failures with deterministic payload fields."""
+    # Arrange - write valid skill files then force read_bytes failure for plugin file.
+    skill_root = tmp_path / "skills" / "echo_plugin"
+    _write_skill(skill_root, {"plugin.py": "def run():\n    return 1\n"})
+    plugin_file = (skill_root / "plugin.py").resolve()
+    entry = _entry(skill_root, source_files=("plugin.py",))
+    scanner = SecurityLanguagePolicy()
+    original_read_bytes = Path.read_bytes
+
+    def _read_bytes_raise(path: Path) -> bytes:
+        if path.resolve() == plugin_file:
+            raise OSError("forced read failure")
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", _read_bytes_raise)
+
+    # Act - scan and capture deterministic deny error.
+    with pytest.raises(LanguagePolicyDeniedError) as exc_info:
+        scanner.scan(entry)
+    # Assert - denial maps to file read error rule.
+    assert exc_info.value.data["rule_id"] == "file_read_error"
+    assert exc_info.value.data["path"] == "plugin.py"
+
+
+@pytest.mark.unit
 def test_language_policy_denies_first_violation_in_sorted_file_order(
     tmp_path: Path,
 ) -> None:

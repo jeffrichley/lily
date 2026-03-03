@@ -193,6 +193,83 @@ def test_security_gate_denies_language_policy_violation(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_security_gate_denies_non_utf8_plugin_source(tmp_path: Path) -> None:
+    """Security gate should map non-UTF8 plugin source to deterministic denial."""
+    # Arrange - plugin source bytes that fail UTF-8 decode.
+    skill_root = tmp_path / "skills" / "echo_plugin"
+    skill_root.mkdir(parents=True, exist_ok=True)
+    (skill_root / "SKILL.md").write_text("# test", encoding="utf-8")
+    (skill_root / "plugin.py").write_bytes(b"\xff\xfe\x00")
+    entry = _entry(skill_root)
+    sandbox = SkillSandboxSettings()
+    gate = SecurityGate(
+        hash_service=SecurityHashService(sandbox=sandbox, project_root=tmp_path),
+        preflight=SecurityPreflightScanner(),
+        store=SecurityApprovalStore(sqlite_path=tmp_path / "security.sqlite"),
+        prompt=_PromptStub(ApprovalDecision.RUN_ONCE),
+        sandbox=sandbox,
+    )
+
+    # Act - authorize and capture policy denial.
+    try:
+        gate.authorize(entry=entry, agent_id="default")
+    except SecurityAuthorizationError as exc:
+        # Assert - deterministic non-UTF8 decode denial is surfaced.
+        assert exc.code == "security_language_policy_denied"
+        assert exc.data["signature"] == "file_decode_error"
+        assert exc.data["path"] == "plugin.py"
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("Expected SecurityAuthorizationError")
+
+
+@pytest.mark.unit
+def test_security_gate_denies_plugin_file_read_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Security gate should map plugin file read failures to deterministic denial."""
+    # Arrange - valid plugin source with forced read failure on plugin file path.
+    skill_root = tmp_path / "skills" / "echo_plugin"
+    _write_skill(
+        skill_root,
+        "def run(payload, **kwargs):\n    return {'display': payload}\n",
+    )
+    plugin_file = (skill_root / "plugin.py").resolve()
+    original_read_bytes = Path.read_bytes
+    read_counts: dict[Path, int] = {}
+
+    def _read_bytes_raise(path: Path) -> bytes:
+        resolved = path.resolve()
+        read_counts[resolved] = read_counts.get(resolved, 0) + 1
+        # First read is from SecurityHashService.
+        # Second read is from language policy scan.
+        if resolved == plugin_file and read_counts[resolved] >= 2:
+            raise OSError("forced read failure")
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", _read_bytes_raise)
+    entry = _entry(skill_root)
+    sandbox = SkillSandboxSettings()
+    gate = SecurityGate(
+        hash_service=SecurityHashService(sandbox=sandbox, project_root=tmp_path),
+        preflight=SecurityPreflightScanner(),
+        store=SecurityApprovalStore(sqlite_path=tmp_path / "security.sqlite"),
+        prompt=_PromptStub(ApprovalDecision.RUN_ONCE),
+        sandbox=sandbox,
+    )
+
+    # Act - authorize and capture policy denial.
+    try:
+        gate.authorize(entry=entry, agent_id="default")
+    except SecurityAuthorizationError as exc:
+        # Assert - deterministic read failure denial is surfaced.
+        assert exc.code == "security_language_policy_denied"
+        assert exc.data["signature"] == "file_read_error"
+        assert exc.data["path"] == "plugin.py"
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("Expected SecurityAuthorizationError")
+
+
+@pytest.mark.unit
 def test_security_store_language_policy_cache_roundtrip(tmp_path: Path) -> None:
     """Security store should persist and reload policy cache rows deterministically."""
     # Arrange - create store and deterministic cache key/result payload.

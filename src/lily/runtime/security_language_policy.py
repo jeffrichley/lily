@@ -7,6 +7,7 @@ import hashlib
 import json
 import sys
 from enum import StrEnum
+from pathlib import Path
 from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict
@@ -217,6 +218,7 @@ class SecurityLanguagePolicy:
 
         Raises:
             LanguagePolicyDeniedError: If policy rejects the plugin source.
+
         """
         if self._config.code_class == UntrustedCodeClass.TRUSTED:
             return
@@ -226,26 +228,33 @@ class SecurityLanguagePolicy:
         policy_fingerprint = self._policy_fingerprint()
         for relative in _policy_files(entry):
             absolute = (entry.path.parent / relative).resolve()
-            source_bytes = absolute.read_bytes()
+            source_bytes = self._read_source_bytes(
+                skill=entry.name, absolute=absolute, relative=relative
+            )
             file_sha256 = _sha256_bytes(source_bytes)
             cached = self._cache.get(
                 file_sha256=file_sha256,
                 policy_fingerprint=policy_fingerprint,
             )
             if cached is not None:
-                if cached.allowed:
+                violation = self._violation_from_cache(
+                    relative=relative,
+                    cached=cached,
+                )
+                if violation is None:
                     continue
                 raise LanguagePolicyDeniedError(
                     skill=entry.name,
-                    violation=LanguagePolicyViolation(
-                        rule_id=cached.rule_id or "unknown_rule",
-                        path=relative,
-                        line=cached.line or 1,
-                        column=cached.column or 0,
-                    ),
+                    violation=violation,
                 )
 
-            source = source_bytes.decode("utf-8")
+            source = self._decode_source(
+                skill=entry.name,
+                relative=relative,
+                source_bytes=source_bytes,
+                file_sha256=file_sha256,
+                policy_fingerprint=policy_fingerprint,
+            )
             file_violations = self._scan_one(path=relative, source=source)
             if not file_violations:
                 self._cache.put(
@@ -269,7 +278,105 @@ class SecurityLanguagePolicy:
                     column=first.column,
                 ),
             )
-            raise LanguagePolicyDeniedError(skill=entry.name, violation=first)
+            raise LanguagePolicyDeniedError(
+                skill=entry.name,
+                violation=first,
+            )
+
+    def _read_source_bytes(self, *, skill: str, absolute: Path, relative: str) -> bytes:
+        """Read one plugin source file.
+
+        Args:
+            skill: Skill name under evaluation.
+            absolute: Absolute source file path.
+            relative: Relative plugin file path for denial payload.
+
+        Returns:
+            Source bytes for policy evaluation.
+
+        Raises:
+            LanguagePolicyDeniedError: If reading the source file fails.
+        """
+        try:
+            return absolute.read_bytes()
+        except OSError:
+            raise LanguagePolicyDeniedError(
+                skill=skill,
+                violation=LanguagePolicyViolation(
+                    rule_id="file_read_error",
+                    path=relative,
+                    line=1,
+                    column=0,
+                ),
+            ) from None
+
+    def _decode_source(
+        self,
+        *,
+        skill: str,
+        relative: str,
+        source_bytes: bytes,
+        file_sha256: str,
+        policy_fingerprint: str,
+    ) -> str:
+        """Decode one source buffer as UTF-8 for AST parsing.
+
+        Args:
+            skill: Skill name under evaluation.
+            relative: Relative plugin file path for denial payload.
+            source_bytes: Source bytes to decode.
+            file_sha256: SHA256 hash for cache key.
+            policy_fingerprint: Deterministic policy fingerprint.
+
+        Returns:
+            UTF-8 decoded source text.
+
+        Raises:
+            LanguagePolicyDeniedError: If UTF-8 decoding fails.
+        """
+        try:
+            return source_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            self._cache.put(
+                file_sha256=file_sha256,
+                policy_fingerprint=policy_fingerprint,
+                result=LanguagePolicyCacheResult(
+                    allowed=False,
+                    rule_id="file_decode_error",
+                    line=1,
+                    column=0,
+                ),
+            )
+            raise LanguagePolicyDeniedError(
+                skill=skill,
+                violation=LanguagePolicyViolation(
+                    rule_id="file_decode_error",
+                    path=relative,
+                    line=1,
+                    column=0,
+                ),
+            ) from None
+
+    def _violation_from_cache(
+        self, *, relative: str, cached: LanguagePolicyCacheResult
+    ) -> LanguagePolicyViolation | None:
+        """Convert one cached policy result to a violation payload.
+
+        Args:
+            relative: Relative plugin file path.
+            cached: Cached allow/deny result.
+
+        Returns:
+            `None` when cached result is allowed; otherwise violation payload.
+        """
+        if cached.allowed:
+            return None
+        return LanguagePolicyViolation(
+            rule_id=cached.rule_id or "unknown_rule",
+            path=relative,
+            line=cached.line or 1,
+            column=cached.column or 0,
+        )
 
     def _scan_one(self, *, path: str, source: str) -> list[LanguagePolicyViolation]:
         """Scan one source file and return deterministic violations.
