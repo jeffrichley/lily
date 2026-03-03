@@ -35,42 +35,6 @@ Priority scale:
 
 ### P1
 
-- [x] Harden language-policy file-read/decode failure path to deterministic deny envelope
-  - Issue draft: `TBD`
-  - Owner: `@team`
-  - Closed: `2026-03-03`
-  - Current state:
-    - language-policy scan now converts read and UTF-8 decode failures into deterministic `security_language_policy_denied` envelopes
-    - syntax parse failures remain deterministic `syntax_error` denials
-  - Exit criteria:
-    - plugin file read/decode/parsing failures are converted to deterministic security denial codes/messages/data
-    - tests cover non-UTF8 and unreadable plugin file scenarios through the security gate + tool-dispatch bridge
-    - no unexpected raw decode/read exceptions leak to command/tool surfaces
-  - Closure evidence:
-    - `src/lily/runtime/security_language_policy.py` (deterministic `file_read_error` and `file_decode_error` mapping)
-    - `tests/unit/runtime/test_security_language_policy.py` (scanner-level decode/read/syntax failure coverage)
-    - `tests/unit/runtime/test_security.py` (SecurityGate boundary mapping for decode/read failures)
-    - `tests/unit/runtime/test_tool_dispatch_executor.py` (tool-dispatch bridge mapping for decode/read failures)
-
-- [x] Add pre-execution language restriction layer (RestrictedPython or equivalent AST policy)
-  - Issue draft: `docs/dev/debt/issues/debt-p1-language-restriction-layer.md`
-  - Owner: `@team`
-  - Closed: `2026-03-03`
-  - Current state: AST restriction layer is implemented and integrated before preflight in plugin authorization flow with deterministic deny envelopes and store-backed scan caching.
-  - Why this matters:
-    - container isolation is the primary boundary, but language restriction is valuable defense-in-depth
-    - catches risky constructs earlier with clearer deterministic denials
-    - reduces blast radius of parser/runtime bypass attempts
-  - Exit criteria:
-    - deterministic pre-execution restriction layer is active for plugin code
-    - denial codes/messages are stable and covered by tests
-    - docs explicitly describe layered security model (language restriction + container isolation)
-  - Closure evidence:
-    - `tests/unit/runtime/test_security_language_policy.py` (policy + cache matrix)
-    - `tests/unit/runtime/test_security.py` (SecurityGate integration + store cache roundtrip)
-    - `tests/unit/runtime/test_tool_dispatch_executor.py` (deterministic tool-envelope mapping)
-    - `docs/dev/debt/issues/debt-p1-language-restriction-layer.md` (layered security model documented: language restriction + container isolation)
-
 ### P2
 
 - [ ] Align `tech-debt` command to canonical debt ledger path
@@ -98,18 +62,6 @@ Priority scale:
     - dependency path upgraded/fixed so no suppression is required
     - warning filter entry removed from `pyproject.toml`
     - quality/test runs remain warning-clean
-
-- [x] Integrate pytest-drill-sergeant for test quality enforcement
-  - Owner: `@team`
-  - Closed: `2026-02-20`
-  - Current state: plugin now enforces marker classification and applies AAA/file-length policy in configured mode.
-  - Reference: [pytest-drill-sergeant on PyPI](https://pypi.org/project/pytest-drill-sergeant/)
-  - Evidence:
-    - dev dependency added: `pytest-drill-sergeant`
-    - pytest config wired in `pyproject.toml` (`drill_sergeant_*` options)
-    - marker mapping aligned for existing layout: `contracts -> integration`
-    - AAA enabled in `basic` mode; file-length rule configured (`max=1200`, `mode=warn`)
-    - full gate run passes with plugin active via `just quality test`
 
 - [ ] Add configurable safe-runtime ruleset profiles
   - Issue draft: `TBD`
@@ -181,15 +133,55 @@ Priority scale:
     - CLI tests are split by concern (bootstrap/run/repl/rendering)
     - no behavior contract coverage is lost during split
 
-- [x] Consolidate planning docs to reduce stale duplication
-  - Owner: `@team`
-  - Closed: `2026-02-17`
-  - Evidence:
-    - `docs/archive/dev/punchlist.md` converted to archived summary + canonical links
-    - `ideas/later_backlog.md` reduced to curated idea list (non-status tracker)
-    - `docs/dev/roadmap.md` updated with explicit status ownership and current execution rule
-
 ## Recently Closed Debt
+
+- [x] Harden language-policy file-read/decode failure path to deterministic deny envelope
+  - Issue draft: `TBD`
+  - Owner: `@team`
+  - Closed: `2026-03-03`
+  - Current state:
+    - language-policy scan now converts read and UTF-8 decode failures into deterministic `security_language_policy_denied` envelopes
+    - syntax parse failures remain deterministic `syntax_error` denials
+  - Exit criteria:
+    - plugin file read/decode/parsing failures are converted to deterministic security denial codes/messages/data
+    - tests cover non-UTF8 and unreadable plugin file scenarios through the security gate + tool-dispatch bridge
+    - no unexpected raw decode/read exceptions leak to command/tool surfaces
+  - Closure evidence:
+    - `src/lily/runtime/security_language_policy.py` (deterministic `file_read_error` and `file_decode_error` mapping)
+    - `tests/unit/runtime/test_security_language_policy.py` (scanner-level decode/read/syntax failure coverage)
+    - `tests/unit/runtime/test_security.py` (SecurityGate boundary mapping for decode/read failures)
+    - `tests/unit/runtime/test_tool_dispatch_executor.py` (tool-dispatch bridge mapping for decode/read failures)
+
+- [x] Add pre-execution language restriction layer (RestrictedPython or equivalent AST policy)
+  - Issue draft: `docs/dev/debt/issues/debt-p1-language-restriction-layer.md`
+  - Owner: `@team`
+  - Closed: `2026-03-03`
+  - Current state: AST restriction layer is implemented and integrated before preflight in plugin authorization flow with deterministic deny envelopes and store-backed scan caching.
+  - Why this matters:
+    - container isolation is the primary boundary, but language restriction is valuable defense-in-depth
+    - catches risky constructs earlier with clearer deterministic denials
+    - reduces blast radius of parser/runtime bypass attempts
+  - Exit criteria:
+    - deterministic pre-execution restriction layer is active for plugin code
+    - denial codes/messages are stable and covered by tests
+    - docs explicitly describe layered security model (language restriction + container isolation)
+  - Closure evidence:
+    - `tests/unit/runtime/test_security_language_policy.py` (policy + cache matrix)
+    - `tests/unit/runtime/test_security.py` (SecurityGate integration + store cache roundtrip)
+    - `tests/unit/runtime/test_tool_dispatch_executor.py` (deterministic tool-envelope mapping)
+    - `docs/dev/debt/issues/debt-p1-language-restriction-layer.md` (layered security model documented: language restriction + container isolation)
+
+- [x] Integrate pytest-drill-sergeant for test quality enforcement
+  - Owner: `@team`
+  - Closed: `2026-02-20`
+  - Current state: plugin now enforces marker classification and applies AAA/file-length policy in configured mode.
+  - Reference: [pytest-drill-sergeant on PyPI](https://pypi.org/project/pytest-drill-sergeant/)
+  - Evidence:
+    - dev dependency added: `pytest-drill-sergeant`
+    - pytest config wired in `pyproject.toml` (`drill_sergeant_*` options)
+    - marker mapping aligned for existing layout: `contracts -> integration`
+    - AAA enabled in `basic` mode; file-length rule configured (`max=1200`, `mode=warn`)
+    - full gate run passes with plugin active via `just quality test`
 
 - [x] Add typed skill/tool contracts (input/output schemas)
   - Closed: `2026-02-17`
@@ -207,3 +199,11 @@ Priority scale:
     - runtime close hooks wired (`RuntimeFacade` + conversation executor)
     - pytest `ResourceWarning` escalated to error
     - `just quality test` and `pytest` run warning-clean
+
+- [x] Consolidate planning docs to reduce stale duplication
+  - Owner: `@team`
+  - Closed: `2026-02-17`
+  - Evidence:
+    - `docs/archive/dev/punchlist.md` converted to archived summary + canonical links
+    - `ideas/later_backlog.md` reduced to curated idea list (non-status tracker)
+    - `docs/dev/roadmap.md` updated with explicit status ownership and current execution rule
