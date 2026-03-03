@@ -67,6 +67,13 @@ Minimum checks:
 - Ensure referenced files actually exist.
 - Ensure new required sections in command templates are present.
 - Ensure AGENTS workflow references remain accurate.
+- Ensure command examples map to real local targets:
+  - `just --list`
+  - verify every `just <target>` reference added/edited in this retro pass exists in `just --list`
+
+Recommended verification snippets:
+- `rg -n "\\.ai/REF/|\\.ai/COMMANDS/|\\.ai/PLANS/" .ai AGENTS.md`
+- `test -f <path-from-reference>`
 
 ## Required Deliverables
 
@@ -107,4 +114,3 @@ Minimum checks:
 ## Residual Risks
 - ...
 ```
-

@@ -28,7 +28,8 @@ Use this command as the canonical validation reference from other workflows.
 
 - `just lint`
 - `just format-check`
-- `just typecheck`
+- `just types`
+- `just docs-check`
 - `just test`
 
 Use this level during development loops.
@@ -36,8 +37,6 @@ Use this level during development loops.
 ### Level 2: Full quality gate
 
 - Preferred final gate:
-  - `just quality-fix test`
-- Strict alternative:
   - `just quality && just test`
 
 Use one of the above before commit/PR handoff.
@@ -103,10 +102,10 @@ For user-visible features, include:
 
 - `just lint`
 - `just format-check`
-- `just typecheck`
+- `just types`
+- `just docs-check`
 - `just test`
-- `just quality-fix test` (preferred final gate)
-- `just quality && just test` (strict alternative)
+- `just quality && just test` (required final gate)
 
 Project-specific examples:
 - `just render-demo`
@@ -116,6 +115,6 @@ Project-specific examples:
 
 - Baseline checks pass (or documented, user-approved exception).
 - Plan-required validation commands pass.
-- Final big-check gate passes (`just quality-fix test` or `just quality && just test`).
+- Final big-check gate passes (`just quality && just test`).
 - Warnings are addressed where feasible, with explicit documentation for any accepted residual warnings.
 - Evidence is captured in execution summary and/or plan `## Execution Report`.

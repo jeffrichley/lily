@@ -26,8 +26,31 @@ This document is not authoritative for:
 - Debt-driven follow-through from `docs/dev/debt/debt_tracker.md`.
 - Priority-4 feature planning for real agent subsystem migration (`docs/dev/roadmap.md`).
 
+## Focus Quality Criteria
+
+Use this rubric when updating `## Current Focus`.
+
+1. Selection scope:
+   - keep only items expected to be actively executed in the next 3-7 days
+   - keep 2-4 bullets maximum
+   - ensure each bullet maps to a canonical source (`docs/dev/roadmap.md`, `docs/dev/debt/debt_tracker.md`, or a specific plan path)
+2. Bullet quality:
+   - write bullets as `outcome + source path`
+   - prefer concrete outcomes over generic activity labels
+3. Freshness:
+   - on each phase completion, either advance the same bullet or replace it with the next active item
+   - if unchanged for 7+ days, document blocker rationale in `## Diary Log`
+4. Non-goals:
+   - do not list completed work
+   - do not list long-horizon ideas not in active execution
+   - do not mix internal implementation detail into user-visible feature bullets
+5. Validation:
+   - update `last_updated` in the same edit when focus changes
+   - run `just docs-check` and `just status` after edits
+
 ## Recently Completed
 
+- Status sync workflow and runbook/command enforcement delivered (`.ai/PLANS/006-status-sync-system.md`).
 - Real agent subsystem phase-0 migration completed (`.ai/PLANS/005-p4-agent-subsystem-phase0.md`).
 - Jobs execution phases J0-J3 completed (`docs/dev/plans/jobs_execution_plan.md`).
 - E2E execution phases 1-5 completed (`docs/dev/plans/e2e_execution_plan.md`).
@@ -40,6 +63,7 @@ This document is not authoritative for:
 
 ## Diary Log
 
+- 2026-03-03: Delivered status-sync system (`status-sync`, `phase-intent-check`, PR polling loop, runbook cadence, `status-ready`, and status report coverage for `.ai/PLANS`) and validated with docs/status gates.
 - 2026-03-03: Completed agent subsystem Phase 4 with e2e `/agent` registry coverage and persona/agent state boundary assertions; updated roadmap/spec indexes to reflect first-class agent runtime path completion.
 - 2026-03-02: Completed language restriction layer implementation phases (AST policy contract, SecurityGate integration, deterministic scan cache) and related tests; debt closure intentionally deferred pending review conversation.
 - 2026-03-02: Docs cleanup pass started. Reconciled stale status references and aligned tracker roles.

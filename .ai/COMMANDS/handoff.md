@@ -20,6 +20,7 @@ Create a concise, high-signal handoff so the next agent/human can continue work 
 
 - `git status --short`
 - `git log --oneline --decorate -n 10`
+- `just status`
 - active plan `## Implementation Plan`, `## Plan Patch` (if any), `## Execution Report` (if any)
 - most recent validation results from `.ai/COMMANDS/validate.md`
 

@@ -20,8 +20,7 @@ This file is the canonical rulebook for coding agents in this repository.
 3. Validate every meaningful change.
 - Run relevant validation commands after edits.
 - For changes touching lint, typing, security, or tests, run final gate:
-  - `just quality-fix test` (preferred)
-  - or `just quality && just test` (strict alternative).
+  - `just quality && just test`.
 - Address warnings where feasible; document accepted residual warnings with rationale.
 
 4. Keep changes small and reversible.
@@ -45,12 +44,11 @@ Use `just` targets from repo root.
 Minimum expected flow:
 - `just lint`
 - `just format-check`
-- `just typecheck`
+- `just types`
 - `just test`
 
 Final gate (required before commit/PR handoff):
-- `just quality-fix test` (preferred)
-- or `just quality && just test` (strict alternative)
+- `just quality && just test`
 
 Warning policy:
 - warnings should be resolved where feasible, not ignored by default
@@ -78,6 +76,7 @@ Keep package responsibilities explicit and isolated; avoid hidden cross-coupling
 ## Documentation Hygiene
 - When introducing new constraints or invariants, update this file and relevant `.ai/REF/*` docs in the same change.
 - Keep this file concise; place deep examples and package-specific guidance in `.ai/REF/`.
+- Ensure all file paths referenced from `.ai/RULES.md` and `.ai/COMMANDS/*` actually exist in the repository.
 - Plans for features that produce user-observable outputs must include:
   - Exact output artifacts and verification commands.
   - A "Definition of Visible Done" section describing what a human can open, run, inspect, or otherwise verify directly.
@@ -86,18 +85,14 @@ Keep package responsibilities explicit and isolated; avoid hidden cross-coupling
   - Re-generation or setup commands for prerequisites.
 
 ## Package-Specific References (Read On Demand)
-- `.ai/REF/platform-overview.md`
-- `.ai/REF/packages-chrona-core-engine.md`
-- `.ai/REF/packages-chrona-media.md`
-- `.ai/REF/packages-other-platform.md`
-- `.ai/REF/studios-and-runs.md`
-- `.ai/REF/engines-and-models.md`
+- `.ai/REF/README.md`
+- `.ai/REF/just-targets.md`
+- `.ai/REF/status-surfaces.md`
+- `.ai/REF/testing-and-gates.md`
+- `.ai/REF/plan-authoring.md`
 
 ## Project-Type Rule References (Read If Applicable)
-- `.ai/REF/project-types/README.md`
 - `.ai/REF/project-types/cli-tool.md`
-- `.ai/REF/project-types/library-package.md`
-- `.ai/REF/project-types/service-backend.md`
 
 ## Output Convention
 - Plans: `.ai/PLANS/<NNN>-<feature>.md`

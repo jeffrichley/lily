@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-03-02"
+last_updated: "2026-03-03"
 status: "active"
 source_of_truth: true
 ---
@@ -66,6 +66,19 @@ Priority scale:
     - `tests/unit/runtime/test_tool_dispatch_executor.py` (deterministic tool-envelope mapping)
 
 ### P2
+
+- [ ] Align `tech-debt` command to canonical debt ledger path
+  - Issue draft: `TBD`
+  - Owner: `@team`
+  - Target: `2026-03-17`
+  - Current state:
+    - `.ai/COMMANDS/tech-debt.md` instructs agents to update `.ai/TECHNICAL_DEBT.md`
+    - canonical debt source of truth is `docs/dev/debt/debt_tracker.md`
+    - `.ai/TECHNICAL_DEBT.md` does not exist, causing workflow ambiguity
+  - Exit criteria:
+    - `tech-debt` command points to `docs/dev/debt/debt_tracker.md`
+    - command text aligns with debt tracker structure/authority rules
+    - no `.ai/TECHNICAL_DEBT.md` references remain in active command workflows
 
 - [ ] Eliminate third-party deprecation warning workaround (`trustcall`)
   - Issue draft: `docs/dev/debt/issues/debt-p1-trustcall-warning.md`
