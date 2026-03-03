@@ -81,3 +81,30 @@ def test_recover_corrupt_session_moves_file_aside(tmp_path: Path) -> None:
     assert backup.name.startswith("session.json.corrupt-")
     assert not path.exists()
     assert backup.exists()
+
+
+@pytest.mark.unit
+def test_load_v1_payload_without_active_persona_sets_default(tmp_path: Path) -> None:
+    """Loader should fill missing active_persona with deterministic default."""
+    # Arrange - persist legacy-like v1 payload missing active_persona field
+    path = tmp_path / "session.json"
+    legacy_payload = {
+        "schema_version": SESSION_SCHEMA_VERSION,
+        "session": {
+            "session_id": "legacy-session",
+            "active_agent": "ops",
+            "active_style": None,
+            "skill_snapshot": {"version": "v-test", "skills": []},
+            "model_config": {"model_name": "default", "temperature": 0.0},
+            "conversation_state": [],
+            "skill_snapshot_config": None,
+        },
+    }
+    path.write_text(json.dumps(legacy_payload), encoding="utf-8")
+
+    # Act - load through migration-aware session store
+    loaded = load_session(path)
+
+    # Assert - missing persona is populated with explicit default
+    assert loaded.active_persona == "default"
+    assert loaded.active_agent == "ops"

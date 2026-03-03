@@ -68,7 +68,7 @@ class ConversationOrchestrator:
         Returns:
             Deterministic conversation command result envelope.
         """
-        persona = self._resolve_persona(session.active_agent)
+        persona = self._resolve_persona(session.active_persona)
         style_level = (
             session.active_style
             or self._derive_context_style(text)

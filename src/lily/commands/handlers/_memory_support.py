@@ -95,7 +95,7 @@ def build_personality_namespace(*, session: Session, domain: str) -> str:
     Returns:
         Deterministic namespace token.
     """
-    persona = session.active_agent.strip() or "default"
+    persona = session.active_persona.strip() or "default"
     scope = _memory_owner_scope(session)
     return "/".join((domain, scope, f"persona:{persona}"))
 

@@ -110,7 +110,7 @@ def run_restart_continuity_suite(*, temp_dir: Path) -> EvalSuiteReport:
             reserved_commands={"remember", "memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade()
     session_file = temp_dir / "session.json"
 
@@ -206,7 +206,7 @@ def run_policy_redline_suite(*, temp_dir: Path) -> EvalSuiteReport:
             reserved_commands={"remember", "memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade(memory_tooling_enabled=True)
     remember_denied = runtime.handle_input("/remember token=abc123", session)
     tool_denied = runtime.handle_input(
@@ -243,7 +243,7 @@ def run_retrieval_relevance_suite(*, temp_dir: Path) -> EvalSuiteReport:
             reserved_commands={"remember"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     capture = _ConversationCaptureExecutor()
     runtime = RuntimeFacade(conversation_executor=capture)
     try:
@@ -331,7 +331,7 @@ def run_memory_phase7_observability_sample(*, temp_dir: Path) -> dict[str, objec
             reserved_commands={"remember", "memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade(consolidation_enabled=True)
     try:
         _ = runtime.handle_input("/remember favorite number is 42", session)
@@ -386,7 +386,7 @@ def run_performance_benchmark_suite(*, temp_dir: Path) -> EvalSuiteReport:
             reserved_commands={"remember", "memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     capture = _ConversationCaptureExecutor()
     runtime = RuntimeFacade(conversation_executor=capture)
     runtime_with_consolidation = RuntimeFacade(

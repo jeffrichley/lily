@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-03-02"
+last_updated: "2026-03-03"
 status: "active"
 source_of_truth: true
 ---
@@ -28,6 +28,7 @@ This document is not authoritative for:
 
 ## Recently Completed
 
+- Real agent subsystem phase-0 migration completed (`.ai/PLANS/005-p4-agent-subsystem-phase0.md`).
 - Jobs execution phases J0-J3 completed (`docs/dev/plans/jobs_execution_plan.md`).
 - E2E execution phases 1-5 completed (`docs/dev/plans/e2e_execution_plan.md`).
 - RuntimeFacade decomposition plan delivered (`docs/dev/plans/runtime_facade_refactor_plan.md`).
@@ -39,6 +40,7 @@ This document is not authoritative for:
 
 ## Diary Log
 
+- 2026-03-03: Completed agent subsystem Phase 4 with e2e `/agent` registry coverage and persona/agent state boundary assertions; updated roadmap/spec indexes to reflect first-class agent runtime path completion.
 - 2026-03-02: Completed language restriction layer implementation phases (AST policy contract, SecurityGate integration, deterministic scan cache) and related tests; debt closure intentionally deferred pending review conversation.
 - 2026-03-02: Docs cleanup pass started. Reconciled stale status references and aligned tracker roles.
 - 2026-03-02: Pulled upstream docs updates for debt issue drafts (PR #14).

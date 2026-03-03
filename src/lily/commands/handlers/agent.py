@@ -1,39 +1,24 @@
-"""Handler for /agent subcommands (persona-backed compatibility surface)."""
+"""Handler for /agent subcommands."""
 
 from __future__ import annotations
 
-from typing import Protocol
-
+from lily.agents import AgentNotFoundError, AgentService
+from lily.agents.models import AgentProfile
 from lily.commands.parser import CommandCall
 from lily.commands.types import CommandResult
-from lily.persona import PersonaCatalog, PersonaProfile
 from lily.session.models import Session
-
-
-class AgentRepositoryPort(Protocol):
-    """Persona repository subset required by `/agent` compatibility command."""
-
-    def load_catalog(self) -> PersonaCatalog:
-        """Load deterministic persona catalog."""
-
-    def get(self, persona_id: str) -> PersonaProfile | None:
-        """Resolve one persona by id.
-
-        Args:
-            persona_id: Persona identifier.
-        """
 
 
 class AgentCommand:
     """Deterministic `/agent list|use|show` command handler."""
 
-    def __init__(self, repository: AgentRepositoryPort) -> None:
-        """Create handler with shared persona repository dependency.
+    def __init__(self, service: AgentService) -> None:
+        """Create handler with agent service dependency.
 
         Args:
-            repository: Persona repository implementation.
+            service: Agent service implementation.
         """
-        self._repository = repository
+        self._service = service
 
     def execute(self, call: CommandCall, session: Session) -> CommandResult:
         """Execute `/agent` subcommands.
@@ -80,14 +65,14 @@ class AgentCommand:
                 code="invalid_args",
                 data={"command": "agent"},
             )
-        catalog = self._repository.load_catalog()
+        profiles = self._service.list_agents()
         rows = [
             {
-                "agent": profile.persona_id,
+                "agent": profile.agent_id,
                 "summary": profile.summary,
-                "active": profile.persona_id == session.active_agent,
+                "active": profile.agent_id == session.active_agent,
             }
-            for profile in catalog.personas
+            for profile in profiles
         ]
         lines = [
             f"{'*' if row['active'] else ' '} {row['agent']} - {row['summary']}"
@@ -116,22 +101,18 @@ class AgentCommand:
                 data={"command": "agent"},
             )
         agent_id = args[0].strip().lower()
-        profile = self._repository.get(agent_id)
-        if profile is None:
+        try:
+            profile = self._service.set_active_agent(session, agent_id)
+        except AgentNotFoundError:
             return CommandResult.error(
                 f"Error: agent '{agent_id}' was not found.",
                 code="agent_not_found",
                 data={"agent": agent_id},
             )
-        session.active_agent = profile.persona_id
-        session.active_style = None
         return CommandResult.ok(
-            (
-                f"Active agent set to '{profile.persona_id}' "
-                "(persona-backed compatibility mode)."
-            ),
+            f"Active agent set to '{profile.agent_id}'.",
             code="agent_set",
-            data={"agent": profile.persona_id},
+            data={"agent": profile.agent_id},
         )
 
     def _show_agent(self, args: tuple[str, ...], session: Session) -> CommandResult:
@@ -150,7 +131,7 @@ class AgentCommand:
                 code="invalid_args",
                 data={"command": "agent"},
             )
-        profile = self._repository.get(session.active_agent)
+        profile = self._service.get_agent(session.active_agent)
         if profile is None:
             return CommandResult.error(
                 f"Error: active agent '{session.active_agent}' is missing.",
@@ -158,7 +139,19 @@ class AgentCommand:
                 data={"agent": session.active_agent},
             )
         return CommandResult.ok(
-            f"Agent: {profile.persona_id}\nSummary: {profile.summary}",
+            _render_agent_details(profile),
             code="agent_shown",
-            data={"agent": profile.persona_id, "summary": profile.summary},
+            data={"agent": profile.agent_id, "summary": profile.summary},
         )
+
+
+def _render_agent_details(profile: AgentProfile) -> str:
+    """Render one agent detail block.
+
+    Args:
+        profile: Resolved agent profile.
+
+    Returns:
+        Deterministic multi-line details.
+    """
+    return f"Agent: {profile.agent_id}\nSummary: {profile.summary}"

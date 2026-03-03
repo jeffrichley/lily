@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.panel import Panel
 
+from lily.agents import FileAgentRepository
 from lily.config import GlobalConfigError, LilyGlobalConfig, load_global_config
 from lily.memory import ConsolidationBackend as MemoryConsolidationBackend
 from lily.memory import (
@@ -318,6 +319,7 @@ def build_runtime_for_workspace(
     result = build_checkpointer(config.checkpointer)
     return RuntimeFacade(
         conversation_checkpointer=result.saver,
+        agent_repository=FileAgentRepository(root_dir=workspace_dir.parent / "agents"),
         memory_tooling_enabled=config.memory_tooling.enabled,
         memory_tooling_auto_apply=config.memory_tooling.auto_apply,
         consolidation_enabled=config.consolidation.enabled,

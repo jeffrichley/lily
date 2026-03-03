@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-18"
+last_updated: "2026-03-03"
 status: "active"
 source_of_truth: true
 ---
@@ -11,6 +11,7 @@ Purpose: index active/current specifications.
 
 ## Active Domains
 
+- `docs/specs/agents/agent_subsystem_v1.md`
 - `docs/specs/agents/skills_platform_v1.md`
 - `docs/specs/agents/supervisor_subagents_v1.md`
 - `docs/specs/blueprints/blueprint_spec_v0.md`

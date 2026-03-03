@@ -113,8 +113,21 @@ def _migrate_payload(payload: object) -> dict[str, object]:
         raise SessionDecodeError("Invalid session payload: expected JSON object.")
     version = payload.get("schema_version")
     if version == SESSION_SCHEMA_VERSION:
+        _migrate_v1_session_defaults(payload)
         return payload
     raise SessionSchemaVersionError(
         f"Unsupported session schema version: {version!r}. "
         f"Expected {SESSION_SCHEMA_VERSION}."
     )
+
+
+def _migrate_v1_session_defaults(payload: dict[str, object]) -> None:
+    """Fill missing V1 session fields with deterministic explicit defaults.
+
+    Args:
+        payload: Decoded V1 payload object mutated in place.
+    """
+    session_raw = payload.get("session")
+    if not isinstance(session_raw, dict):
+        return
+    session_raw.setdefault("active_persona", "default")

@@ -35,16 +35,6 @@ Priority scale:
 
 ### P1
 
-- [ ] Eliminate third-party deprecation warning workaround (`trustcall`)
-  - Issue draft: `docs/dev/debt/issues/debt-p1-trustcall-warning.md`
-  - Owner: `@team`
-  - Target: `2026-03-15`
-  - Current state: pytest suppresses `trustcall._base` deprecation warning about `Send` import path.
-  - Exit criteria:
-    - dependency path upgraded/fixed so no suppression is required
-    - warning filter entry removed from `pyproject.toml`
-    - quality/test runs remain warning-clean
-
 - [ ] Harden language-policy file-read/decode failure path to deterministic deny envelope
   - Issue draft: `TBD`
   - Owner: `@team`
@@ -76,6 +66,19 @@ Priority scale:
     - `tests/unit/runtime/test_tool_dispatch_executor.py` (deterministic tool-envelope mapping)
 
 ### P2
+
+- [ ] Eliminate third-party deprecation warning workaround (`trustcall`)
+  - Issue draft: `docs/dev/debt/issues/debt-p1-trustcall-warning.md`
+  - Execution plan: `.ai/PLANS/004-p1-trustcall-warning-removal.md`
+  - Owner: `@team`
+  - Target: `2026-03-15`
+  - Current state:
+    - pytest suppresses `trustcall._base` deprecation warning about `Send` import path
+    - upstream latest currently still emits this warning path, so immediate no-downgrade removal is blocked
+  - Exit criteria:
+    - dependency path upgraded/fixed so no suppression is required
+    - warning filter entry removed from `pyproject.toml`
+    - quality/test runs remain warning-clean
 
 - [x] Integrate pytest-drill-sergeant for test quality enforcement
   - Owner: `@team`

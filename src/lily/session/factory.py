@@ -39,6 +39,7 @@ class SessionFactory:
         self,
         *,
         active_agent: str = "default",
+        active_persona: str = "default",
         model_config: ModelConfig | None = None,
         session_id: str | None = None,
     ) -> Session:
@@ -46,6 +47,7 @@ class SessionFactory:
 
         Args:
             active_agent: Initial active agent identifier.
+            active_persona: Initial active persona identifier.
             model_config: Optional model behavior override for this session.
             session_id: Optional explicit session ID.
 
@@ -65,6 +67,7 @@ class SessionFactory:
         )
 
         payload: dict[str, object] = {
+            "active_persona": active_persona,
             "active_agent": active_agent,
             "skill_snapshot": snapshot,
             "model_config": model_config or ModelConfig(),

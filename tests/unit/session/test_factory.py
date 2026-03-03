@@ -54,6 +54,7 @@ invocation_mode: llm_orchestration
 
     # Assert - session and snapshot match expected
     assert session.session_id == "session-001"
+    assert session.active_persona == "default"
     assert session.active_agent == "default"
     assert session.model_settings.model_name == "stub-model"
     assert len(session.skill_snapshot.skills) == 1
@@ -117,3 +118,28 @@ invocation_mode: llm_orchestration
     new_session = factory.create()
     new_names = [entry.name for entry in new_session.skill_snapshot.skills]
     assert new_names == ["echo", "new_skill"]
+
+
+@pytest.mark.unit
+def test_create_supports_explicit_independent_persona_and_agent(tmp_path: Path) -> None:
+    """SessionFactory should preserve independent persona/agent defaults."""
+    # Arrange - create minimal skill roots and session factory
+    bundled_dir = tmp_path / "bundled"
+    workspace_dir = tmp_path / "workspace"
+    bundled_dir.mkdir()
+    workspace_dir.mkdir()
+    factory = SessionFactory(
+        SessionFactoryConfig(
+            bundled_dir=bundled_dir,
+            workspace_dir=workspace_dir,
+            platform="linux",
+            env={},
+        )
+    )
+
+    # Act - create session with independent persona and agent ids
+    session = factory.create(active_persona="writer", active_agent="ops")
+
+    # Assert - persona and agent are stored as independent fields
+    assert session.active_persona == "writer"
+    assert session.active_agent == "ops"

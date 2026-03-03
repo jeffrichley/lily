@@ -27,7 +27,7 @@ def test_memory_long_verify_updates_last_verified(tmp_path: Path) -> None:
             reserved_commands={"remember", "memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade()
 
     remembered = runtime.handle_input("/remember my favorite editor is vim", session)
@@ -69,7 +69,7 @@ def test_memory_long_show_excludes_conflicted_unless_requested(tmp_path: Path) -
             reserved_commands={"memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade(consolidation_enabled=True)
     session.conversation_state.append(
         Message(role=MessageRole.USER, content="My favorite color is green")
@@ -112,7 +112,7 @@ def test_scheduled_auto_consolidation_runs_on_interval(tmp_path: Path) -> None:
             reserved_commands={"memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     session.conversation_state.append(
         Message(role=MessageRole.USER, content="My favorite movie is Inception")
     )

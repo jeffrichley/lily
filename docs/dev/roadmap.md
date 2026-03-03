@@ -180,11 +180,11 @@ Execution rule:
 
 ## Planned Feature Tracks (Post-Core)
 
-- [ ] Real agent subsystem + `/agent` migration (Priority 4)
-  - Build an explicit agent registry/state model (not persona-compat mode).
-  - Rebind `/agent list|use|show` to real agent entities.
-  - Define deterministic migration behavior from current persona-backed commands.
-  - Add command + REPL coverage for registry/list/show/use flows.
+- [x] Real agent subsystem + `/agent` migration (Priority 4)
+  - Implemented explicit agent registry/repository/service model with structured agent contracts.
+  - Rebound `/agent list|use|show` to real agent entities (no persona-backed fallback).
+  - Added deterministic unit + e2e coverage for registry/list/use/show flows and persona/agent state independence.
+  - Deferred: supervisor/subagent orchestration remains tracked in `docs/specs/agents/supervisor_subagents_v1.md`.
 
 ## System Improvements (Internal Work)
 
@@ -214,3 +214,4 @@ For every new task:
 - 2026-02-14: Initial roadmap created as execution guide after Agent Mode v0 completion.
 - 2026-02-17: Pruned status ownership; active execution status moved to debt/domain plan docs.
 - 2026-02-21: Moved real `/agent` work from debt tracker into planned feature tracks.
+- 2026-03-03: Marked real `/agent` phase-0 migration complete with first-class agent registry/runtime binding and e2e coverage.

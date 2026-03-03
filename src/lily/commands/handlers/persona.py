@@ -264,14 +264,14 @@ class PersonaCommand:
         lines = []
         rows = []
         for profile in catalog.personas:
-            marker = "*" if profile.persona_id == session.active_agent else " "
+            marker = "*" if profile.persona_id == session.active_persona else " "
             lines.append(f"{marker} {profile.persona_id} - {profile.summary}")
             rows.append(
                 {
                     "persona": profile.persona_id,
                     "summary": profile.summary,
                     "default_style": profile.default_style.value,
-                    "active": profile.persona_id == session.active_agent,
+                    "active": profile.persona_id == session.active_persona,
                 }
             )
         return CommandResult.ok(
@@ -279,7 +279,7 @@ class PersonaCommand:
             code="persona_listed",
             data={
                 "count": len(catalog.personas),
-                "active": session.active_agent,
+                "active": session.active_persona,
                 "personas": rows,
             },
         )
@@ -302,7 +302,7 @@ class PersonaCommand:
                 code="persona_not_found",
                 data={"persona": normalized},
             )
-        session.active_agent = profile.persona_id
+        session.active_persona = profile.persona_id
         session.active_style = None
         return CommandResult.ok(
             (
@@ -325,15 +325,15 @@ class PersonaCommand:
         Returns:
             Success/error result.
         """
-        profile = self._repository.get(session.active_agent)
+        profile = self._repository.get(session.active_persona)
         if profile is None:
             return CommandResult.error(
                 (
-                    f"Error: active persona '{session.active_agent}' "
+                    f"Error: active persona '{session.active_persona}' "
                     "is missing from persona catalog."
                 ),
                 code="persona_not_found",
-                data={"persona": session.active_agent},
+                data={"persona": session.active_persona},
             )
         effective_style = session.active_style or profile.default_style
         lines = [
