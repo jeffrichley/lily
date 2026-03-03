@@ -23,8 +23,8 @@ This document is not authoritative for:
 
 ## Current Focus
 
-- Advance structured loader/command/executor trace events for runtime operability (Priority 4 system improvement) (`docs/dev/roadmap.md`).
-- Define file-locking strategy for multi-process persistence safety (Priority 3 system improvement) (`docs/dev/roadmap.md`).
+- Advance structured loader/command/executor trace events for runtime operability (Priority 4 system improvement, SI-007) (`docs/dev/roadmap.md`).
+- Define file-locking strategy for multi-process persistence safety (Priority 3 system improvement, SI-008) (`docs/dev/roadmap.md`).
 
 ## Focus Quality Criteria
 
@@ -50,11 +50,11 @@ Use this rubric when updating `## Current Focus`.
 
 ## Recently Completed
 
-- Closed P3 debt item for test-suite maintainability via module splits and repetitive-case parameterization (`docs/dev/debt/debt_tracker.md`).
-- Session persistence schema versioning and deterministic recovery coverage delivered (`.ai/PLANS/011-session-persistence-schema-versioning.md`).
+- Closed P3 debt item for test-suite maintainability via module splits and repetitive-case parameterization (DEBT-011) (`docs/dev/debt/debt_tracker.md`).
+- Session persistence schema versioning and deterministic recovery coverage delivered (SI-006) (`.ai/PLANS/011-session-persistence-schema-versioning.md`).
 - Seedling Copier template planning phase finalized and synced as complete (`.ai/PLANS/008-seedling-copier-template.md`).
-- Closed P1 debt item for deterministic language-policy read/decode/parse denial handling (`docs/dev/debt/debt_tracker.md`).
-- Closed P1 debt item for pre-execution language restriction layer with closure evidence (`docs/dev/debt/debt_tracker.md`).
+- Closed P1 debt item for deterministic language-policy read/decode/parse denial handling (DEBT-008) (`docs/dev/debt/debt_tracker.md`).
+- Closed P1 debt item for pre-execution language restriction layer with closure evidence (DEBT-009) (`docs/dev/debt/debt_tracker.md`).
 - Status sync workflow and runbook/command enforcement delivered (`.ai/PLANS/006-status-sync-system.md`).
 - Real agent subsystem phase-0 migration completed (`.ai/PLANS/005-p4-agent-subsystem-phase0.md`).
 - Jobs execution phases J0-J3 completed (`docs/dev/plans/jobs_execution_plan.md`).

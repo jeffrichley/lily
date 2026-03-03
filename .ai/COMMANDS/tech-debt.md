@@ -8,9 +8,9 @@ argument-hint: [optional-scope-path-or-plan]
 ## Objective
 
 Identify, prioritize, and document technical debt in one canonical file:
-- `.ai/TECHNICAL_DEBT.md`
+- `docs/dev/debt/debt_tracker.md`
 
-This command should update that file directly with concrete, actionable debt items.
+This command should update that file directly with concrete, actionable debt items and stable debt IDs.
 
 ## Inputs
 
@@ -46,23 +46,16 @@ For each item:
 
 ### 4. Update ledger
 
-Write updates only in `.ai/TECHNICAL_DEBT.md` using its template.
+Write updates only in `docs/dev/debt/debt_tracker.md` using its structure.
 
 Rules:
-- Keep IDs stable (`TD-001`, `TD-002`, ...).
+- Keep IDs stable (`DEBT-001`, `DEBT-002`, ...).
+- New open debt entries must include a unique `DEBT-XXX` token in the checkbox line.
+- If the debt maps to a roadmap system improvement, include:
+  - `Roadmap: SI-XXX`
 - Do not duplicate equivalent debt; merge evidence into existing entries.
-- Update `## All Debt Index (ID Order)` on every change.
-- Keep `## All Debt Index (ID Order)` sorted by ID ascending.
-- Ensure index rows include priority/severity (`P0`..`P3`) and match entry metadata.
-- Place entries into status-specific sections:
-  - `## Open`
-  - `## In Progress`
-  - `## Blocked`
-  - `## Resolved`
-- Move resolved items to `## Resolved` with resolution note/date.
-- Within each status section, sort by:
-  1. Priority (`P0` -> `P1` -> `P2` -> `P3`)
-  2. ID ascending
+- Follow tracker sections (`## Active Debt` by `P1/P2/P3`, and `## Recently Closed Debt`).
+- When resolving debt, move/update entry under `## Recently Closed Debt` with closure date and evidence.
 
 ## Required Output
 
@@ -76,6 +69,5 @@ Provide concise summary:
 
 - Every open debt item has concrete evidence and remediation steps.
 - No vague entries without impact or owner.
-- Ledger remains readable with clear status sections and priority sorting within each section.
-- `## All Debt Index (ID Order)` matches section entries and date fields.
-- `## All Debt Index (ID Order)` includes accurate priority/severity for each item.
+- Ledger remains readable with clear priority sections and deterministic ID labeling.
+- `DEBT-XXX` identifiers remain unique and stable.

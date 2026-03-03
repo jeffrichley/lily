@@ -67,7 +67,7 @@ For user-visible outputs, include proof commands (examples):
 - If a warning cannot be removed safely, document:
   - why it remains
   - why it is acceptable for now
-  - follow-up action (or add to `.ai/TECHNICAL_DEBT.md`)
+  - follow-up action (or add to `docs/dev/debt/debt_tracker.md` with a `DEBT-XXX` ID)
 - Do not ignore warning-heavy output during final gate checks.
 
 ## Parallel Fix Policy

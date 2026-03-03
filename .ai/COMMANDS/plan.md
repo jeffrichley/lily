@@ -20,6 +20,10 @@ Transform a feature request into a **comprehensive implementation plan** through
 - If prerequisites are needed, include input/resource provenance and regeneration/setup commands.
 - Include a `## Branch Setup` section with executable commands that derive the feature branch name from the plan filename.
 - For each implementation phase, include an `Intent Lock` section with: source-of-truth references, `Must`, `Must Not`, provenance mapping, and acceptance gates.
+- Include a `## Traceability Mapping` section:
+  - roadmap system improvements as `SI-XXX` (when applicable)
+  - debt items as `DEBT-XXX` and optional `Roadmap: SI-XXX` linkage (when applicable)
+  - explicit `No SI/DEBT mapping` statement when not applicable
 
 ## Planning Process
 
@@ -181,6 +185,13 @@ So that <benefit/value>
 **Estimated Complexity**: [Low/Medium/High]
 **Primary Systems Affected**: [List of main components/services]
 **Dependencies**: [External libraries or services required]
+
+## Traceability Mapping (Required When Applicable)
+
+- Roadmap system improvements: `<SI-XXX, SI-YYY>` or `None`
+- Debt items: `<DEBT-XXX, DEBT-YYY>` or `None`
+- Debt to roadmap linkage (if debt exists): `<DEBT-XXX -> SI-XXX>`
+- If not applicable, write: `No SI/DEBT mapping for this feature.`
 
 ## Branch Setup (Required)
 
@@ -454,6 +465,7 @@ For user-visible features, include explicit artifact verification commands (for 
 - [ ] Gotchas and anti-patterns captured
 - [ ] Every task has executable validation command
 - [ ] `## Branch Setup` section is present with executable plan-derived branch commands
+- [ ] `## Traceability Mapping` includes `SI/DEBT` IDs or explicit `No SI/DEBT mapping`
 
 ### Implementation Ready ✓
 
