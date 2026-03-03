@@ -15,7 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 STATUS_FILE = ROOT / "docs" / "dev" / "status.md"
 ROADMAP_FILE = ROOT / "docs" / "dev" / "roadmap.md"
 DEBT_FILE = ROOT / "docs" / "dev" / "debt" / "debt_tracker.md"
-PLANS_DIR = ROOT / "docs" / "dev" / "plans"
+DOMAIN_PLANS_DIR = ROOT / "docs" / "dev" / "plans"
+AI_PLANS_DIR = ROOT / ".ai" / "PLANS"
 
 
 @dataclass(frozen=True)
@@ -135,14 +136,29 @@ def main() -> int:
     console.print(docs_table)
 
     plan_table = Table(
-        title="Execution Plans", show_header=True, header_style="bold cyan"
+        title="Plan Trackers",
+        show_header=True,
+        header_style="bold cyan",
     )
+    plan_table.add_column("Surface")
     plan_table.add_column("Plan")
     plan_table.add_column("Lifecycle")
     plan_table.add_column("Open Tasks")
-    for plan in sorted(PLANS_DIR.glob("*_execution_plan.md")):
+    for plan in sorted(DOMAIN_PLANS_DIR.glob("*_execution_plan.md")):
         meta = _frontmatter(plan)
-        plan_table.add_row(plan.name, meta.status, str(_count_open_checkboxes(plan)))
+        plan_table.add_row(
+            "docs/dev/plans",
+            plan.name,
+            meta.status,
+            str(_count_open_checkboxes(plan)),
+        )
+    for plan in sorted(AI_PLANS_DIR.glob("*.md")):
+        plan_table.add_row(
+            ".ai/PLANS",
+            plan.name,
+            "n/a",
+            str(_count_open_checkboxes(plan)),
+        )
     console.print(plan_table)
 
     focus = _current_focus_items()

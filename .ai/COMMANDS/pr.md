@@ -51,6 +51,26 @@ When template exists:
 If no template exists:
 - use structured fallback format below
 
+### 5. Monitor CI checks to completion, then merge or fix
+
+After creating/updating the PR, do not stop at submission. Keep polling checks until they complete:
+
+- Get PR number:
+  - `gh pr view --json number -q .number`
+- Watch checks (preferred):
+  - `gh pr checks <PR_NUMBER> --watch --interval 10`
+- Polling fallback:
+  - `while true; do gh pr checks <PR_NUMBER>; sleep 10; done`
+
+Decision rule after checks complete:
+- If all required checks pass:
+  - merge PR (`gh pr merge <PR_NUMBER> --squash --delete-branch` or repo-standard merge mode)
+- If any required check fails:
+  - inspect failing job logs
+  - fix on the same branch
+  - re-run validation (`.ai/COMMANDS/validate.md`)
+  - push and continue polling until green
+
 ## Fallback PR Body Format
 
 ```markdown

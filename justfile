@@ -145,6 +145,9 @@ repl:
 status:
     uv run python scripts/status_report.py
 
+# Run docs validation plus status summary in one command.
+status-ready: docs-check status
+
 # Validate docs frontmatter values and active-doc staleness.
 docs-check:
     uv run python scripts/validate_docs_frontmatter.py --max-active-age-days 21

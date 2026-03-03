@@ -20,8 +20,7 @@ This file is the canonical rulebook for coding agents in this repository.
 3. Validate every meaningful change.
 - Run relevant validation commands after edits.
 - For changes touching lint, typing, security, or tests, run final gate:
-  - `just quality-fix test` (preferred)
-  - or `just quality && just test` (strict alternative).
+  - `just quality && just test`.
 - Address warnings where feasible; document accepted residual warnings with rationale.
 
 4. Keep changes small and reversible.
@@ -45,12 +44,11 @@ Use `just` targets from repo root.
 Minimum expected flow:
 - `just lint`
 - `just format-check`
-- `just typecheck`
+- `just types`
 - `just test`
 
 Final gate (required before commit/PR handoff):
-- `just quality-fix test` (preferred)
-- or `just quality && just test` (strict alternative)
+- `just quality && just test`
 
 Warning policy:
 - warnings should be resolved where feasible, not ignored by default

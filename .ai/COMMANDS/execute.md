@@ -57,6 +57,10 @@ For EACH task in "Step by Step Tasks":
 - If the plan includes checkbox tasks, mark them complete as each phase/task is finished.
 - Do not defer checklist updates until the end.
 
+#### e. Run status sync after each completed phase
+- Run `.ai/COMMANDS/status-sync.md <plan-path>` (or without a plan path when not applicable).
+- Ensure `just docs-check` and `just status` pass before moving to the next phase.
+
 ### 3. Implement Testing Strategy
 
 After completing implementation tasks:
