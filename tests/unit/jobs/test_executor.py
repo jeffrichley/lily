@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import time
+import threading
 from pathlib import Path
 
 import pytest
@@ -81,9 +81,9 @@ class _AlwaysSleepRunnable:
         self._delay_seconds = delay_seconds
 
     def invoke(self, raw_input: dict[str, object]) -> BlueprintRunEnvelope:
-        """Sleep and return success payload (usually too late)."""
+        """Wait and return success payload (usually too late)."""
         del raw_input
-        time.sleep(self._delay_seconds)
+        threading.Event().wait(timeout=self._delay_seconds)
         return BlueprintRunEnvelope(
             status=BlueprintRunStatus.OK,
             artifacts=("summary.md",),

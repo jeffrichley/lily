@@ -145,38 +145,38 @@ def test_tool_dispatch_returns_input_validation_error_deterministically() -> Non
 
 
 @pytest.mark.unit
-def test_tool_dispatch_conformance_for_three_tools() -> None:
-    """Typed contract conformance should hold for add/subtract/multiply tools."""
-    # Arrange - executor with add, subtract, multiply
+@pytest.mark.parametrize(
+    ("skill_name", "command_tool", "payload", "expected_message"),
+    [
+        ("add", "add", "20+42", "62"),
+        ("subtract", "subtract", "50-8", "42"),
+        ("multiply", "multiply", "6*7", "42"),
+    ],
+)
+def test_tool_dispatch_conformance_for_builtin_tools(
+    skill_name: str,
+    command_tool: str,
+    payload: str,
+    expected_message: str,
+) -> None:
+    """Typed contract conformance should hold for builtin arithmetic tools."""
+    # Arrange - executor with add, subtract, and multiply tools.
     executor = ToolDispatchExecutor(
         providers=(
             BuiltinToolProvider(tools=(AddTool(), SubtractTool(), MultiplyTool())),
         )
     )
 
-    # Act - execute each tool
-    add_result = executor.execute(
-        _entry(name="add", command_tool="add"),
+    # Act - execute the selected builtin tool case.
+    result = executor.execute(
+        _entry(name=skill_name, command_tool=command_tool),
         _session(),
-        "20+42",
+        payload,
     )
-    subtract_result = executor.execute(
-        _entry(name="subtract", command_tool="subtract"),
-        _session(),
-        "50-8",
-    )
-    multiply_result = executor.execute(
-        _entry(name="multiply", command_tool="multiply"),
-        _session(),
-        "6*7",
-    )
-    # Assert - each tool returns expected value
-    assert add_result.status.value == "ok"
-    assert add_result.message == "62"
-    assert subtract_result.status.value == "ok"
-    assert subtract_result.message == "42"
-    assert multiply_result.status.value == "ok"
-    assert multiply_result.message == "42"
+    # Assert - deterministic success envelope and rendered output.
+    assert result.status.value == "ok"
+    assert result.code == "tool_ok"
+    assert result.message == expected_message
 
 
 class _DummyInput(BaseModel):
@@ -479,13 +479,30 @@ def test_tool_dispatch_maps_plugin_runtime_error(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-def test_tool_dispatch_maps_language_policy_denial(tmp_path: Path) -> None:
-    """Language policy denials should map through tool dispatch deterministically."""
-    # Arrange - plugin source with import node and plugin provider dependencies.
+@pytest.mark.parametrize(
+    ("source_text", "source_bytes", "expected_signature"),
+    [
+        ("import os\n", None, "node_import"),
+        (None, b"\xff\xfe\x00", "file_decode_error"),
+    ],
+)
+def test_tool_dispatch_maps_language_policy_denials(
+    tmp_path: Path,
+    source_text: str | None,
+    source_bytes: bytes | None,
+    expected_signature: str,
+) -> None:
+    """Language policy denials should map through tool-dispatch deterministically."""
+    # Arrange - plugin source violating language policy and provider dependencies.
     skill_root = tmp_path / "skills" / "echo_plugin"
     skill_root.mkdir(parents=True, exist_ok=True)
     (skill_root / "SKILL.md").write_text("# plugin", encoding="utf-8")
-    (skill_root / "plugin.py").write_text("import os\n", encoding="utf-8")
+    plugin_path = skill_root / "plugin.py"
+    if source_text is not None:
+        plugin_path.write_text(source_text, encoding="utf-8")
+    else:
+        assert source_bytes is not None
+        plugin_path.write_bytes(source_bytes)
     entry = SkillEntry(
         name="echo_plugin",
         source=SkillSource.BUNDLED,
@@ -519,61 +536,12 @@ def test_tool_dispatch_maps_language_policy_denial(tmp_path: Path) -> None:
     # Act - execute plugin-backed tool.
     result = executor.execute(entry, session, "hello")
 
-    # Assert - security language denial is bridged to tool error envelope.
+    # Assert - denial is bridged to deterministic tool error envelope.
     assert result.status.value == "error"
     assert result.code == "security_language_policy_denied"
     assert result.data is not None
     assert result.data["path"] == "plugin.py"
-    assert result.data["signature"] == "node_import"
-
-
-@pytest.mark.unit
-def test_tool_dispatch_maps_language_policy_decode_denial(tmp_path: Path) -> None:
-    """Non-UTF8 plugin source should map through tool-dispatch deterministically."""
-    # Arrange - plugin source bytes that fail UTF-8 decode.
-    skill_root = tmp_path / "skills" / "echo_plugin"
-    skill_root.mkdir(parents=True, exist_ok=True)
-    (skill_root / "SKILL.md").write_text("# plugin", encoding="utf-8")
-    (skill_root / "plugin.py").write_bytes(b"\xff\xfe\x00")
-    entry = SkillEntry(
-        name="echo_plugin",
-        source=SkillSource.BUNDLED,
-        path=skill_root / "SKILL.md",
-        invocation_mode=InvocationMode.TOOL_DISPATCH,
-        command_tool_provider="plugin",
-        command_tool="execute",
-        capabilities=SkillCapabilitySpec(declared_tools=("plugin:execute",)),
-        plugin=SkillPluginSpec(entrypoint="plugin.py", source_files=("plugin.py",)),
-    )
-    providers = (
-        PluginToolProvider(
-            security_gate=SecurityGate(
-                hash_service=SecurityHashService(
-                    sandbox=SkillSandboxSettings(),
-                    project_root=Path.cwd(),
-                ),
-                preflight=SecurityPreflightScanner(),
-                store=SecurityApprovalStore(sqlite_path=tmp_path / "security.sqlite"),
-                prompt=_ApprovalPromptStub(),
-                sandbox=SkillSandboxSettings(),
-            ),
-            runner=_PluginRunnerStub(),
-        ),
-    )
-    executor = ToolDispatchExecutor(providers=providers)
-    session = _session().model_copy(
-        update={"skill_snapshot": SkillSnapshot(version="v-test", skills=(entry,))}
-    )
-
-    # Act - execute plugin-backed tool.
-    result = executor.execute(entry, session, "hello")
-
-    # Assert - decode denial is bridged to tool error envelope.
-    assert result.status.value == "error"
-    assert result.code == "security_language_policy_denied"
-    assert result.data is not None
-    assert result.data["path"] == "plugin.py"
-    assert result.data["signature"] == "file_decode_error"
+    assert result.data["signature"] == expected_signature
 
 
 @pytest.mark.unit

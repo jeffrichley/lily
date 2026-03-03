@@ -1,7 +1,7 @@
 ---
 owner: "@team"
-last_updated: "2026-03-02"
-status: "active"
+last_updated: "2026-03-03"
+status: "archived"
 source_of_truth: false
 ---
 

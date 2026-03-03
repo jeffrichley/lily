@@ -73,79 +73,47 @@ def test_language_policy_allows_safe_plugin_source(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-def test_language_policy_denies_import_node_deterministically(tmp_path: Path) -> None:
-    """Policy should deny import statements with deterministic payload fields."""
-    # Arrange - write plugin source containing an import statement.
-    skill_root = tmp_path / "skills" / "echo_plugin"
-    _write_skill(skill_root, {"plugin.py": "import os\n"})
-    entry = _entry(skill_root, source_files=("plugin.py",))
-    scanner = SecurityLanguagePolicy()
-
-    # Act - scan and capture deterministic deny error.
-    with pytest.raises(LanguagePolicyDeniedError) as exc_info:
-        scanner.scan(entry)
-    # Assert - deny payload contains stable code/message/data fields.
-    exc = exc_info.value
-    assert exc.code == "security_language_policy_denied"
-    assert "blocked rule 'node_import'" in exc.message
-    assert exc.data["skill"] == "echo_plugin"
-    assert exc.data["path"] == "plugin.py"
-    assert exc.data["signature"] == "node_import"
-    assert exc.data["rule_id"] == "node_import"
-
-
-@pytest.mark.unit
-def test_language_policy_denies_forbidden_builtin_call(tmp_path: Path) -> None:
-    """Policy should deny direct eval/exec-style builtin calls."""
-    # Arrange - write plugin source that directly calls eval.
-    skill_root = tmp_path / "skills" / "echo_plugin"
-    _write_skill(skill_root, {"plugin.py": "eval('1+1')\n"})
-    entry = _entry(skill_root, source_files=("plugin.py",))
-    scanner = SecurityLanguagePolicy()
-
-    # Act - scan and capture deterministic deny error.
-    with pytest.raises(LanguagePolicyDeniedError) as exc_info:
-        scanner.scan(entry)
-    # Assert - denial maps to forbidden builtin call rule.
-    assert exc_info.value.data["rule_id"] == "forbidden_builtin_call"
-
-
-@pytest.mark.unit
-def test_language_policy_denies_syntax_errors_deterministically(tmp_path: Path) -> None:
-    """Policy should treat syntax errors as deterministic deny events."""
-    # Arrange - write syntactically invalid plugin source.
-    skill_root = tmp_path / "skills" / "echo_plugin"
-    _write_skill(skill_root, {"plugin.py": "def run(:\n    return 1\n"})
-    entry = _entry(skill_root, source_files=("plugin.py",))
-    scanner = SecurityLanguagePolicy()
-
-    # Act - scan and capture deterministic deny error.
-    with pytest.raises(LanguagePolicyDeniedError) as exc_info:
-        scanner.scan(entry)
-    # Assert - denial rule is syntax_error with source path context.
-    assert exc_info.value.data["rule_id"] == "syntax_error"
-    assert exc_info.value.data["path"] == "plugin.py"
-
-
-@pytest.mark.unit
-def test_language_policy_denies_non_utf8_source_deterministically(
+@pytest.mark.parametrize(
+    ("source_text", "source_bytes", "expected_rule_id", "expected_message_fragment"),
+    [
+        ("import os\n", None, "node_import", "blocked rule 'node_import'"),
+        ("eval('1+1')\n", None, "forbidden_builtin_call", "forbidden_builtin_call"),
+        ("def run(:\n    return 1\n", None, "syntax_error", "syntax_error"),
+        (None, b"\xff\xfe\x00", "file_decode_error", "file_decode_error"),
+    ],
+)
+def test_language_policy_denies_violations_deterministically(
     tmp_path: Path,
+    source_text: str | None,
+    source_bytes: bytes | None,
+    expected_rule_id: str,
+    expected_message_fragment: str,
 ) -> None:
-    """Policy should deny non-UTF8 plugin source deterministically."""
-    # Arrange - write plugin source bytes that are invalid UTF-8.
+    """Policy should deny blocked source with deterministic rule identifiers."""
+    # Arrange - write one violating plugin source payload.
     skill_root = tmp_path / "skills" / "echo_plugin"
     skill_root.mkdir(parents=True, exist_ok=True)
     (skill_root / "SKILL.md").write_text("# test", encoding="utf-8")
-    (skill_root / "plugin.py").write_bytes(b"\xff\xfe\x00")
+    plugin_path = skill_root / "plugin.py"
+    if source_text is not None:
+        plugin_path.write_text(source_text, encoding="utf-8")
+    else:
+        assert source_bytes is not None
+        plugin_path.write_bytes(source_bytes)
     entry = _entry(skill_root, source_files=("plugin.py",))
     scanner = SecurityLanguagePolicy()
 
     # Act - scan and capture deterministic deny error.
     with pytest.raises(LanguagePolicyDeniedError) as exc_info:
         scanner.scan(entry)
-    # Assert - denial maps to non-UTF8 decode failure rule.
-    assert exc_info.value.data["rule_id"] == "file_decode_error"
-    assert exc_info.value.data["path"] == "plugin.py"
+    # Assert - stable code and payload fields are preserved.
+    exc = exc_info.value
+    assert exc.code == "security_language_policy_denied"
+    assert expected_message_fragment in exc.message
+    assert exc.data["skill"] == "echo_plugin"
+    assert exc.data["path"] == "plugin.py"
+    assert exc.data["signature"] == expected_rule_id
+    assert exc.data["rule_id"] == expected_rule_id
 
 
 @pytest.mark.unit

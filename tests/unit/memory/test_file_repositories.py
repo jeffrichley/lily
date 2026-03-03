@@ -16,6 +16,8 @@ from lily.memory import (
     MemoryWriteRequest,
 )
 
+_FIXED_NOW = datetime(2026, 1, 15, 12, 0, tzinfo=UTC)
+
 
 def _personality_repo(tmp_path: Path) -> FileBackedPersonalityMemoryRepository:
     """Create personality repo fixture."""
@@ -154,7 +156,7 @@ def test_query_excludes_archived_conflicted_and_expired_by_default(
     """Default query should hide archived/conflicted/expired records."""
     # Arrange - repo with verified, archived, conflicted, expired records
     repo = _personality_repo(tmp_path)
-    now = datetime.now(UTC)
+    now = _FIXED_NOW
     repo.remember(
         MemoryWriteRequest(
             namespace="global",

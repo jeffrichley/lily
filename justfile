@@ -6,7 +6,7 @@ set shell := ["sh", "-cu"]
 
 # Run all tests
 test:
-    uv run pytest
+    uv run pytest -n auto
 
 # Run end-to-end tests only
 e2e:
