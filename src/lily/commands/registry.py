@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from lily.agents import AgentService, FileAgentRepository
 from lily.commands.handlers.agent import AgentCommand
 from lily.commands.handlers.forget import ForgetCommand
 from lily.commands.handlers.help_skill import HelpSkillCommand
@@ -35,6 +36,8 @@ class CommandRegistry:
         *,
         skill_invoker: SkillInvoker,
         persona_repository: FilePersonaRepository | None = None,
+        agent_repository: FileAgentRepository | None = None,
+        agent_service: AgentService | None = None,
         memory_tooling_enabled: bool = False,
         memory_tooling_auto_apply: bool = False,
         consolidation_enabled: bool = False,
@@ -51,6 +54,8 @@ class CommandRegistry:
         Args:
             skill_invoker: Invoker dependency for `/skill` command execution.
             persona_repository: Optional persona repository for `/persona` commands.
+            agent_repository: Optional agent repository for `/agent` commands.
+            agent_service: Optional agent service for `/agent` commands.
             memory_tooling_enabled: Whether memory LangMem tool routes are enabled.
             memory_tooling_auto_apply: Whether standard memory routes auto-use tools.
             consolidation_enabled: Whether consolidation pipeline is enabled.
@@ -63,17 +68,106 @@ class CommandRegistry:
             handlers: Optional custom handlers keyed by command name.
         """
         self._skill_invoker = skill_invoker
-        repository = persona_repository or FilePersonaRepository(
-            root_dir=default_persona_root()
+        persona_repo = self._resolve_persona_repository(persona_repository)
+        resolved_agent_service = self._resolve_agent_service(
+            agent_repository=agent_repository,
+            agent_service=agent_service,
         )
-        self._handlers: dict[str, CommandHandler] = {
+        self._handlers = self._build_default_handlers(
+            skill_invoker=skill_invoker,
+            persona_repo=persona_repo,
+            agent_service=resolved_agent_service,
+            memory_tooling_enabled=memory_tooling_enabled,
+            memory_tooling_auto_apply=memory_tooling_auto_apply,
+            consolidation_enabled=consolidation_enabled,
+            consolidation_backend=consolidation_backend,
+            consolidation_llm_assisted_enabled=consolidation_llm_assisted_enabled,
+            evidence_chunking=evidence_chunking,
+        )
+        self._register_optional_jobs_handler(
+            jobs_executor=jobs_executor,
+            jobs_runs_root=jobs_runs_root,
+            jobs_scheduler_control=jobs_scheduler_control,
+        )
+        self._apply_handler_overrides(handlers=handlers)
+
+    @staticmethod
+    def _resolve_persona_repository(
+        persona_repository: FilePersonaRepository | None,
+    ) -> FilePersonaRepository:
+        """Resolve persona repository with deterministic default.
+
+        Args:
+            persona_repository: Optional external persona repository.
+
+        Returns:
+            Resolved persona repository.
+        """
+        if persona_repository is not None:
+            return persona_repository
+        return FilePersonaRepository(root_dir=default_persona_root())
+
+    @staticmethod
+    def _resolve_agent_service(
+        *,
+        agent_repository: FileAgentRepository | None,
+        agent_service: AgentService | None,
+    ) -> AgentService:
+        """Resolve agent service with deterministic default repository.
+
+        Args:
+            agent_repository: Optional external agent repository.
+            agent_service: Optional external agent service.
+
+        Returns:
+            Resolved agent service.
+        """
+        if agent_service is not None:
+            return agent_service
+        repository = (
+            agent_repository
+            if agent_repository is not None
+            else FileAgentRepository(root_dir=Path.cwd() / "agents")
+        )
+        return AgentService(repository)
+
+    @staticmethod
+    def _build_default_handlers(  # noqa: PLR0913
+        *,
+        skill_invoker: SkillInvoker,
+        persona_repo: FilePersonaRepository,
+        agent_service: AgentService,
+        memory_tooling_enabled: bool,
+        memory_tooling_auto_apply: bool,
+        consolidation_enabled: bool,
+        consolidation_backend: ConsolidationBackend,
+        consolidation_llm_assisted_enabled: bool,
+        evidence_chunking: EvidenceChunkingSettings | None,
+    ) -> dict[str, CommandHandler]:
+        """Build deterministic default handler map.
+
+        Args:
+            skill_invoker: Invoker dependency for `/skill` command execution.
+            persona_repo: Persona repository for `/persona` commands.
+            agent_service: Agent service for `/agent` commands.
+            memory_tooling_enabled: Whether memory LangMem tool routes are enabled.
+            memory_tooling_auto_apply: Whether standard memory routes auto-use tools.
+            consolidation_enabled: Whether consolidation pipeline is enabled.
+            consolidation_backend: Consolidation backend selection.
+            consolidation_llm_assisted_enabled: LLM-assisted consolidation toggle.
+            evidence_chunking: Evidence chunking settings.
+
+        Returns:
+            Handler map keyed by command name.
+        """
+        return {
             "skills": SkillsListCommand(),
             "skill": SkillInvokeCommand(skill_invoker),
             "help": HelpSkillCommand(),
             "reload_skills": ReloadSkillsCommand(),
-            "persona": PersonaCommand(repository),
-            "reload_persona": ReloadPersonaCommand(repository),
-            "agent": AgentCommand(repository),
+            "persona": PersonaCommand(persona_repo),
+            "reload_persona": ReloadPersonaCommand(persona_repo),
+            "agent": AgentCommand(agent_service),
             "style": StyleCommand(),
             "remember": RememberCommand(),
             "forget": ForgetCommand(),
@@ -86,14 +180,41 @@ class CommandRegistry:
                 evidence_chunking=evidence_chunking,
             ),
         }
+
+    def _register_optional_jobs_handler(
+        self,
+        *,
+        jobs_executor: JobExecutor | None,
+        jobs_runs_root: Path | None,
+        jobs_scheduler_control: JobSchedulerRuntime | None,
+    ) -> None:
+        """Register `/jobs` handler when jobs dependencies are provided.
+
+        Args:
+            jobs_executor: Optional jobs executor for `/jobs`.
+            jobs_runs_root: Optional run artifact root path for `/jobs`.
+            jobs_scheduler_control: Optional scheduler controls for `/jobs`.
+        """
         if jobs_executor is not None and jobs_runs_root is not None:
             self._handlers["jobs"] = JobsCommand(
                 jobs_executor,
                 runs_root=jobs_runs_root,
                 scheduler_control=jobs_scheduler_control,
             )
-        if handlers:
-            self._handlers.update(handlers)
+
+    def _apply_handler_overrides(
+        self,
+        *,
+        handlers: dict[str, CommandHandler] | None,
+    ) -> None:
+        """Apply optional handler override map.
+
+        Args:
+            handlers: Optional custom handlers keyed by command name.
+        """
+        if handlers is None:
+            return
+        self._handlers.update(handlers)
 
     def dispatch(self, call: CommandCall, session: Session) -> CommandResult:
         """Dispatch parsed command call to exact-match handler.

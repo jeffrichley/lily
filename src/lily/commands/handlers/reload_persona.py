@@ -48,21 +48,21 @@ class ReloadPersonaCommand:
                 code="persona_not_found",
             )
 
-        active_exists = catalog.get(session.active_agent) is not None
+        active_exists = catalog.get(session.active_persona) is not None
         switched = False
         if not active_exists:
-            session.active_agent = catalog.personas[0].persona_id
+            session.active_persona = catalog.personas[0].persona_id
             session.active_style = None
             switched = True
 
         return CommandResult.ok(
             (
-                f"Reloaded personas. active={session.active_agent} "
+                f"Reloaded personas. active={session.active_persona} "
                 f"count={len(catalog.personas)} switched={str(switched).lower()}"
             ),
             code="persona_reloaded",
             data={
-                "active": session.active_agent,
+                "active": session.active_persona,
                 "count": len(catalog.personas),
                 "switched": switched,
             },

@@ -41,10 +41,10 @@ Phase 6 command surface for persona and memory controls.
 - `/forget <memory_id>`
   - Delete one personality memory record by id.
 
-## Agent Compatibility
+## Agent
 
 - `/agent list`
 - `/agent use <name>`
 - `/agent show`
 
-Current behavior: persona-backed compatibility surface until full multi-agent orchestration lands.
+Current behavior: first-class agent registry surface. `/agent` resolves runtime agents, while `/persona` remains user-facing style/personality control.

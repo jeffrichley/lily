@@ -163,6 +163,7 @@ class Session(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     session_id: str = Field(default_factory=lambda: str(uuid4()))
+    active_persona: str = "default"
     active_agent: str = "default"
     active_style: PersonaStyleLevel | None = None
     skill_snapshot: SkillSnapshot

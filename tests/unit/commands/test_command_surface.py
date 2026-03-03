@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from lily.agents import FileAgentRepository
 from lily.memory import (
     ConsolidationBackend,
     MemoryWriteRequest,
@@ -99,6 +100,15 @@ def _write_persona(root: Path, name: str, summary: str, default_style: str) -> N
             "---\n"
             f"You are {name}.\n"
         ),
+        encoding="utf-8",
+    )
+
+
+def _write_agent(root: Path, name: str, summary: str) -> None:
+    """Write one structured agent contract fixture."""
+    root.mkdir(parents=True, exist_ok=True)
+    (root / f"{name}.agent.yaml").write_text(
+        (f"id: {name}\nsummary: {summary}\npolicy: safe_eval\ndeclared_tools: []\n"),
         encoding="utf-8",
     )
 
@@ -505,7 +515,8 @@ def test_persona_list_use_show_and_style_commands(tmp_path: Path) -> None:
     # Act - persona use chad
     used = runtime.handle_input("/persona use chad", session)
     assert used.status.value == "ok"
-    assert session.active_agent == "chad"
+    assert session.active_persona == "chad"
+    assert session.active_agent == "default"
     assert session.active_style is None
 
     # Act - persona show
@@ -544,7 +555,7 @@ def test_memory_commands_roundtrip(tmp_path: Path) -> None:
             reserved_commands={"remember", "forget", "memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade(
         persona_repository=FilePersonaRepository(root_dir=personas_dir)
     )
@@ -641,32 +652,39 @@ def test_persona_export_and_import_commands(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
-def test_agent_commands_persona_backed_compatibility(tmp_path: Path) -> None:
-    """`/agent` commands should use persona-backed compatibility behavior."""
-    # Arrange - persona repo with lily and chad, runtime, session
+def test_agent_commands_use_real_agent_repository(tmp_path: Path) -> None:
+    """`/agent` commands should resolve from first-class agent repository."""
+    # Arrange - separate persona/agent repositories, runtime, session
     personas_dir = tmp_path / "personas"
+    agents_dir = tmp_path / "agents"
     _write_persona(personas_dir, "lily", "Executive assistant", "focus")
     _write_persona(personas_dir, "chad", "Beach bro", "playful")
+    _write_agent(agents_dir, "ops", "Operational executor")
+    _write_agent(agents_dir, "research", "Research executor")
     runtime = RuntimeFacade(
-        persona_repository=FilePersonaRepository(root_dir=personas_dir)
+        persona_repository=FilePersonaRepository(root_dir=personas_dir),
+        agent_repository=FileAgentRepository(root_dir=agents_dir),
     )
     session = _make_session(skills=())
 
-    # Act - agent list (persona-backed)
+    # Act - list and use real agent id
     listed = runtime.handle_input("/agent list", session)
-    # Assert - list/use/show match persona-backed behavior
+    # Assert - list/use/show are backed by agent repository, not personas
     assert listed.status.value == "ok"
     assert listed.code == "agent_listed"
+    assert "ops - Operational executor" in listed.message
+    assert "chad" not in listed.message
 
-    used = runtime.handle_input("/agent use chad", session)
+    used = runtime.handle_input("/agent use ops", session)
     assert used.status.value == "ok"
     assert used.code == "agent_set"
-    assert session.active_agent == "chad"
+    assert session.active_agent == "ops"
+    assert session.active_persona == "default"
 
     shown = runtime.handle_input("/agent show", session)
     assert shown.status.value == "ok"
     assert shown.code == "agent_shown"
-    assert "Agent: chad" in shown.message
+    assert "Agent: ops" in shown.message
 
 
 @pytest.mark.unit
@@ -681,7 +699,7 @@ def test_context_aware_tone_adaptation_without_style_override(tmp_path: Path) ->
         persona_repository=FilePersonaRepository(root_dir=personas_dir),
     )
     session = _make_session(skills=())
-    session.active_agent = "lily"
+    session.active_persona = "lily"
     session.active_style = None
 
     # Act - send message (no explicit style)
@@ -710,7 +728,7 @@ def test_conversation_request_includes_repository_backed_memory_summary(
             reserved_commands={"remember", "memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     capture = _ConversationCaptureExecutor()
     runtime = RuntimeFacade(conversation_executor=capture)
 
@@ -740,7 +758,7 @@ def test_memory_command_family_long_short_and_evidence_paths(tmp_path: Path) -> 
             reserved_commands={"remember", "forget", "memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade()
 
     # Act - remember, then long show, short show, evidence show
@@ -787,7 +805,7 @@ def test_memory_evidence_ingest_and_show_with_citations(tmp_path: Path) -> None:
             reserved_commands={"memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade()
 
     # Act - evidence ingest then show with query
@@ -827,7 +845,7 @@ def test_memory_evidence_results_remain_non_canonical_vs_structured(
             reserved_commands={"remember", "memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade()
 
     # Act - remember blue, ingest evidence (red), then long show and evidence show
@@ -864,7 +882,7 @@ def test_memory_long_show_domain_isolation(tmp_path: Path) -> None:
             reserved_commands={"memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade()
 
     store_file = workspace_dir.parent / "memory" / "langgraph_store.sqlite"
@@ -921,7 +939,7 @@ def test_memory_long_tool_requires_opt_in_flag(tmp_path: Path) -> None:
             reserved_commands={"memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade(memory_tooling_enabled=False)
 
     # Act - invoke long tool show
@@ -947,7 +965,7 @@ def test_memory_long_tool_remember_enforces_policy_redline(tmp_path: Path) -> No
             reserved_commands={"memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade(memory_tooling_enabled=True)
 
     # Act - remember policy-sensitive content (api_key)
@@ -978,7 +996,7 @@ def test_memory_long_tool_show_uses_langmem_adapter_when_enabled(
             reserved_commands={"memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade(memory_tooling_enabled=True)
 
     # Act - remember then long tool show
@@ -1017,7 +1035,7 @@ def test_memory_tooling_auto_apply_switches_standard_show_route(tmp_path: Path) 
             reserved_commands={"memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade(
         memory_tooling_enabled=True,
         memory_tooling_auto_apply=True,
@@ -1056,7 +1074,7 @@ def test_memory_long_consolidate_disabled_by_default(tmp_path: Path) -> None:
             reserved_commands={"memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     runtime = RuntimeFacade(consolidation_enabled=False)
 
     # Act - invoke consolidate
@@ -1082,7 +1100,7 @@ def test_memory_long_consolidate_rule_based_writes_candidates(tmp_path: Path) ->
             reserved_commands={"memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     session.conversation_state.append(
         Message(role=MessageRole.USER, content="My favorite number is 42")
     )
@@ -1116,7 +1134,7 @@ def test_memory_long_consolidate_langmem_manager_backend(tmp_path: Path) -> None
             reserved_commands={"memory"},
         )
     )
-    session = factory.create(active_agent="lily")
+    session = factory.create(active_agent="lily", active_persona="lily")
     session.conversation_state.append(
         Message(role=MessageRole.USER, content="My name is Jeff")
     )

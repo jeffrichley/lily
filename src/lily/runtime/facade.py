@@ -6,6 +6,7 @@ from pathlib import Path
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
+from lily.agents import FileAgentRepository
 from lily.commands.parser import CommandParseError, ParsedInputKind, parse_input
 from lily.commands.registry import CommandRegistry
 from lily.commands.types import CommandResult
@@ -37,6 +38,7 @@ class RuntimeFacade:
         self,
         command_registry: CommandRegistry | None = None,
         persona_repository: FilePersonaRepository | None = None,
+        agent_repository: FileAgentRepository | None = None,
         conversation_checkpointer: BaseCheckpointSaver | None = None,
         memory_tooling_enabled: bool = False,
         memory_tooling_auto_apply: bool = False,
@@ -65,6 +67,7 @@ class RuntimeFacade:
         Args:
             command_registry: Optional deterministic command registry.
             persona_repository: Optional persona profile repository.
+            agent_repository: Optional agent profile repository.
             conversation_checkpointer: Optional checkpointer for conversation wiring.
             memory_tooling_enabled: Whether LangMem command routes are enabled.
             memory_tooling_auto_apply: Whether standard memory routes auto-use tools.
@@ -89,6 +92,7 @@ class RuntimeFacade:
         self._persona_repository = persona_repository or FilePersonaRepository(
             root_dir=default_persona_root()
         )
+        self._agent_repository = agent_repository
         self._memory_summary_provider = MemorySummaryProvider()
         self._consolidation_scheduler = ConsolidationScheduler(
             enabled=consolidation_enabled,
@@ -294,6 +298,11 @@ class RuntimeFacade:
             effective_registry = CommandRegistry(
                 skill_invoker=tooling.skill_invoker,
                 persona_repository=self._persona_repository,
+                agent_repository=(
+                    self._agent_repository
+                    if self._agent_repository is not None
+                    else FileAgentRepository(root_dir=project_root / "agents")
+                ),
                 memory_tooling_enabled=memory_tooling_enabled,
                 memory_tooling_auto_apply=memory_tooling_auto_apply,
                 consolidation_enabled=consolidation_enabled,
