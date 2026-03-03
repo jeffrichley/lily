@@ -35,9 +35,33 @@ Priority scale:
 
 ### P1
 
+- [ ] [DEBT-015] Fix debt metadata parsing boundaries in docs traceability validator
+  - Issue draft: `TBD`
+  - Owner: `@team`
+  - Target: `2026-03-10`
+  - Current state:
+    - `src/lily/docs_validator.py::_parse_debt_items` appends all non-checkbox lines to the current debt item until another checkbox appears.
+    - this can incorrectly associate unrelated lines (including later section content) with the last parsed debt item.
+  - Exit criteria:
+    - parser captures only lines that belong to a debt item's metadata block
+    - unrelated section/body lines are not attached to previous debt items
+    - unit tests cover boundary cases (section breaks, blank lines, non-indented lines)
+
+- [ ] [DEBT-016] Enforce explicit roadmap-ID requirement in status traceability validator
+  - Issue draft: `TBD`
+  - Owner: `@team`
+  - Target: `2026-03-10`
+  - Current state:
+    - status-sync policy requires explicit roadmap/debt references to use IDs (`SI-XXX`/`DEBT-XXX`)
+    - validator currently requires SI IDs only when the bullet text includes `system improvement`, leaving other roadmap references under-enforced
+  - Exit criteria:
+    - validator rejects explicit roadmap references without `SI-XXX`
+    - enforcement behavior matches `.ai/COMMANDS/status-sync.md`
+    - unit tests cover positive/negative roadmap-reference patterns
+
 ### P2
 
-- [ ] Align `tech-debt` command to canonical debt ledger path
+- [ ] [DEBT-001] Align `tech-debt` command to canonical debt ledger path
   - Issue draft: `TBD`
   - Owner: `@team`
   - Target: `2026-03-17`
@@ -50,7 +74,7 @@ Priority scale:
     - command text aligns with debt tracker structure/authority rules
     - no `.ai/TECHNICAL_DEBT.md` references remain in active command workflows
 
-- [ ] Eliminate third-party deprecation warning workaround (`trustcall`)
+- [ ] [DEBT-002] Eliminate third-party deprecation warning workaround (`trustcall`)
   - Issue draft: `docs/dev/debt/issues/debt-p1-trustcall-warning.md`
   - Execution plan: `.ai/PLANS/004-p1-trustcall-warning-removal.md`
   - Owner: `@team`
@@ -63,7 +87,7 @@ Priority scale:
     - warning filter entry removed from `pyproject.toml`
     - quality/test runs remain warning-clean
 
-- [ ] Add configurable safe-runtime ruleset profiles
+- [ ] [DEBT-003] Add configurable safe-runtime ruleset profiles
   - Issue draft: `TBD`
   - Owner: `@team`
   - Target: `2026-03-22`
@@ -76,7 +100,7 @@ Priority scale:
     - active ruleset identity/version is observable in runtime status/evidence surfaces
     - tests cover profile selection, precedence, and safe fallback/error behavior for invalid profiles
 
-- [ ] Unify duplicated memory repository behavior across file/store backends
+- [ ] [DEBT-004] Unify duplicated memory repository behavior across file/store backends
   - Issue draft: `docs/dev/debt/issues/debt-p2-unify-memory-repository-core.md`
   - Owner: `@team`
   - Target: `2026-03-20`
@@ -90,7 +114,7 @@ Priority scale:
 
 ### P3
 
-- [ ] Add scheduled jobs for run-artifact cleanup and self-learning pipelines
+- [ ] [DEBT-005] Add scheduled jobs for run-artifact cleanup and self-learning pipelines
   - Issue draft: `docs/dev/debt/issues/debt-p3-scheduled-jobs-cleanup-self-learning.md`
   - Owner: `@team`
   - Target: `TBD`
@@ -100,7 +124,7 @@ Priority scale:
     - explicit self-learning job cadence and safety gates are defined
     - runbook covers enabling/disabling and observing these scheduled jobs
 
-- [ ] Consolidate runtime SQLite locations under `.lily/db/`
+- [ ] [DEBT-006] Consolidate runtime SQLite locations under `.lily/db/`
   - Issue draft: `docs/dev/debt/issues/debt-p3-consolidate-runtime-sqlite-location.md`
   - Owner: `@team`
   - Target: `TBD`
@@ -110,8 +134,9 @@ Priority scale:
     - existing SQLite paths (checkpointer and related runtime DBs) are migrated or compatibility-mapped
     - docs/config defaults are updated and tested for migration safety
 
-- [ ] Add multi-process persistence safety strategy
+- [ ] [DEBT-007] Add multi-process persistence safety strategy
   - Issue draft: `docs/dev/debt/issues/debt-p3-multiprocess-persistence-safety.md`
+  - Roadmap: `SI-008`
   - Owner: `@team`
   - Target: `TBD`
   - Current state: per-session serialization exists, but multi-process locking strategy is not finalized.
@@ -122,7 +147,7 @@ Priority scale:
 
 ## Recently Closed Debt
 
-- [x] Harden language-policy file-read/decode failure path to deterministic deny envelope
+- [x] [DEBT-008] Harden language-policy file-read/decode failure path to deterministic deny envelope
   - Issue draft: `TBD`
   - Owner: `@team`
   - Closed: `2026-03-03`
@@ -139,7 +164,7 @@ Priority scale:
     - `tests/unit/runtime/test_security.py` (SecurityGate boundary mapping for decode/read failures)
     - `tests/unit/runtime/test_tool_dispatch_executor.py` (tool-dispatch bridge mapping for decode/read failures)
 
-- [x] Add pre-execution language restriction layer (RestrictedPython or equivalent AST policy)
+- [x] [DEBT-009] Add pre-execution language restriction layer (RestrictedPython or equivalent AST policy)
   - Issue draft: `docs/dev/debt/issues/debt-p1-language-restriction-layer.md`
   - Owner: `@team`
   - Closed: `2026-03-03`
@@ -158,7 +183,7 @@ Priority scale:
     - `tests/unit/runtime/test_tool_dispatch_executor.py` (deterministic tool-envelope mapping)
     - `docs/dev/debt/issues/debt-p1-language-restriction-layer.md` (layered security model documented: language restriction + container isolation)
 
-- [x] Integrate pytest-drill-sergeant for test quality enforcement
+- [x] [DEBT-010] Integrate pytest-drill-sergeant for test quality enforcement
   - Owner: `@team`
   - Closed: `2026-02-20`
   - Current state: plugin now enforces marker classification and applies AAA/file-length policy in configured mode.
@@ -170,7 +195,7 @@ Priority scale:
     - AAA enabled in `basic` mode; file-length rule configured (`max=1200`, `mode=warn`)
     - full gate run passes with plugin active via `just quality test`
 
-- [x] Split oversized test modules into focused suites
+- [x] [DEBT-011] Split oversized test modules into focused suites
   - Issue draft: `docs/dev/debt/issues/debt-p3-split-oversized-test-modules.md`
   - Owner: `@team`
   - Closed: `2026-03-03`
@@ -186,7 +211,7 @@ Priority scale:
     - matrix deduplication in `tests/unit/config/test_global_config.py`, `tests/unit/runtime/test_security_language_policy.py`, and `tests/unit/runtime/test_tool_dispatch_executor.py`
     - `just quality` passes warning-clean after refactor set
 
-- [x] Add typed skill/tool contracts (input/output schemas)
+- [x] [DEBT-012] Add typed skill/tool contracts (input/output schemas)
   - Closed: `2026-02-17`
   - Evidence:
     - phase completion: `docs/dev/plans/skills_platform_execution_plan.md`
@@ -195,7 +220,7 @@ Priority scale:
     - deterministic envelope snapshots: `tests/contracts/contract_envelopes.snapshot.json`
     - wrapper compatibility coverage: `tests/unit/contracts/test_langchain_wrappers.py`
 
-- [x] Warning-clean test/runtime policy established and enforced
+- [x] [DEBT-013] Warning-clean test/runtime policy established and enforced
   - Closed: `2026-02-17`
   - Evidence:
     - `AGENTS.md` warning policy added
@@ -203,7 +228,7 @@ Priority scale:
     - pytest `ResourceWarning` escalated to error
     - `just quality test` and `pytest` run warning-clean
 
-- [x] Consolidate planning docs to reduce stale duplication
+- [x] [DEBT-014] Consolidate planning docs to reduce stale duplication
   - Owner: `@team`
   - Closed: `2026-02-17`
   - Evidence:

@@ -20,6 +20,10 @@ Run a deterministic status maintenance loop so `just status` stays accurate and 
    - `docs/dev/status.md` (`## Current Focus`, `## Recently Completed`, `## Diary Log`)
    - `docs/dev/roadmap.md` (only when priority/order changed)
    - `docs/dev/debt/debt_tracker.md` (only when debt created/closed/retargeted)
+   - keep traceability IDs in sync:
+     - roadmap system improvements: `SI-XXX`
+     - debt tracker items: `DEBT-XXX`
+     - debt-to-roadmap mapping field (when applicable): `Roadmap: SI-XXX`
 2. Update `last_updated` frontmatter date for each changed canonical doc.
 3. Update plan progress state in all relevant plan trackers:
    - `.ai/PLANS/*.md` (implementation plans)
@@ -37,10 +41,13 @@ Use these rules whenever `## Current Focus` is edited in `docs/dev/status.md`.
    - Include only items expected to be actively executed in the next 3-7 days.
    - Keep 2-4 bullets maximum.
    - Every bullet must map to a canonical source (`docs/dev/roadmap.md`, `docs/dev/debt/debt_tracker.md`, or a specific plan path).
+   - Roadmap-backed system-improvement bullets must include `SI-XXX`.
+   - Debt-backed bullets must include `DEBT-XXX`.
+   - In `## Current Focus` and `## Recently Completed`, any explicit roadmap/debt reference must use IDs (`SI-XXX` / `DEBT-XXX`).
    - If any open `P1` debt exists, include at least one `P1` debt outcome from `docs/dev/debt/debt_tracker.md`.
    - AI agents must not add `P2`/`P3` debt items unless a human explicitly prioritizes that exact item for current focus.
 2. Bullet quality:
-   - Write each bullet as `outcome + source path`.
+   - Write each bullet as `outcome (+ ID when applicable) + source path`.
    - Prefer concrete outcomes ("close P1 decode failure path") over activity labels ("work on docs").
 3. Freshness:
    - On each phase completion, either keep and advance the same bullet or replace it with the next active item.

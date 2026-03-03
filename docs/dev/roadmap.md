@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-03-02"
+last_updated: "2026-03-03"
 status: "active"
 source_of_truth: true
 ---
@@ -190,16 +190,16 @@ Execution rule:
 
 These are not user-facing features. They are required to make Lily robust.
 
-| Improvement | Priority | Status | Enables |
-|---|---:|---|---|
-| Remove skill-specific prototype branches (for example `echo` special-casing). | 5 | Completed | Real extensibility from skill files |
-| Pass skill artifact content (`SKILL.md`) into execution paths. | 5 | Completed | Skill-driven behavior |
-| Implement strict `command_tool` validation for direct command skills. | 5 | Completed | Deterministic/safe command execution |
-| Add per-session lane/queue serialization primitives. | 5 | Completed | Reliable concurrent behavior |
-| Add restart, snapshot drift, and concurrency reliability tests. | 5 | Completed | Confidence in core stability |
-| Session persistence schema versioning and migration stubs. | 4 | Open | Safe evolution over time |
-| Structured loader/command/executor trace events. | 4 | Open | Operability and debugging |
-| File-locking strategy for multi-process persistence safety. | 3 | Open | Correctness in advanced deployments |
+| ID | Improvement | Priority | Status | Enables |
+|---|---|---:|---|---|
+| SI-001 | Remove skill-specific prototype branches (for example `echo` special-casing). | 5 | Completed | Real extensibility from skill files |
+| SI-002 | Pass skill artifact content (`SKILL.md`) into execution paths. | 5 | Completed | Skill-driven behavior |
+| SI-003 | Implement strict `command_tool` validation for direct command skills. | 5 | Completed | Deterministic/safe command execution |
+| SI-004 | Add per-session lane/queue serialization primitives. | 5 | Completed | Reliable concurrent behavior |
+| SI-005 | Add restart, snapshot drift, and concurrency reliability tests. | 5 | Completed | Confidence in core stability |
+| SI-006 | Session persistence schema versioning and migration stubs. | 4 | Completed | Safe evolution over time |
+| SI-007 | Structured loader/command/executor trace events. | 4 | Open | Operability and debugging |
+| SI-008 | File-locking strategy for multi-process persistence safety. | 3 | Open | Correctness in advanced deployments |
 
 ## How We Use This Document
 
