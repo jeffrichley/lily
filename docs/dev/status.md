@@ -23,7 +23,7 @@ This document is not authoritative for:
 
 ## Current Focus
 
-- Debt-driven follow-through from `docs/dev/debt/debt_tracker.md`.
+- Progress P2 warning-clean follow-through (`docs/dev/debt/debt_tracker.md`).
 - Priority-4 feature planning for real agent subsystem migration (`docs/dev/roadmap.md`).
 
 ## Focus Quality Criteria
@@ -50,6 +50,8 @@ Use this rubric when updating `## Current Focus`.
 
 ## Recently Completed
 
+- Closed P1 debt item for deterministic language-policy read/decode/parse denial handling (`docs/dev/debt/debt_tracker.md`).
+- Closed P1 debt item for pre-execution language restriction layer with closure evidence (`docs/dev/debt/debt_tracker.md`).
 - Status sync workflow and runbook/command enforcement delivered (`.ai/PLANS/006-status-sync-system.md`).
 - Real agent subsystem phase-0 migration completed (`.ai/PLANS/005-p4-agent-subsystem-phase0.md`).
 - Jobs execution phases J0-J3 completed (`docs/dev/plans/jobs_execution_plan.md`).
@@ -63,6 +65,8 @@ Use this rubric when updating `## Current Focus`.
 
 ## Diary Log
 
+- 2026-03-03: Closed the remaining P1 language-policy read/decode failure debt item after implementing deterministic `file_read_error`/`file_decode_error` denials and adding scanner + SecurityGate + tool-dispatch coverage.
+- 2026-03-03: Closed the P1 language-restriction-layer debt item after re-validating policy/security/dispatch tests and confirming layered security model documentation.
 - 2026-03-03: Delivered status-sync system (`status-sync`, `phase-intent-check`, PR polling loop, runbook cadence, `status-ready`, and status report coverage for `.ai/PLANS`) and validated with docs/status gates.
 - 2026-03-03: Completed agent subsystem Phase 4 with e2e `/agent` registry coverage and persona/agent state boundary assertions; updated roadmap/spec indexes to reflect first-class agent runtime path completion.
 - 2026-03-02: Completed language restriction layer implementation phases (AST policy contract, SecurityGate integration, deterministic scan cache) and related tests; debt closure intentionally deferred pending review conversation.

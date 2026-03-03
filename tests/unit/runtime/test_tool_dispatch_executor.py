@@ -525,3 +525,120 @@ def test_tool_dispatch_maps_language_policy_denial(tmp_path: Path) -> None:
     assert result.data is not None
     assert result.data["path"] == "plugin.py"
     assert result.data["signature"] == "node_import"
+
+
+@pytest.mark.unit
+def test_tool_dispatch_maps_language_policy_decode_denial(tmp_path: Path) -> None:
+    """Non-UTF8 plugin source should map through tool-dispatch deterministically."""
+    # Arrange - plugin source bytes that fail UTF-8 decode.
+    skill_root = tmp_path / "skills" / "echo_plugin"
+    skill_root.mkdir(parents=True, exist_ok=True)
+    (skill_root / "SKILL.md").write_text("# plugin", encoding="utf-8")
+    (skill_root / "plugin.py").write_bytes(b"\xff\xfe\x00")
+    entry = SkillEntry(
+        name="echo_plugin",
+        source=SkillSource.BUNDLED,
+        path=skill_root / "SKILL.md",
+        invocation_mode=InvocationMode.TOOL_DISPATCH,
+        command_tool_provider="plugin",
+        command_tool="execute",
+        capabilities=SkillCapabilitySpec(declared_tools=("plugin:execute",)),
+        plugin=SkillPluginSpec(entrypoint="plugin.py", source_files=("plugin.py",)),
+    )
+    providers = (
+        PluginToolProvider(
+            security_gate=SecurityGate(
+                hash_service=SecurityHashService(
+                    sandbox=SkillSandboxSettings(),
+                    project_root=Path.cwd(),
+                ),
+                preflight=SecurityPreflightScanner(),
+                store=SecurityApprovalStore(sqlite_path=tmp_path / "security.sqlite"),
+                prompt=_ApprovalPromptStub(),
+                sandbox=SkillSandboxSettings(),
+            ),
+            runner=_PluginRunnerStub(),
+        ),
+    )
+    executor = ToolDispatchExecutor(providers=providers)
+    session = _session().model_copy(
+        update={"skill_snapshot": SkillSnapshot(version="v-test", skills=(entry,))}
+    )
+
+    # Act - execute plugin-backed tool.
+    result = executor.execute(entry, session, "hello")
+
+    # Assert - decode denial is bridged to tool error envelope.
+    assert result.status.value == "error"
+    assert result.code == "security_language_policy_denied"
+    assert result.data is not None
+    assert result.data["path"] == "plugin.py"
+    assert result.data["signature"] == "file_decode_error"
+
+
+@pytest.mark.unit
+def test_tool_dispatch_maps_language_policy_read_denial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plugin file read failures should map through tool-dispatch deterministically."""
+    # Arrange - valid plugin source with forced read failure on plugin file path.
+    skill_root = tmp_path / "skills" / "echo_plugin"
+    skill_root.mkdir(parents=True, exist_ok=True)
+    (skill_root / "SKILL.md").write_text("# plugin", encoding="utf-8")
+    (skill_root / "plugin.py").write_text(
+        "def run(payload, **kwargs):\n    return {'display': payload}\n",
+        encoding="utf-8",
+    )
+    plugin_file = (skill_root / "plugin.py").resolve()
+    original_read_bytes = Path.read_bytes
+    read_counts: dict[Path, int] = {}
+
+    def _read_bytes_raise(path: Path) -> bytes:
+        resolved = path.resolve()
+        read_counts[resolved] = read_counts.get(resolved, 0) + 1
+        # First read is from SecurityHashService.
+        # Second read is from language policy scan.
+        if resolved == plugin_file and read_counts[resolved] >= 2:
+            raise OSError("forced read failure")
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", _read_bytes_raise)
+    entry = SkillEntry(
+        name="echo_plugin",
+        source=SkillSource.BUNDLED,
+        path=skill_root / "SKILL.md",
+        invocation_mode=InvocationMode.TOOL_DISPATCH,
+        command_tool_provider="plugin",
+        command_tool="execute",
+        capabilities=SkillCapabilitySpec(declared_tools=("plugin:execute",)),
+        plugin=SkillPluginSpec(entrypoint="plugin.py", source_files=("plugin.py",)),
+    )
+    providers = (
+        PluginToolProvider(
+            security_gate=SecurityGate(
+                hash_service=SecurityHashService(
+                    sandbox=SkillSandboxSettings(),
+                    project_root=Path.cwd(),
+                ),
+                preflight=SecurityPreflightScanner(),
+                store=SecurityApprovalStore(sqlite_path=tmp_path / "security.sqlite"),
+                prompt=_ApprovalPromptStub(),
+                sandbox=SkillSandboxSettings(),
+            ),
+            runner=_PluginRunnerStub(),
+        ),
+    )
+    executor = ToolDispatchExecutor(providers=providers)
+    session = _session().model_copy(
+        update={"skill_snapshot": SkillSnapshot(version="v-test", skills=(entry,))}
+    )
+
+    # Act - execute plugin-backed tool.
+    result = executor.execute(entry, session, "hello")
+
+    # Assert - read denial is bridged to tool error envelope.
+    assert result.status.value == "error"
+    assert result.code == "security_language_policy_denied"
+    assert result.data is not None
+    assert result.data["path"] == "plugin.py"
+    assert result.data["signature"] == "file_read_error"

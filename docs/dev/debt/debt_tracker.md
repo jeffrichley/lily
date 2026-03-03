@@ -35,23 +35,28 @@ Priority scale:
 
 ### P1
 
-- [ ] Harden language-policy file-read/decode failure path to deterministic deny envelope
+- [x] Harden language-policy file-read/decode failure path to deterministic deny envelope
   - Issue draft: `TBD`
   - Owner: `@team`
-  - Target: `2026-03-12`
+  - Closed: `2026-03-03`
   - Current state:
-    - language-policy scan decodes plugin source with UTF-8 directly
-    - decode/read failures can escape as non-security runtime errors instead of deterministic `SecurityAuthorizationError` envelopes
+    - language-policy scan now converts read and UTF-8 decode failures into deterministic `security_language_policy_denied` envelopes
+    - syntax parse failures remain deterministic `syntax_error` denials
   - Exit criteria:
     - plugin file read/decode/parsing failures are converted to deterministic security denial codes/messages/data
     - tests cover non-UTF8 and unreadable plugin file scenarios through the security gate + tool-dispatch bridge
     - no unexpected raw decode/read exceptions leak to command/tool surfaces
+  - Closure evidence:
+    - `src/lily/runtime/security_language_policy.py` (deterministic `file_read_error` and `file_decode_error` mapping)
+    - `tests/unit/runtime/test_security_language_policy.py` (scanner-level decode/read/syntax failure coverage)
+    - `tests/unit/runtime/test_security.py` (SecurityGate boundary mapping for decode/read failures)
+    - `tests/unit/runtime/test_tool_dispatch_executor.py` (tool-dispatch bridge mapping for decode/read failures)
 
-- [ ] Add pre-execution language restriction layer (RestrictedPython or equivalent AST policy)
+- [x] Add pre-execution language restriction layer (RestrictedPython or equivalent AST policy)
   - Issue draft: `docs/dev/debt/issues/debt-p1-language-restriction-layer.md`
   - Owner: `@team`
-  - Target: `2026-03-08`
-  - Current state: AST restriction layer is implemented and integrated before preflight in plugin authorization flow with deterministic deny envelopes and store-backed scan caching; debt item remains open pending explicit closure review/signoff.
+  - Closed: `2026-03-03`
+  - Current state: AST restriction layer is implemented and integrated before preflight in plugin authorization flow with deterministic deny envelopes and store-backed scan caching.
   - Why this matters:
     - container isolation is the primary boundary, but language restriction is valuable defense-in-depth
     - catches risky constructs earlier with clearer deterministic denials
@@ -60,10 +65,11 @@ Priority scale:
     - deterministic pre-execution restriction layer is active for plugin code
     - denial codes/messages are stable and covered by tests
     - docs explicitly describe layered security model (language restriction + container isolation)
-  - Latest evidence (not yet closed):
+  - Closure evidence:
     - `tests/unit/runtime/test_security_language_policy.py` (policy + cache matrix)
     - `tests/unit/runtime/test_security.py` (SecurityGate integration + store cache roundtrip)
     - `tests/unit/runtime/test_tool_dispatch_executor.py` (deterministic tool-envelope mapping)
+    - `docs/dev/debt/issues/debt-p1-language-restriction-layer.md` (layered security model documented: language restriction + container isolation)
 
 ### P2
 
