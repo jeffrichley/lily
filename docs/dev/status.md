@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-03-03"
+last_updated: "2026-03-04"
 status: "active"
 source_of_truth: true
 ---
@@ -50,6 +50,7 @@ Use this rubric when updating `## Current Focus`.
 
 ## Recently Completed
 
+- Delivered `just status` Git Context panel with default-on positive `--show-*` flags, lazy panel collection, and explicit `--json` mode (`.ai/PLANS/013-status-git-context-panel.md`).
 - Closed P3 debt item for test-suite maintainability via module splits and repetitive-case parameterization (DEBT-011) (`docs/dev/debt/debt_tracker.md`).
 - Session persistence schema versioning and deterministic recovery coverage delivered (SI-006) (`.ai/PLANS/011-session-persistence-schema-versioning.md`).
 - Seedling Copier template planning phase finalized and synced as complete (`.ai/PLANS/008-seedling-copier-template.md`).
@@ -68,6 +69,7 @@ Use this rubric when updating `## Current Focus`.
 
 ## Diary Log
 
+- 2026-03-04: Completed status report enhancement plan with Git Context rendering, positive default-on panel visibility flags, visibility-gated command collection, JSON output mode, and unit coverage (`.ai/PLANS/013-status-git-context-panel.md`).
 - 2026-03-03: Completed test-suite rejiggering pass: split oversized command/CLI/runtime conversation modules, added shared test helpers, and parameterized repetitive config/security/tool-dispatch matrices; closed related P3 debt item (`docs/dev/debt/debt_tracker.md`).
 - 2026-03-03: Completed session persistence schema-version contract hardening with explicit migration dispatch scaffolding, unsupported-version recovery coverage, and deterministic bootstrap reason messaging (`.ai/PLANS/011-session-persistence-schema-versioning.md`).
 - 2026-03-03: Updated `Current Focus` to remove P2 debt items per current-focus priority guardrails and shifted active focus to roadmap-prioritized open system improvements.
