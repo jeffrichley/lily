@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-03-03"
+last_updated: "2026-03-04"
 status: "active"
 source_of_truth: true
 ---
@@ -21,6 +21,7 @@ Purpose: index active/current specifications.
 - `docs/specs/memory/memory_eval_governance.md`
 - `docs/specs/commands/persona_commands.md`
 - `docs/specs/runtime/runtime_architecture_v1.md`
+- `docs/specs/runtime/executable-orchestration-architecture-v1.md`
 
 ## Archived Spec Packs
 

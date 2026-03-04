@@ -23,8 +23,8 @@ This document is not authoritative for:
 
 ## Current Focus
 
-- Advance structured loader/command/executor trace events for runtime operability (Priority 4 system improvement, SI-007) (`docs/dev/roadmap.md`).
-- Define file-locking strategy for multi-process persistence safety (Priority 3 system improvement, SI-008) (`docs/dev/roadmap.md`).
+- Execute CAP-011 through CAP-015 orchestration implementation phases with standards-first runtime contracts (`.ai/PLANS/014-executable-orchestration-v1-e2e.md`).
+- Close executable-type interoperability non-compliance across `agent/tool/skill/workflow/blueprint/job` (`docs/dev/references/interoperability-remediation-matrix-v1.md`).
 
 ## Focus Quality Criteria
 
@@ -50,6 +50,7 @@ Use this rubric when updating `## Current Focus`.
 
 ## Recently Completed
 
+- Completed Phase 0 human review and standards-compliance baseline for executable types; recorded non-compliance and remediation draft items (`.ai/PLANS/014-executable-orchestration-v1-e2e.md`, `docs/dev/references/interoperability-remediation-matrix-v1.md`).
 - Delivered `just status` Git Context panel with default-on positive `--show-*` flags, lazy panel collection, and explicit `--json` mode (`.ai/PLANS/013-status-git-context-panel.md`).
 - Closed P3 debt item for test-suite maintainability via module splits and repetitive-case parameterization (DEBT-011) (`docs/dev/debt/debt_tracker.md`).
 - Session persistence schema versioning and deterministic recovery coverage delivered (SI-006) (`.ai/PLANS/011-session-persistence-schema-versioning.md`).
@@ -66,9 +67,12 @@ Use this rubric when updating `## Current Focus`.
 
 - Risk: documentation drift between weekly status and plan trackers.
   - Mitigation: on every phase completion, update plan checklist first, then append diary entry here.
+- Risk: standards-first rewiring may intentionally break legacy CLI/REPL flows.
+  - Mitigation: keep compatibility out-of-scope explicit in plan/checklist and validate against interoperability contract, not legacy behavior.
 
 ## Diary Log
 
+- 2026-03-04: Completed `.ai/PLANS/014-executable-orchestration-v1-e2e.md` Phase 0 human review baseline for `agent`, `blueprint`, `skill`, `tool`, and `job`; confirmed major non-compliance with interoperability contract in missing supervisor/runtime envelopes, stubbed MCP wiring, non-standard skill import semantics, missing workflow kind, and direct blueprint/job bypass paths; captured required remediation in `docs/dev/references/interoperability-remediation-matrix-v1.md` and drafted debt issue candidates (`DRAFT-EO-001` supervisor/handoff runtime gap, `DRAFT-EO-002` MCP policy/registration gap, `DRAFT-EO-003` Agent Skills import/progressive-disclosure gap, `DRAFT-EO-004` workflow executable + trace/replay gap).
 - 2026-03-04: Completed status report enhancement plan with Git Context rendering, positive default-on panel visibility flags, visibility-gated command collection, JSON output mode, and unit coverage (`.ai/PLANS/013-status-git-context-panel.md`).
 - 2026-03-03: Completed test-suite rejiggering pass: split oversized command/CLI/runtime conversation modules, added shared test helpers, and parameterized repetitive config/security/tool-dispatch matrices; closed related P3 debt item (`docs/dev/debt/debt_tracker.md`).
 - 2026-03-03: Completed session persistence schema-version contract hardening with explicit migration dispatch scaffolding, unsupported-version recovery coverage, and deterministic bootstrap reason messaging (`.ai/PLANS/011-session-persistence-schema-versioning.md`).
