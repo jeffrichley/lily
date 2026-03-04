@@ -162,10 +162,13 @@ GateDecision:
 Caller does not pick implementation mechanics.
 
 Rules:
-1. Caller supplies objective + optional target hint.
-2. Resolver determines final `executable_kind` and bound handler.
-3. Resolver output is deterministic for same input/context.
-4. Resolution failure returns deterministic envelope (`resolver_unresolved`, `resolver_ambiguous`, etc).
+1. Supervisor/planner should interpret user intent and, when confident, produce explicit target ids before resolver binding.
+2. Caller supplies objective + optional target hint.
+3. Resolver determines final `executable_kind` and bound handler.
+4. Resolver output is deterministic for same input/context.
+5. Executable ids are unique in resolver scope; duplicate-id collisions are deterministic ambiguity failures.
+6. Hints remain supported for non-supervisor callers and partial-target call paths.
+7. Resolution failure returns deterministic envelope (`resolver_unresolved`, `resolver_ambiguous`, etc).
 
 ## 8. Dispatcher Contract
 

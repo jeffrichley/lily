@@ -116,7 +116,7 @@ git show-ref --verify --quiet "refs/heads/${BRANCH_NAME}" \
 - `src/lily/runtime/orchestration/gates.py`
 - `src/lily/runtime/orchestration/trace_store.py`
 - `src/lily/runtime/orchestration/replay.py`
-- `tests/unit/runtime/executables/test_models.py`
+- `tests/unit/runtime/executables/test_executable_models.py`
 - `tests/unit/runtime/executables/test_resolver.py`
 - `tests/unit/runtime/executables/test_dispatcher.py`
 - `tests/unit/runtime/executables/handlers/test_skill_handler.py`
@@ -247,8 +247,8 @@ Internal engineering tasks:
 
 **Tasks:**
 
-- [ ] Add executable models and type aliases/protocols under `src/lily/runtime/executables/`.
-- [ ] Add unit tests for schema validity, rejection cases, and deterministic error shape.
+- [x] Add executable models and type aliases/protocols under `src/lily/runtime/executables/`.
+- [x] Add unit tests for schema validity, rejection cases, and deterministic error shape.
 
 ### Phase 2: Resolver + Dispatcher Registry
 
@@ -278,8 +278,8 @@ Internal engineering tasks:
 
 **Tasks:**
 
-- [ ] Create resolver and dispatcher modules with protocol-driven handler contracts.
-- [ ] Add resolver/dispatcher unit tests, including deterministic error code assertions.
+- [x] Create resolver and dispatcher modules with protocol-driven handler contracts.
+- [x] Add resolver/dispatcher unit tests, including deterministic error code assertions.
 
 ### Phase 3: Adapter Handlers Over Existing Runtime
 
@@ -507,7 +507,7 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 - **PATTERN**: Mirror `CommandResult` strict pydantic pattern from `src/lily/commands/types.py:21-69`.
 - **IMPORTS**: `pydantic.BaseModel`, `ConfigDict`, `Field`, typed enums where appropriate.
 - **GOTCHA**: No silent fallback defaults for required contract fields.
-- **VALIDATE**: `uv run pytest tests/unit/runtime/executables/test_models.py -q`
+- **VALIDATE**: `uv run pytest tests/unit/runtime/executables/test_executable_models.py -q`
 
 ### CREATE src/lily/runtime/executables/types.py
 
@@ -620,7 +620,7 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 ### Unit Tests
 
 - Envelope model validation and deterministic error shape:
-  - `tests/unit/runtime/executables/test_models.py`
+  - `tests/unit/runtime/executables/test_executable_models.py`
 - Resolver and dispatcher behavior:
   - `tests/unit/runtime/executables/test_resolver.py`
   - `tests/unit/runtime/executables/test_dispatcher.py`
@@ -809,3 +809,56 @@ Acceptance gate evidence:
 
 Blocked/partial items:
 - none for Phase 0.
+
+### 2026-03-04 - Phase 1 Completed (Common Executable Contracts)
+
+Completion status:
+- Completed Phase 1 scope only.
+
+Implemented artifacts:
+- `src/lily/runtime/executables/models.py`
+- `src/lily/runtime/executables/types.py`
+- `src/lily/runtime/executables/__init__.py`
+- `tests/unit/runtime/executables/test_executable_models.py`
+
+Validation commands and outcomes:
+- `uv run pytest tests/unit/runtime/executables/test_executable_models.py -q` -> pass (`7 passed`)
+- `just format-check` -> pass
+- `just lint` -> pass
+- `just types` -> pass
+
+Acceptance gate evidence:
+- Canonical envelopes `ExecutableRequest`, `ExecutableResult`, `GateDecision` are implemented, strict (`extra=forbid`), and importable.
+- Required run/step identity and caller authority fields are validated with rejection tests.
+- Status/error envelope consistency is enforced by model validation.
+
+Blocked/partial items:
+- none for Phase 1.
+
+### 2026-03-04 - Phase 2 Completed (Resolver + Dispatcher Registry)
+
+Completion status:
+- Completed Phase 2 scope only.
+
+Implemented artifacts:
+- `src/lily/runtime/executables/resolver.py`
+- `src/lily/runtime/executables/dispatcher.py`
+- `src/lily/runtime/executables/handlers/base.py`
+- `src/lily/runtime/executables/handlers/__init__.py`
+- `tests/unit/runtime/executables/test_resolver.py`
+- `tests/unit/runtime/executables/test_dispatcher.py`
+
+Validation commands and outcomes:
+- `uv run pytest tests/unit/runtime/executables/test_resolver.py tests/unit/runtime/executables/test_dispatcher.py -q` -> pass (`9 passed`)
+- `just format-check` -> pass
+- `just lint` -> pass
+- `just types` -> pass
+- `just test` -> pass (`342 passed`)
+
+Acceptance gate evidence:
+- Resolver is deterministic over catalog snapshot and emits machine-readable ambiguity/unresolved errors.
+- Dispatcher uses registry map (`kind -> handler`) with no kind-based conditional dispatch chain.
+- Resolver/dispatcher success and failure paths are covered by dedicated unit tests.
+
+Blocked/partial items:
+- none for Phase 2.

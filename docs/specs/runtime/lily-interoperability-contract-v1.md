@@ -95,6 +95,11 @@ Caller code `MUST NOT` branch on concrete implementation details after handoff t
 
 Requirements:
 
+- Supervisor/planner `SHOULD` translate user intent into explicit target ids before resolver dispatch when confidence is sufficient.
+- Resolver `MUST` remain deterministic binding/validation logic, not an LLM-style intent interpreter.
+- Executable ids `MUST` be unique within resolver scope.
+- Duplicate-id collisions `MUST` fail with deterministic ambiguity errors (`resolver_ambiguous`), never silent tie-breaking.
+- Hints (`kind`, partial target refs) `MUST` remain supported for non-supervisor callers and partial-target execution paths.
 - Resolver decisions `MUST` be traceable and reproducible from stored context.
 - Dispatcher `MUST` be map/registry based (no long `if/elif` chains).
 - All unresolved/ambiguous bindings `MUST` return deterministic error envelopes.

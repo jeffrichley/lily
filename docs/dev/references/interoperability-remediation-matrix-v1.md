@@ -29,9 +29,9 @@ Compatibility posture:
 
 ### 1) Cross-Cutting Runtime Contract
 
-- [ ] Implement canonical executable envelopes (`ExecutableRef`, `ExecutableRequest`, `ExecutableResult`, `GateDecision`).
-- [ ] Implement resolver + dispatcher registry runtime.
-- [ ] Fail unresolved/ambiguous bindings with deterministic codes.
+- [x] Implement canonical executable envelopes (`ExecutableRef`, `ExecutableRequest`, `ExecutableResult`, `GateDecision`).
+- [x] Implement resolver + dispatcher registry runtime.
+- [x] Fail unresolved/ambiguous bindings with deterministic codes.
 - [ ] Add orchestration trace/replay persistence with run/step/parent IDs.
 
 ### 2) Agent Remediation

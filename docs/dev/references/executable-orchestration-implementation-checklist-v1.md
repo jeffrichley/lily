@@ -38,25 +38,25 @@ Compatibility policy:
 ## 1) Ordered Build Checklist (Execution Plan)
 
 ## Phase 1 - Common Executable Contracts (CAP-011, CAP-012 foundation)
-- [ ] Add canonical envelopes and types:
+- [x] Add canonical envelopes and types:
   - `src/lily/runtime/executables/models.py`
   - `src/lily/runtime/executables/types.py`
   - `src/lily/runtime/executables/__init__.py`
-- [ ] Add unit tests:
-  - `tests/unit/runtime/executables/test_models.py`
-- [ ] Exit criteria:
+- [x] Add unit tests:
+  - `tests/unit/runtime/executables/test_executable_models.py`
+- [x] Exit criteria:
   - `ExecutableRequest`, `ExecutableResult`, `GateDecision` validated and importable.
 
 ## Phase 2 - Resolver + Dispatcher Registry (CAP-004, CAP-011)
-- [ ] Add resolver and dispatcher:
+- [x] Add resolver and dispatcher:
   - `src/lily/runtime/executables/resolver.py`
   - `src/lily/runtime/executables/dispatcher.py`
-- [ ] Add registry-based handler interface:
+- [x] Add registry-based handler interface:
   - `src/lily/runtime/executables/handlers/base.py`
-- [ ] Add tests:
+- [x] Add tests:
   - `tests/unit/runtime/executables/test_resolver.py`
   - `tests/unit/runtime/executables/test_dispatcher.py`
-- [ ] Exit criteria:
+- [x] Exit criteria:
   - no `if/elif` dispatch chain for executable kinds; registry map enforced.
 
 ## Phase 3 - Adapter Handlers For Existing Runtime (CAP-003, CAP-008, CAP-010)
