@@ -310,9 +310,9 @@ Internal engineering tasks:
 
 **Tasks:**
 
-- [ ] Implement handler adapters for `agent`, `skill`, `tool`, `blueprint`, `job`.
-- [ ] Add adapter-specific unit tests.
-- [ ] Remove or rewrite direct legacy call paths that bypass adapters.
+- [x] Implement handler adapters for `agent`, `skill`, `tool`, `blueprint`, `job`.
+- [x] Add adapter-specific unit tests.
+- [x] Remove or rewrite direct legacy call paths that bypass adapters.
 
 ### Phase 4: Supervisor Runtime MVP + Typed Handoffs
 
@@ -862,3 +862,39 @@ Acceptance gate evidence:
 
 Blocked/partial items:
 - none for Phase 2.
+
+### 2026-03-04 - Phase 3 Completed (Adapter Handlers Over Existing Runtime)
+
+Completion status:
+- Completed Phase 3 scope only.
+
+Implemented artifacts:
+- `src/lily/runtime/executables/handlers/_common.py`
+- `src/lily/runtime/executables/handlers/agent_handler.py`
+- `src/lily/runtime/executables/handlers/skill_handler.py`
+- `src/lily/runtime/executables/handlers/tool_handler.py`
+- `src/lily/runtime/executables/handlers/blueprint_handler.py`
+- `src/lily/runtime/executables/handlers/job_handler.py`
+- `src/lily/runtime/executables/handlers/__init__.py`
+- `src/lily/runtime/executables/__init__.py`
+- `tests/unit/runtime/executables/handlers/test_agent_handler.py`
+- `tests/unit/runtime/executables/handlers/test_skill_handler.py`
+- `tests/unit/runtime/executables/handlers/test_tool_handler.py`
+- `tests/unit/runtime/executables/handlers/test_blueprint_handler.py`
+- `tests/unit/runtime/executables/handlers/test_job_handler.py`
+
+Validation commands and outcomes:
+- `uv run pytest tests/unit/runtime/executables/handlers -q` -> pass (`11 passed`)
+- `uv run pytest tests/e2e/test_phase3_routing.py tests/e2e/test_phase4_memory_jobs.py -q` -> pass (`9 passed`)
+- `just format-check` -> pass
+- `just lint` -> pass
+- `just types` -> pass
+
+Acceptance gate evidence:
+- Adapter handlers now exist for all required executable kinds and normalize outputs to `ExecutableResult`.
+- Failure paths across adapter boundaries map to deterministic error codes in canonical envelopes.
+- Dispatcher-facing handler path is envelope-driven with no direct subsystem bypass in the orchestration adapter stack.
+- Existing skills/jobs end-to-end regression suites remain green.
+
+Blocked/partial items:
+- none for Phase 3.

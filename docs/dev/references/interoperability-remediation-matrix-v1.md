@@ -22,8 +22,8 @@ Compatibility posture:
 | `tool` | Partial | MCP is stubbed by default, no first-class MCP server policy registry | `CAP-004`, `CAP-005`, `CAP-013` |
 | `skill` | Partial | metadata schema diverges from Agent Skills import expectations, body loaded at snapshot-time not activation-time | `CAP-002`, `CAP-003` |
 | `workflow` | Missing | no first-class workflow executable kind with deterministic step trace model | `CAP-011`, `CAP-015` |
-| `blueprint` | Partial | direct blueprint invocation bypasses resolver/dispatcher adapters | `CAP-010`, `CAP-011` |
-| `job` | Partial | target model is blueprint-only, no common executable envelope/gate-decision integration | `CAP-008`, `CAP-014`, `CAP-015` |
+| `blueprint` | Partial | adapter exists, but gate pipeline and full orchestration wiring are not implemented | `CAP-010`, `CAP-011`, `CAP-013` |
+| `job` | Partial | job adapter exists, but target model is blueprint-only and no supervisor bridge/trace convergence | `CAP-008`, `CAP-014`, `CAP-015` |
 
 ## Remediation Tasks (Normative)
 
@@ -61,8 +61,8 @@ Compatibility posture:
 
 ### 6) Blueprint Remediation
 
-- [ ] Route blueprint execution through executable adapters (no direct invocation from callers).
-- [ ] Ensure blueprint compile/execute boundaries emit common executable envelopes.
+- [x] Route blueprint execution through executable adapters (no direct invocation from callers in orchestration path).
+- [x] Ensure blueprint compile/execute boundaries emit common executable envelopes.
 - [ ] Enforce gate evaluation at blueprint step boundaries.
 
 ### 7) Job Remediation

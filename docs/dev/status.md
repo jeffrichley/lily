@@ -50,6 +50,7 @@ Use this rubric when updating `## Current Focus`.
 
 ## Recently Completed
 
+- Completed Phase 3 executable adapters over existing runtime (`agent`/`skill`/`tool`/`blueprint`/`job`) with canonical envelope normalization and unit/e2e regression coverage (`.ai/PLANS/014-executable-orchestration-v1-e2e.md`).
 - Completed Phase 2 resolver/dispatcher registry runtime with deterministic unresolved/ambiguous envelopes and unit coverage (`.ai/PLANS/014-executable-orchestration-v1-e2e.md`).
 - Completed Phase 1 common executable contracts with strict envelopes/protocols and unit validation (`.ai/PLANS/014-executable-orchestration-v1-e2e.md`).
 - Completed Phase 0 human review and standards-compliance baseline for executable types; recorded non-compliance and remediation draft items (`.ai/PLANS/014-executable-orchestration-v1-e2e.md`, `docs/dev/references/interoperability-remediation-matrix-v1.md`).
@@ -74,6 +75,7 @@ Use this rubric when updating `## Current Focus`.
 
 ## Diary Log
 
+- 2026-03-04: Completed `.ai/PLANS/014-executable-orchestration-v1-e2e.md` Phase 3 by implementing adapter handlers for `agent`, `skill`, `tool`, `blueprint`, and `job` under `src/lily/runtime/executables/handlers/*`; added/expanded adapter unit coverage (`tests/unit/runtime/executables/handlers/*`) and validated with `uv run pytest tests/unit/runtime/executables/handlers -q`, `uv run pytest tests/e2e/test_phase3_routing.py tests/e2e/test_phase4_memory_jobs.py -q`, `just format-check`, `just lint`, and `just types`.
 - 2026-03-04: Completed `.ai/PLANS/014-executable-orchestration-v1-e2e.md` Phase 2 by implementing deterministic `ExecutableCatalogResolver` and `RegistryExecutableDispatcher` with handler registry protocol in `src/lily/runtime/executables/*` and adding `tests/unit/runtime/executables/test_resolver.py` + `test_dispatcher.py`; validated with targeted unit tests, `just format-check`, `just lint`, `just types`, and `just test`.
 - 2026-03-04: Completed `.ai/PLANS/014-executable-orchestration-v1-e2e.md` Phase 1 by adding canonical executable envelopes and protocols under `src/lily/runtime/executables/*` plus `tests/unit/runtime/executables/test_executable_models.py`; validated with `uv run pytest tests/unit/runtime/executables/test_executable_models.py -q`, `just format-check`, `just lint`, and `just types`.
 - 2026-03-04: Completed `.ai/PLANS/014-executable-orchestration-v1-e2e.md` Phase 0 human review baseline for `agent`, `blueprint`, `skill`, `tool`, and `job`; confirmed major non-compliance with interoperability contract in missing supervisor/runtime envelopes, stubbed MCP wiring, non-standard skill import semantics, missing workflow kind, and direct blueprint/job bypass paths; captured required remediation in `docs/dev/references/interoperability-remediation-matrix-v1.md` and drafted debt issue candidates (`DRAFT-EO-001` supervisor/handoff runtime gap, `DRAFT-EO-002` MCP policy/registration gap, `DRAFT-EO-003` Agent Skills import/progressive-disclosure gap, `DRAFT-EO-004` workflow executable + trace/replay gap).

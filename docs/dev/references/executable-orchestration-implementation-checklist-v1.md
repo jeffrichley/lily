@@ -60,18 +60,20 @@ Compatibility policy:
   - no `if/elif` dispatch chain for executable kinds; registry map enforced.
 
 ## Phase 3 - Adapter Handlers For Existing Runtime (CAP-003, CAP-008, CAP-010)
-- [ ] Add adapters for current subsystems:
+- [x] Add adapters for current subsystems:
   - `src/lily/runtime/executables/handlers/skill_handler.py`
   - `src/lily/runtime/executables/handlers/tool_handler.py`
   - `src/lily/runtime/executables/handlers/blueprint_handler.py`
   - `src/lily/runtime/executables/handlers/job_handler.py`
   - `src/lily/runtime/executables/handlers/agent_handler.py`
-- [ ] Rework existing internals as needed; compatibility preservation is not required.
-- [ ] Add tests:
+- [x] Rework existing internals as needed; compatibility preservation is not required.
+- [x] Add tests:
+  - `tests/unit/runtime/executables/handlers/test_agent_handler.py`
   - `tests/unit/runtime/executables/handlers/test_skill_handler.py`
+  - `tests/unit/runtime/executables/handlers/test_tool_handler.py`
   - `tests/unit/runtime/executables/handlers/test_blueprint_handler.py`
   - `tests/unit/runtime/executables/handlers/test_job_handler.py`
-- [ ] Exit criteria:
+- [x] Exit criteria:
   - executable kinds are invoked only through dispatcher envelopes.
   - no legacy direct-call bypass remains in new orchestration path.
 
