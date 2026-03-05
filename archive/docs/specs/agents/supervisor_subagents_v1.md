@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-02-17"
+last_updated: "2026-03-04"
 status: "active"
 source_of_truth: true
 ---
@@ -32,6 +32,7 @@ This feature starts only after `docs/specs/agents/skills_platform_v1.md` gates a
 ## 3.1 Runtime Roles
 
 - `SupervisorRuntime`: decides plan and delegates work units.
+- `PlannerLLM` (PydanticAI-backed): emits typed multi-step plan/handoff models.
 - `SubagentExecutor`: executes a scoped skill/task with least-privilege capabilities.
 - `Aggregator`: merges subagent outputs into final deterministic envelope.
 
@@ -41,6 +42,8 @@ This feature starts only after `docs/specs/agents/skills_platform_v1.md` gates a
 - subagents cannot recursively delegate in V1.
 - delegation depth is fixed at 1 for V1.
 - each handoff uses typed request/response models.
+- planner outputs are schema-validated typed models before execution.
+- orchestration execution is owned by supervisor runtime, not by an LLM-invoked orchestration tool loop.
 - failures are isolated to subagent scope and surfaced deterministically.
 
 ## 3.3 Trace and Audit
@@ -60,11 +63,13 @@ User-visible features:
 
 Internal engineering tasks:
 - add supervisor planner interface.
+- implement LLM-first planner adapter (PydanticAI) returning typed plan models.
 - add typed handoff request/response models.
 - add deterministic routing config contract.
 
 Acceptance criteria:
 - supervisor can select a target subagent deterministically for supported routes.
+- supervisor can execute a bounded typed multi-step plan emitted by planner.
 - invalid handoff payloads fail with deterministic contract errors.
 
 Non-goals:
@@ -123,7 +128,6 @@ Required tests and gates:
 
 ## 5. Open Questions
 
-- default planning strategy in V1 (rule-based vs model-assisted).
+- V1 planner backend is model-assisted and implemented LLM-first (PydanticAI), with typed schema-constrained outputs at the orchestration boundary.
 - session-level vs turn-level supervisor planning state retention.
 - initial canonical subagent set for V1 rollout.
-

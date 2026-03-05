@@ -50,7 +50,8 @@ Run all validation commands defined in the active plan:
 
 For user-visible outputs, include proof commands (examples):
 - file/artifact checks (`ls`, `test -f`)
-- probe/inspection commands (`ffprobe`, `curl`, CLI health checks, etc.)
+- status/report checks (`just status`, `just status-ready`)
+- targeted pytest invocation for changed areas (`uv run pytest tests/<area> -q`)
 
 ## Failure Handling
 
@@ -108,8 +109,8 @@ For user-visible features, include:
 - `just quality && just test` (required final gate)
 
 Project-specific examples:
-- `just render-demo`
-- `uv run pytest packages/chrona_render/tests -q`
+- `just status-ready`
+- `just test-cov`
 
 ## Completion Criteria
 

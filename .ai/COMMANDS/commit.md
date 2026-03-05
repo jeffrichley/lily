@@ -77,7 +77,7 @@ Validation:
 ### 5. Add footers when relevant
 
 - Reference plans/issues:
-  - `Refs: .ai/PLANS/007-render-vertical-slice-cli-app.md`
+  - `Refs: .ai/PLANS/<NNN>-<feature>.md`
 - Breaking changes:
   - `BREAKING CHANGE: ...`
 
@@ -92,23 +92,22 @@ Validation:
 ## Example
 
 ```text
-feat(render): deliver runnable compile+render vertical slice
+docs(reboot): align rules and command references with reboot baseline
 
 Context:
-- chrona_render had docs/PRD but no executable end-to-end workflow.
+- command guidance referenced removed targets and legacy architecture paths.
 
 Changes:
-- added timeline + render-plan models, compiler, ffmpeg renderer, and reporting
-- added chrona-render CLI commands: compile, render, run
-- added demo wrapper and reproducible run assets under runs/dev/render_001
+- updated `.ai/RULES.md` architecture/boundary guidance for current repository layout
+- updated command/reference docs to use active `just` targets
+- removed stale examples that referenced legacy render subsystem paths
 
 Why:
-- establish a concrete, extensible baseline so future features land on a working pipeline
+- keep workflow docs actionable so validation and execution commands match real repo state
 
 Validation:
-- uv run pytest packages/chrona_render/tests -q (pass)
-- just render-demo (pass)
-- ffprobe runs/dev/render_001/output/final.mp4 (playable, audio+video)
+- just quality-check (pass)
+- just status (pass)
 
-Refs: .ai/PLANS/007-render-vertical-slice-cli-app.md
+Refs: .ai/PLANS/016-example-reboot-docs-alignment.md
 ```
