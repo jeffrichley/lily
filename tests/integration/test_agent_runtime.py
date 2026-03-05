@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from contextlib import closing
+from pathlib import Path
+
 import pytest
 from langchain_core.language_models import BaseChatModel
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
@@ -141,7 +144,8 @@ def test_agent_runtime_executes_tool_call_cycle_and_returns_final_output() -> No
     )
 
     # Act - execute a single runtime prompt.
-    result = runtime.run("run tool please")
+    with closing(runtime):
+        result = runtime.run("run tool please")
 
     # Assert - runtime returns deterministic final output from final AI message.
     assert result.final_output == "All done."
@@ -165,7 +169,7 @@ def test_agent_runtime_rejects_unknown_allowlisted_tools() -> None:
     )
 
     # Act - execute runtime with invalid allowlist configuration.
-    with pytest.raises(ToolRegistryError) as err:
+    with closing(runtime), pytest.raises(ToolRegistryError) as err:
         runtime.run("hello")
 
     # Assert - error surfaces missing tool details.
@@ -196,10 +200,12 @@ def test_agent_runtime_dynamic_model_routing_changes_model_by_message_size() -> 
     )
 
     # Act - run one short prompt and one long prompt through the same runtime.
-    short_result = runtime.run("short prompt")
-    long_result = runtime.run(
-        "This prompt is intentionally long enough to exceed the configured threshold."
-    )
+    with closing(runtime):
+        short_result = runtime.run("short prompt")
+        long_result = runtime.run(
+            "This prompt is intentionally long enough to exceed the configured "
+            "threshold."
+        )
 
     # Assert - routing middleware selects different model profiles.
     assert short_result.final_output == "DEFAULT"
@@ -237,7 +243,8 @@ def test_agent_runtime_passes_conversation_id_as_thread_id_config() -> None:
     )
 
     # Act - run runtime with explicit conversation id.
-    result = runtime.run("hello", conversation_id="conv-123")
+    with closing(runtime):
+        result = runtime.run("hello", conversation_id="conv-123")
 
     # Assert - invoke config includes thread_id and result echoes conversation id.
     assert spy_agent.config is not None
@@ -277,9 +284,46 @@ def test_agent_runtime_omits_thread_config_when_conversation_id_absent() -> None
     )
 
     # Act - run runtime without explicit conversation id.
-    result = runtime.run("hello")
+    with closing(runtime):
+        result = runtime.run("hello")
 
     # Assert - invoke config keeps recursion limit only and result id is None.
     assert spy_agent.config is not None
-    assert spy_agent.config == {"recursion_limit": 10}
+    assert spy_agent.config["recursion_limit"] == 10
+    assert "configurable" in spy_agent.config
+    assert "thread_id" in dict(spy_agent.config["configurable"])
     assert result.conversation_id is None
+
+
+def test_agent_runtime_persists_history_for_same_conversation_id(
+    tmp_path: Path,
+) -> None:
+    """Reuses checkpointed history when same conversation id is provided."""
+
+    # Arrange - use deterministic fake model and on-disk checkpoint DB.
+    @tool
+    def ping_tool() -> str:
+        """Return pong."""
+        return "pong"
+
+    fake_model = ToolCapableFakeModel(
+        responses=[AIMessage(content="FIRST"), AIMessage(content="SECOND")]
+    )
+    runtime = AgentRuntime(
+        config=_runtime_config(allowlist=["ping_tool"], routing_enabled=False),
+        tools=[ping_tool],
+        model_factory=_model_factory(
+            {"default-model": fake_model, "long-model": fake_model}
+        ),
+        checkpoint_db_path=tmp_path / "checkpoints.sqlite3",
+    )
+
+    # Act - run twice with same conversation id.
+    with closing(runtime):
+        first = runtime.run("my name is Jeff", conversation_id="conv-remember")
+        second = runtime.run("what is my name", conversation_id="conv-remember")
+
+    # Assert - second run includes prior messages from checkpoint history.
+    assert first.final_output == "FIRST"
+    assert second.final_output == "SECOND"
+    assert second.message_count > first.message_count

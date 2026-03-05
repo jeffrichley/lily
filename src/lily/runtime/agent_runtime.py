@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Protocol, cast
+from uuid import uuid4
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
@@ -11,6 +14,7 @@ from langchain.agents.middleware import (
     ToolCallLimitMiddleware,
 )
 from langchain_core.messages import AIMessage, BaseMessage
+from langgraph.checkpoint.sqlite import SqliteSaver
 from pydantic import BaseModel, ConfigDict
 
 from lily.runtime.config_schema import RuntimeConfig
@@ -78,6 +82,7 @@ class AgentRuntime:
         config: RuntimeConfig,
         tools: Sequence[ToolLike],
         model_factory: ModelFactory | None = None,
+        checkpoint_db_path: Path | None = None,
         agent_builder: AgentBuilder = create_agent,
     ) -> None:
         """Initialize runtime with validated config, tools, and adapters.
@@ -86,13 +91,51 @@ class AgentRuntime:
             config: Validated runtime config object.
             tools: Tool surfaces available to the agent.
             model_factory: Optional model construction override.
+            checkpoint_db_path: Optional SQLite path for thread checkpoints.
             agent_builder: Agent builder callable (defaults to create_agent).
         """
         self._config = config
         self._tools = list(tools)
         self._model_factory = model_factory or ModelFactory()
+        self._checkpoint_db_path = checkpoint_db_path or (
+            Path(".lily") / "runtime-checkpoints.sqlite3"
+        )
         self._agent_builder = agent_builder
         self._agent: _InvokableAgent | None = None
+        self._checkpoint_conn: sqlite3.Connection | None = None
+        self._checkpointer: SqliteSaver | None = None
+
+    def close(self) -> None:
+        """Close held checkpoint database connection when present."""
+        if self._checkpoint_conn is None:
+            return
+        self._checkpoint_conn.close()
+        self._checkpoint_conn = None
+        self._checkpointer = None
+
+    def __del__(self) -> None:
+        """Best-effort cleanup for checkpoint connection."""
+        try:
+            self.close()
+        except Exception:
+            return
+
+    def _build_checkpointer(self) -> SqliteSaver:
+        """Create and memoize SQLite checkpointer for thread persistence.
+
+        Returns:
+            LangGraph SQLite saver used as create_agent checkpointer.
+        """
+        if self._checkpointer is not None:
+            return self._checkpointer
+
+        self._checkpoint_db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._checkpoint_conn = sqlite3.connect(
+            self._checkpoint_db_path,
+            check_same_thread=False,
+        )
+        self._checkpointer = SqliteSaver(self._checkpoint_conn)
+        return self._checkpointer
 
     def _build_agent(self) -> _InvokableAgent:
         """Create and memoize the compiled LangChain agent graph.
@@ -124,6 +167,7 @@ class AgentRuntime:
             tools=allowlisted_tools,
             system_prompt=self._config.agent.system_prompt,
             middleware=middleware,
+            checkpointer=self._build_checkpointer(),
             name=self._config.agent.name,
         )
         if not hasattr(built, "invoke"):
@@ -156,8 +200,8 @@ class AgentRuntime:
         invoke_config: dict[str, object] = {
             "recursion_limit": self._config.policies.max_iterations
         }
-        if conversation_id is not None:
-            invoke_config["configurable"] = {"thread_id": conversation_id}
+        thread_id = conversation_id or f"ephemeral-{uuid4()}"
+        invoke_config["configurable"] = {"thread_id": thread_id}
 
         result = agent.invoke(payload, config=invoke_config)
         if not isinstance(result, dict):
