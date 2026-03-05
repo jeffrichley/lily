@@ -30,6 +30,26 @@ class ToolCapableFakeModel(FakeMessagesListChatModel):
         return self
 
 
+class _SpyInvokableAgent:
+    """Spy invokable capturing invoke payload/config for assertions."""
+
+    def __init__(self) -> None:
+        """Initialize empty capture fields."""
+        self.request: dict[str, object] | None = None
+        self.config: dict[str, object] | None = None
+
+    def invoke(
+        self,
+        request: dict[str, object],
+        *,
+        config: dict[str, object],
+    ) -> dict[str, object]:
+        """Capture invoke call details and return deterministic output."""
+        self.request = request
+        self.config = config
+        return {"messages": [AIMessage(content="SPY")]}
+
+
 def _runtime_config(
     *,
     allowlist: list[str],
@@ -184,3 +204,82 @@ def test_agent_runtime_dynamic_model_routing_changes_model_by_message_size() -> 
     # Assert - routing middleware selects different model profiles.
     assert short_result.final_output == "DEFAULT"
     assert long_result.final_output == "LONG"
+
+
+def test_agent_runtime_passes_conversation_id_as_thread_id_config() -> None:
+    """Adds thread_id to invoke config when conversation id is provided."""
+
+    # Arrange - build runtime with spy agent builder and one allowlisted tool.
+    @tool
+    def ping_tool() -> str:
+        """Return pong."""
+        return "pong"
+
+    spy_agent = _SpyInvokableAgent()
+
+    def _spy_agent_builder(**_kwargs: object) -> _SpyInvokableAgent:
+        return spy_agent
+
+    runtime = AgentRuntime(
+        config=_runtime_config(allowlist=["ping_tool"], routing_enabled=False),
+        tools=[ping_tool],
+        model_factory=_model_factory(
+            {
+                "default-model": ToolCapableFakeModel(
+                    responses=[AIMessage(content="ignored")]
+                ),
+                "long-model": ToolCapableFakeModel(
+                    responses=[AIMessage(content="ignored")]
+                ),
+            }
+        ),
+        agent_builder=_spy_agent_builder,
+    )
+
+    # Act - run runtime with explicit conversation id.
+    result = runtime.run("hello", conversation_id="conv-123")
+
+    # Assert - invoke config includes thread_id and result echoes conversation id.
+    assert spy_agent.config is not None
+    assert spy_agent.config["recursion_limit"] == 10
+    assert spy_agent.config["configurable"] == {"thread_id": "conv-123"}
+    assert result.conversation_id == "conv-123"
+
+
+def test_agent_runtime_omits_thread_config_when_conversation_id_absent() -> None:
+    """Preserves one-shot behavior by omitting configurable thread_id."""
+
+    # Arrange - build runtime with spy agent builder and one allowlisted tool.
+    @tool
+    def ping_tool() -> str:
+        """Return pong."""
+        return "pong"
+
+    spy_agent = _SpyInvokableAgent()
+
+    def _spy_agent_builder(**_kwargs: object) -> _SpyInvokableAgent:
+        return spy_agent
+
+    runtime = AgentRuntime(
+        config=_runtime_config(allowlist=["ping_tool"], routing_enabled=False),
+        tools=[ping_tool],
+        model_factory=_model_factory(
+            {
+                "default-model": ToolCapableFakeModel(
+                    responses=[AIMessage(content="ignored")]
+                ),
+                "long-model": ToolCapableFakeModel(
+                    responses=[AIMessage(content="ignored")]
+                ),
+            }
+        ),
+        agent_builder=_spy_agent_builder,
+    )
+
+    # Act - run runtime without explicit conversation id.
+    result = runtime.run("hello")
+
+    # Assert - invoke config keeps recursion limit only and result id is None.
+    assert spy_agent.config is not None
+    assert spy_agent.config == {"recursion_limit": 10}
+    assert result.conversation_id is None

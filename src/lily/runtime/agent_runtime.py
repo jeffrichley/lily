@@ -30,6 +30,7 @@ class AgentRunResult(BaseModel):
 
     final_output: str
     message_count: int
+    conversation_id: str | None = None
 
 
 AgentBuilder = Callable[..., object]
@@ -42,7 +43,7 @@ class _InvokableAgent(Protocol):
         self,
         request: dict[str, object],
         *,
-        config: dict[str, int],
+        config: dict[str, object],
     ) -> dict[str, object]:
         """Invoke one request and return mapping output.
 
@@ -131,11 +132,16 @@ class AgentRuntime:
         self._agent = cast(_InvokableAgent, built)
         return self._agent
 
-    def _invoke(self, user_prompt: str) -> dict[str, object]:
+    def _invoke(
+        self,
+        user_prompt: str,
+        conversation_id: str | None = None,
+    ) -> dict[str, object]:
         """Invoke the underlying agent with configured recursion limit.
 
         Args:
             user_prompt: Raw user prompt text.
+            conversation_id: Optional conversation/thread id for resume continuity.
 
         Returns:
             Raw mapping output from compiled LangChain agent.
@@ -147,7 +153,11 @@ class AgentRuntime:
         payload: dict[str, object] = {
             "messages": [{"role": "user", "content": user_prompt}]
         }
-        invoke_config = {"recursion_limit": self._config.policies.max_iterations}
+        invoke_config: dict[str, object] = {
+            "recursion_limit": self._config.policies.max_iterations
+        }
+        if conversation_id is not None:
+            invoke_config["configurable"] = {"thread_id": conversation_id}
 
         result = agent.invoke(payload, config=invoke_config)
         if not isinstance(result, dict):
@@ -155,11 +165,16 @@ class AgentRuntime:
             raise AgentRuntimeError(msg)
         return result
 
-    def run(self, user_prompt: str) -> AgentRunResult:
+    def run(
+        self,
+        user_prompt: str,
+        conversation_id: str | None = None,
+    ) -> AgentRunResult:
         """Run one user prompt through the configured LangChain agent.
 
         Args:
             user_prompt: Prompt text to execute.
+            conversation_id: Optional conversation/thread id for resume continuity.
 
         Returns:
             Deterministic final output + message count contract.
@@ -167,7 +182,7 @@ class AgentRuntime:
         Raises:
             AgentRuntimeError: If agent output is missing expected messages.
         """
-        output = self._invoke(user_prompt)
+        output = self._invoke(user_prompt, conversation_id=conversation_id)
         raw_messages = output.get("messages")
         if not isinstance(raw_messages, list) or not raw_messages:
             msg = "Agent output missing non-empty 'messages' list."
@@ -184,4 +199,5 @@ class AgentRuntime:
         return AgentRunResult(
             final_output=final_output,
             message_count=len(raw_messages),
+            conversation_id=conversation_id,
         )

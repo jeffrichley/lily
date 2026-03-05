@@ -63,13 +63,18 @@ class LilySupervisor:
         runtime = AgentRuntime(config=config, tools=[echo_tool, ping_tool])
         return cls(runtime=runtime)
 
-    def run_prompt(self, prompt: str) -> AgentRunResult:
+    def run_prompt(
+        self,
+        prompt: str,
+        conversation_id: str | None = None,
+    ) -> AgentRunResult:
         """Execute one prompt through runtime and return normalized result.
 
         Args:
             prompt: Prompt text to execute.
+            conversation_id: Optional conversation/thread id for resume continuity.
 
         Returns:
             Normalized run result contract.
         """
-        return self._runtime.run(prompt)
+        return self._runtime.run(prompt, conversation_id=conversation_id)
