@@ -78,18 +78,18 @@ Compatibility policy:
   - no legacy direct-call bypass remains in new orchestration path.
 
 ## Phase 4 - Supervisor Runtime MVP (CAP-011, CAP-012)
-- [ ] Implement supervisor plan + single-depth delegation:
+- [x] Implement supervisor plan + single-depth delegation:
   - `src/lily/runtime/orchestration/supervisor.py`
   - `src/lily/runtime/orchestration/plan_models.py`
   - `src/lily/runtime/orchestration/aggregator.py`
-- [ ] Integration wiring:
+- [x] Integration wiring:
   - `src/lily/runtime/facade.py`
   - `src/lily/runtime/runtime_dependencies.py`
   - `src/lily/runtime/conversation_orchestrator.py` (only if needed for non-slash path)
-- [ ] Add tests:
+- [x] Add tests:
   - `tests/unit/runtime/orchestration/test_supervisor.py`
   - `tests/integration/runtime/test_supervisor_delegation.py`
-- [ ] Exit criteria:
+- [x] Exit criteria:
   - supervisor can execute at least one multi-step plan with typed handoffs.
 
 ## Phase 5 - Gate Pipeline (CAP-005, CAP-013)

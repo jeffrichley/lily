@@ -23,8 +23,8 @@ Purpose: canonical mapping between workflow commands and real `justfile` targets
 ## CI/Quality Adjacent Targets
 
 - `just quality-check` -> check-only equivalent of full quality lane
-- `just ci-gates` -> static checks + eval gates + e2e lane
-- `just contract-conformance` -> typed envelope and wrapper contract lane
+- `just test-cov` -> tests with coverage (coverage threshold from `pyproject.toml`)
+- `just e2e` -> run end-to-end suite only
 
 ## Drift Rule
 

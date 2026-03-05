@@ -96,6 +96,9 @@ Caller code `MUST NOT` branch on concrete implementation details after handoff t
 Requirements:
 
 - Supervisor/planner `SHOULD` translate user intent into explicit target ids before resolver dispatch when confidence is sufficient.
+- Supervisor/planner `MUST` emit schema-validated typed execution plans/handoffs at orchestration boundaries.
+- Supervisor runtime `MUST` own executable invocation; planner/tool loops `MUST NOT` directly execute orchestration steps as the primary control path.
+- Planner feedback for replanning/summarization `SHOULD` use typed execution digests by default (status, key outputs/errors, gate decisions, references/artifacts), not full raw step history unless explicitly required.
 - Resolver `MUST` remain deterministic binding/validation logic, not an LLM-style intent interpreter.
 - Executable ids `MUST` be unique within resolver scope.
 - Duplicate-id collisions `MUST` fail with deterministic ambiguity errors (`resolver_ambiguous`), never silent tie-breaking.

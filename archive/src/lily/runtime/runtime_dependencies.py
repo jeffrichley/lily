@@ -12,6 +12,7 @@ from lily.config import SecuritySettings
 from lily.jobs import JobExecutor, JobSchedulerRuntime
 from lily.memory import EvidenceChunkingSettings
 from lily.runtime.conversation import ConversationExecutor
+from lily.runtime.orchestration.supervisor import SupervisorRuntime
 from lily.runtime.security import SecurityPrompt
 from lily.runtime.skill_invoker import SkillInvoker
 from lily.session.models import HistoryCompactionBackend
@@ -69,3 +70,4 @@ class RuntimeDependencies:
     command_registry: CommandRegistry
     conversation_executor: ConversationExecutor
     jobs_scheduler_runtime: JobSchedulerRuntime | None = None
+    supervisor_runtime: SupervisorRuntime | None = None

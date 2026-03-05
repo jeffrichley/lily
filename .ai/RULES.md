@@ -4,7 +4,7 @@ This file is the canonical rulebook for coding agents in this repository.
 
 ## Audience and Scope
 - Audience: coding agents only.
-- Project type: Python monorepo + CLI/engine platform with channel configurations.
+- Project type: Python CLI/runtime reboot repository.
 - This is not a web app. Do not assume frontend/backend web patterns.
 
 ## Workflow Invariants
@@ -34,9 +34,8 @@ This file is the canonical rulebook for coding agents in this repository.
 - Prefer `uv run python` (or `python3` when `uv` is not appropriate) over bare `python` in docs, plans, and scripts.
 - Do not commit directly to `main`; use a feature branch for all implementation work.
 - Do not introduce silent fallback defaults for missing/invalid required contract fields; validate explicitly and fail with field-specific errors.
-- Do not break platform boundaries:
-  - `studios/*` may import `chrona_*`
-  - `chrona_*` must not import from `studios/*`
+- Keep active implementation in `src/lily`; treat `archive/` as historical content.
+- Keep scripts compatible with active runtime surfaces (`src/lily`) or clearly mark them archived.
 
 ## Required Quality Gates
 Use `just` targets from repo root.
@@ -55,10 +54,11 @@ Warning policy:
 - any accepted residual warning must be documented with rationale
 
 ## Architecture and Boundaries
-- `packages/` contains platform capabilities (`chrona_*`).
-- `studios/` contains product/studio configs, prompts, specs, and run assets.
-- `engines/` contains containerized execution implementations.
-- `configs/` holds engine/model registries as operational contracts.
+- `src/lily/` contains active runtime/package code.
+- `scripts/` contains active operational scripts.
+- `docs/dev/` contains canonical active status/roadmap/debt docs.
+- `tests/` contains active test suites (unit/integration/e2e/contracts).
+- `archive/` contains rebooted-out historical assets.
 
 Keep package responsibilities explicit and isolated; avoid hidden cross-coupling.
 
@@ -96,6 +96,7 @@ Keep package responsibilities explicit and isolated; avoid hidden cross-coupling
 
 ## Output Convention
 - Plans: `.ai/PLANS/<NNN>-<feature>.md`
+- Historical plans: `archive/.ai/PLANS/`
 - Execution reports: append to plan under `## Execution Report`
 
 ## Lily-Specific Project Rules

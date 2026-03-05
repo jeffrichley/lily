@@ -1,4 +1,4 @@
-# Justfile for Lily project
+# Justfile for Lily reboot baseline
 
 # Windows uses PowerShell, Unix-like systems use sh
 set windows-shell := ["pwsh.exe", "-NoLogo", "-Command"]
@@ -12,41 +12,25 @@ test:
 e2e:
     uv run pytest tests/e2e
 
-# Run personality quality gates (Gate C / Phase 7)
-eval-gates:
-    uv run pytest tests/unit/evals/test_baseline.py tests/unit/evals/test_phase7_quality.py
-
-# Regression eval lane (frozen contracts)
-eval-regression:
-    uv run pytest tests/unit/evals/test_baseline.py tests/unit/evals/test_phase7_quality.py
-
-# Capability eval lane (memory migration behaviors)
-eval-capability:
-    uv run pytest tests/unit/evals/test_memory_migration_quality.py
-
-# Performance eval lane (memory migration perf thresholds)
-eval-performance:
-    uv run pytest tests/unit/evals/test_memory_performance.py
-
 # Run all tests with coverage report
 test-cov:
     uv run pytest --cov=src/lily --cov-report=term-missing --cov-report=html
 
 # Format code (ruff)
 format:
-    uv run ruff format .
+    uv run ruff format src tests scripts
 
 # Check formatting only (CI; no write)
 format-check:
-    uv run ruff format --check .
+    uv run ruff format --check src tests scripts
 
 # Lint and auto-fix (ruff)
 lint:
-    uv run ruff check --fix .
+    uv run ruff check --fix src tests scripts
 
 # Lint check only (CI; no fix)
 lint-check:
-    uv run ruff check .
+    uv run ruff check src tests scripts
 
 # Type-check (mypy)
 types:
@@ -84,18 +68,6 @@ radon:
 find-dupes:
     uv run pylint src/lily --disable=all --enable=duplicate-code --min-similarity-lines=10
 
-# Conventional commits: interactive commit (Commitizen)
-commit:
-    uv run cz commit
-
-# Check that commit message(s) follow conventional commits
-commit-check:
-    uv run cz check
-
-# Install commit-msg hook to enforce conventional commits (run once). Requires scripts/install_commit_msg_hook.py.
-# commit-hook-install:
-#     uv run python scripts/install_commit_msg_hook.py
-
 # Install pre-commit hooks (run once). Includes commit-msg hook for conventional commits.
 pre-commit-install:
     uv run pre-commit install
@@ -105,41 +77,22 @@ pre-commit-install:
 pre-commit:
     uv run pre-commit run --all-files
 
-# Run all quality checks (format, lint, types, complexity, vulture, darglint, audit, bandit, radon, docs)
+# Conventional commits: interactive commit (Commitizen)
+commit:
+    uv run cz commit
+
+# Check that commit message(s) follow conventional commits
+commit-check:
+    uv run cz check
+
+# Run full quality checks (format, lint, types, complexity, dead code, docs, security, maintainability)
 quality: format lint types complexity vulture darglint audit bandit radon find-dupes docstr-coverage docs-check
 
-# Same gates as quality but check-only (no format write, no lint fix). Use in CI so PR fails if not clean.
+# Check-only quality lane (CI-safe; no write)
 quality-check: format-check lint-check types complexity vulture darglint audit bandit radon find-dupes docstr-coverage docs-check
 
-# CI-ready aggregate gates: static checks + eval thresholds + e2e coverage.
-ci-gates: quality-check contract-conformance eval-gates e2e
-
-# Contract conformance lane (typed envelopes + wrapper compatibility).
-contract-conformance:
-    uv run pytest tests/unit/contracts
-
-# Regenerate deterministic contract-envelope snapshots.
-contract-snapshots:
-    uv run python scripts/generate_contract_snapshots.py
-
-# Scaffold a minimal tool module; usage: `just scaffold-tool echo_text`
-scaffold-tool name:
-    uv run python scripts/scaffold_tool.py {{name}}
-
-# Memory migration CI gate target.
-memory-migration-gates: quality-check eval-regression eval-capability eval-performance
-
-# Generate Phase 7 memory observability snapshot artifact.
-memory-metrics-snapshot:
-    uv run python scripts/generate_memory_metrics_snapshot.py
-
-# --- Lighter targets for day-to-day dev ---
-# Recommended while developing: format + lint + types. Fast except mypy; catches most issues.
+# Lighter target for day-to-day reboot development
 quality-dev: format lint types darglint
-
-# Run interactive CLI REPL (slash-command testing)
-repl:
-    uv run lily repl
 
 # Show one-command project/docs execution status summary.
 status:

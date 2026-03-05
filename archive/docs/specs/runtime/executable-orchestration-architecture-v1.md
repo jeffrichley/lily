@@ -170,6 +170,15 @@ Rules:
 6. Hints remain supported for non-supervisor callers and partial-target call paths.
 7. Resolution failure returns deterministic envelope (`resolver_unresolved`, `resolver_ambiguous`, etc).
 
+## 7.1 Planner-to-Orchestrator Boundary (LLM-First)
+
+Planner interaction rules for V1:
+1. Planner is LLM-backed (PydanticAI) and returns a schema-validated typed plan object.
+2. Planner may emit multi-step plans in one response, bounded by supervisor policy (depth, step budget, cost budget).
+3. Supervisor/orchestrator executes steps; planner does not directly execute steps through an orchestration-execution tool loop.
+4. Replanning/summarization calls consume typed execution digests (step outcomes, gate decisions, references/artifacts), not full raw execution history by default.
+5. Raw detailed payloads are included only when explicitly required by policy or retrieval path.
+
 ## 8. Dispatcher Contract
 
 Dispatcher is registry-driven, not `if/elif` driven.
@@ -364,5 +373,5 @@ No new orchestration runtime code is accepted unless:
 ## 20. Decision Log Seed
 
 - V1 delegation depth: `1` (supervisor -> worker, no recursive delegation).
-- V1 planner mode: deterministic/rule-based baseline first.
+- V1 planner mode: LLM-backed planner first (PydanticAI), with schema-validated typed outputs and deterministic executable envelopes at runtime boundaries.
 - V1 async execution: jobs remain primary async substrate.

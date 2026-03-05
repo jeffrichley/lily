@@ -105,6 +105,7 @@ class RuntimeFacade:
             self._command_registry = dependencies.command_registry
             self._conversation_executor = dependencies.conversation_executor
             self._jobs_scheduler_runtime = dependencies.jobs_scheduler_runtime
+            self._supervisor_runtime = dependencies.supervisor_runtime
         else:
             effective_security = security or SecuritySettings()
             effective_project_root = project_root or Path.cwd()
@@ -134,6 +135,7 @@ class RuntimeFacade:
             self._command_registry = resolved.command_registry
             self._conversation_executor = resolved.conversation_executor
             self._jobs_scheduler_runtime = resolved.jobs_scheduler_runtime
+            self._supervisor_runtime = resolved.supervisor_runtime
 
         self._conversation_orchestrator = ConversationOrchestrator(
             conversation_executor=self._conversation_executor,

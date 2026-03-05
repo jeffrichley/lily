@@ -31,7 +31,7 @@ Confirm core developer/runtime commands available for this repo type:
 - `uv` availability and package workflow compatibility
 - `just` task runner availability
 - language runtime invocation policy (`uv run python` preferred, `python3` fallback)
-- any project-critical binaries (for example `ffmpeg`, `ffprobe`, `docker`, `node`, `go`)
+- pytest toolchain availability for the current environment (`uv run pytest --version`)
 
 ### 4. Identify Key Files
 

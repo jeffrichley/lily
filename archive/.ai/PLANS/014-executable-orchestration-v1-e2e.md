@@ -329,12 +329,18 @@ Internal engineering tasks:
   - supervisor spec (`docs/specs/agents/supervisor_subagents_v1.md:34-53, 56-92`)
   - checklist phase 4 (`docs/dev/references/executable-orchestration-implementation-checklist-v1.md:69-82`)
 - Must:
+  - supervisor planner is LLM-backed in V1 (PydanticAI-backed planner implementation first).
   - supervisor is only delegator in V1.
   - delegation depth fixed at 1.
   - typed handoff request/response contracts enforced.
+  - planner may emit bounded multi-step plans in one typed response.
+  - planner outputs must be schema-validated typed plans/handoffs (no free-form planner output at execution boundary).
+  - planner follow-up context is a typed execution digest by default (status, key outputs/errors, gate decisions, refs/artifacts), not full raw history.
   - aggregation preserves provenance references.
 - Must Not:
   - recursive delegation.
+  - introduce a rule-based-first planner implementation as the primary Phase 4 path.
+  - treat orchestration execution as a primary LLM tool-call loop.
   - free-form untyped handoff payloads.
 - Provenance map:
   - `run_id/step_id/parent_step_id` originate in supervisor plan and propagate to every delegated call.
@@ -344,9 +350,9 @@ Internal engineering tasks:
 
 **Tasks:**
 
-- [ ] Add supervisor/plan/aggregation modules.
-- [ ] Wire supervisor dependencies into runtime composition.
-- [ ] Add unit + integration tests for typed delegation and aggregation behavior.
+- [x] Add supervisor/plan/aggregation modules.
+- [x] Wire supervisor dependencies into runtime composition.
+- [x] Add unit + integration tests for typed delegation and aggregation behavior.
 
 ### Phase 5: Gate Pipeline Outcomes
 
@@ -898,3 +904,33 @@ Acceptance gate evidence:
 
 Blocked/partial items:
 - none for Phase 3.
+
+### 2026-03-04 - Phase 4 Completed (Supervisor Runtime MVP + Typed Handoffs)
+
+Completion status:
+- Completed Phase 4 scope only.
+
+Implemented artifacts:
+- `src/lily/runtime/orchestration/__init__.py`
+- `src/lily/runtime/orchestration/plan_models.py`
+- `src/lily/runtime/orchestration/supervisor.py`
+- `src/lily/runtime/orchestration/aggregator.py`
+- `src/lily/runtime/runtime_dependencies.py`
+- `src/lily/runtime/facade.py`
+- `tests/unit/runtime/orchestration/test_supervisor.py`
+- `tests/integration/runtime/test_supervisor_delegation.py`
+
+Validation commands and outcomes:
+- `uv run pytest tests/unit/runtime/orchestration/test_supervisor.py tests/integration/runtime/test_supervisor_delegation.py -q` -> pass (`4 passed`)
+- `just lint` -> pass
+- `just types` -> pass
+
+Acceptance gate evidence:
+- Supervisor is the sole delegator and executes planner-emitted typed multi-step plans via dispatcher boundaries.
+- Planner output is schema-validated (`SupervisorPlan.model_validate`) before execution; invalid payloads fail with deterministic envelope `supervisor_plan_invalid`.
+- Delegation depth remains fixed at one level (`parent_step_id` of delegated steps is root supervisor step id, no recursive planning path).
+- Aggregation preserves provenance references/artifacts and surfaces deterministic failed-step envelopes.
+- Deterministic multi-step delegated flow is covered by integration test.
+
+Blocked/partial items:
+- PydanticAI backend runner wiring is represented by `PydanticAiPlanRunner`/`PydanticAiSupervisorPlanner` ports; concrete provider bootstrap is deferred to subsequent phase wiring.

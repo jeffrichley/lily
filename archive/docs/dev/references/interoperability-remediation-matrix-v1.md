@@ -18,7 +18,7 @@ Compatibility posture:
 
 | Executable type | Compliance status | Critical gaps | CAP mapping |
 | --- | --- | --- | --- |
-| `agent` | Non-compliant | no supervisor/worker runtime, no typed handoff envelopes | `CAP-011`, `CAP-012` |
+| `agent` | Partial | supervisor runtime exists with typed plan/handoff contracts, but gate pipeline/trace-replay/full runtime path integration remains incomplete | `CAP-011`, `CAP-012`, `CAP-013`, `CAP-015` |
 | `tool` | Partial | MCP is stubbed by default, no first-class MCP server policy registry | `CAP-004`, `CAP-005`, `CAP-013` |
 | `skill` | Partial | metadata schema diverges from Agent Skills import expectations, body loaded at snapshot-time not activation-time | `CAP-002`, `CAP-003` |
 | `workflow` | Missing | no first-class workflow executable kind with deterministic step trace model | `CAP-011`, `CAP-015` |
@@ -36,9 +36,9 @@ Compatibility posture:
 
 ### 2) Agent Remediation
 
-- [ ] Add supervisor runtime as sole delegator in V1.
-- [ ] Add typed worker handoff request/response contracts.
-- [ ] Enforce bounded delegation depth and authority propagation.
+- [x] Add supervisor runtime as sole delegator in V1.
+- [x] Add typed worker handoff request/response contracts.
+- [x] Enforce bounded delegation depth and authority propagation.
 
 ### 3) Tool Remediation
 
