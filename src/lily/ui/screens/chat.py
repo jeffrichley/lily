@@ -14,6 +14,15 @@ from lily.ui.widgets.transcript import TranscriptLog
 class ChatScreen(Screen[None]):
     """Single-screen chat UI with transcript and prompt input."""
 
+    def __init__(self, conversation_id: str | None = None) -> None:
+        """Initialize chat screen with optional active conversation id.
+
+        Args:
+            conversation_id: Active conversation id for session startup display.
+        """
+        super().__init__()
+        self._conversation_id = conversation_id
+
     def compose(self) -> ComposeResult:
         """Build screen widget tree.
 
@@ -29,10 +38,16 @@ class ChatScreen(Screen[None]):
         """Focus prompt input and display startup message."""
         prompt_input = self.query_one("#prompt_input", Input)
         prompt_input.focus()
-        self.query_one("#transcript", TranscriptLog).append_entry(
+        transcript = self.query_one("#transcript", TranscriptLog)
+        transcript.append_entry(
             "system",
             "Lily TUI ready. Press Enter to send.",
         )
+        if self._conversation_id is not None:
+            transcript.append_entry(
+                "system",
+                f"Active conversation id: {self._conversation_id}",
+            )
 
     @on(Input.Submitted)
     def _handle_prompt_submitted(self, event: Input.Submitted) -> None:

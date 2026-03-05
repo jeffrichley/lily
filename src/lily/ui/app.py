@@ -17,11 +17,16 @@ from lily.ui.screens.chat import ChatScreen
 class _SupervisorProtocol(Protocol):
     """Protocol for supervisor prompt execution used by the TUI."""
 
-    def run_prompt(self, prompt: str) -> AgentRunResult:
+    def run_prompt(
+        self,
+        prompt: str,
+        conversation_id: str | None = None,
+    ) -> AgentRunResult:
         """Run one prompt through supervisor runtime.
 
         Args:
             prompt: Prompt text to execute.
+            conversation_id: Optional conversation/thread id for resume continuity.
         """
 
 
@@ -60,6 +65,7 @@ class LilyTuiApp(App[None]):
         self,
         config_path: Path,
         override_config_path: Path | None = None,
+        conversation_id: str | None = None,
         supervisor_factory: SupervisorFactory = _default_supervisor_factory,
     ) -> None:
         """Initialize TUI app with config-driven supervisor factory.
@@ -67,17 +73,19 @@ class LilyTuiApp(App[None]):
         Args:
             config_path: Base YAML config path.
             override_config_path: Optional YAML override config path.
+            conversation_id: Active conversation id for this TUI process.
             supervisor_factory: Factory building supervisor runtime object.
         """
         super().__init__()
         self._config_path = config_path
         self._override_config_path = override_config_path
+        self._conversation_id = conversation_id
         self._supervisor_factory = supervisor_factory
         self._supervisor: _SupervisorProtocol | None = None
 
     def on_mount(self) -> None:
         """Push the chat screen on startup."""
-        self.push_screen(ChatScreen())
+        self.push_screen(ChatScreen(conversation_id=self._conversation_id))
 
     def _get_supervisor(self) -> _SupervisorProtocol:
         """Lazily construct and return supervisor runtime object.
@@ -101,5 +109,8 @@ class LilyTuiApp(App[None]):
         Returns:
             Final assistant output text.
         """
-        result = self._get_supervisor().run_prompt(prompt)
+        result = self._get_supervisor().run_prompt(
+            prompt,
+            conversation_id=self._conversation_id,
+        )
         return result.final_output
