@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from lily.docs_validator import (
+from docs_validator_lib import (
     ValidationConfig,
     default_config,
     validate_docs_frontmatter,

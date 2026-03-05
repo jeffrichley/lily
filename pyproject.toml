@@ -20,6 +20,7 @@ dependencies = [
     "docker>=7.1.0",
     "apscheduler>=3.11.2",
     "sqlalchemy>=2.0.44",
+    "textual>=8.0.2",
 ]
 
 [project.scripts]

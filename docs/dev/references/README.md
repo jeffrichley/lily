@@ -1,10 +1,14 @@
 ---
 owner: "@team"
-last_updated: "2026-03-04"
-status: "reference"
+last_updated: "2026-03-05"
+status: "active"
 source_of_truth: true
 ---
 
-# Dev References
+# References
 
-Reference material for implementation details belongs in this directory.
+Canonical implementation references for active reboot surfaces.
+
+## Runtime
+
+- `docs/dev/references/runtime-config-and-interfaces.md`

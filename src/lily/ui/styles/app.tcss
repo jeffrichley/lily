@@ -1,0 +1,15 @@
+Screen {
+    layout: vertical;
+}
+
+#transcript {
+    height: 1fr;
+    border: round $accent;
+    padding: 1;
+}
+
+#prompt_input {
+    dock: bottom;
+    height: 3;
+    border: round $panel;
+}
