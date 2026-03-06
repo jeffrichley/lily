@@ -19,7 +19,9 @@ from lily.runtime.conversation_sessions import (
     default_sessions_db_path,
 )
 from lily.runtime.model_factory import ModelFactoryError
+from lily.runtime.tool_catalog import ToolCatalogLoadError
 from lily.runtime.tool_registry import ToolRegistryError
+from lily.runtime.tool_resolvers import ToolResolverError
 from lily.ui.app import LilyTuiApp
 
 app = typer.Typer(no_args_is_help=True)
@@ -37,7 +39,7 @@ ConfigOption = Annotated[
         dir_okay=False,
         readable=True,
         resolve_path=False,
-        help="Path to base runtime YAML config.",
+        help="Path to base runtime config (.yaml/.yml/.toml).",
     ),
 ]
 OverrideOption = Annotated[
@@ -49,7 +51,7 @@ OverrideOption = Annotated[
         dir_okay=False,
         readable=True,
         resolve_path=False,
-        help="Optional path to YAML override config.",
+        help="Optional path to runtime override config (.yaml/.yml/.toml).",
     ),
 ]
 ConversationIdOption = Annotated[
@@ -134,17 +136,17 @@ def app_callback() -> None:
 @app.command("run")
 def run_command(
     prompt: PromptOption,
-    config: ConfigOption = Path(".lily/config/agent.yaml"),
+    config: ConfigOption = Path(".lily/config/agent.toml"),
     override: OverrideOption = None,
     conversation_id: ConversationIdOption = None,
     last_conversation: LastConversationOption = False,
 ) -> None:
-    """Run a single prompt using YAML-configured Lily supervisor runtime.
+    """Run a single prompt using config-driven Lily supervisor runtime.
 
     Args:
         prompt: Prompt text to execute.
-        config: Base YAML config path.
-        override: Optional override YAML config path.
+        config: Base runtime config path.
+        override: Optional override runtime config path.
         conversation_id: Optional explicit conversation id attach target.
         last_conversation: Whether to attach to most-recent conversation.
 
@@ -166,6 +168,8 @@ def run_command(
         ConversationResolutionError,
         ConversationSessionStoreError,
         ToolRegistryError,
+        ToolCatalogLoadError,
+        ToolResolverError,
         ModelFactoryError,
         AgentRuntimeError,
     ) as exc:
@@ -181,16 +185,16 @@ def run_command(
 
 @app.command("tui")
 def tui_command(
-    config: ConfigOption = Path(".lily/config/agent.yaml"),
+    config: ConfigOption = Path(".lily/config/agent.toml"),
     override: OverrideOption = None,
     conversation_id: ConversationIdOption = None,
     last_conversation: LastConversationOption = False,
 ) -> None:
-    """Launch Textual TUI using YAML-configured Lily supervisor runtime.
+    """Launch Textual TUI using config-driven Lily supervisor runtime.
 
     Args:
-        config: Base YAML config path.
-        override: Optional override YAML config path.
+        config: Base runtime config path.
+        override: Optional override runtime config path.
         conversation_id: Optional explicit conversation id attach target.
         last_conversation: Whether to attach to most-recent conversation.
 
@@ -213,6 +217,8 @@ def tui_command(
         ConversationResolutionError,
         ConversationSessionStoreError,
         ToolRegistryError,
+        ToolCatalogLoadError,
+        ToolResolverError,
         ModelFactoryError,
         AgentRuntimeError,
     ) as exc:

@@ -1,0 +1,15 @@
+[[definitions]]
+id = "echo_tool"
+source = "python"
+target = "lily.agents.lily_supervisor:echo_tool"
+
+[[definitions]]
+id = "ping_tool"
+source = "python"
+target = "lily.agents.lily_supervisor:ping_tool"
+
+[[definitions]]
+id = "search_langgraph_code"
+source = "mcp"
+server = "langgraph_docs"
+remote_tool = "search_langgraph_code"

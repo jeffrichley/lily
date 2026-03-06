@@ -112,14 +112,14 @@ flowchart TB
     class evolution not_started
     class logging not_started
     class capability_registry not_started
-    class kernel in_progress
-    class llmadapter in_progress
-    class supervisor in_progress
+    class kernel done
+    class llmadapter done
+    class supervisor done
     class runtime_policies not_started
-    class knowledge in_progress
+    class knowledge done
     class cli done
     class tui done
-    class tools not_started
+    class tools done
     class tool_registry not_started
     class procedural_skill not_started
     class playbooks not_started
@@ -129,7 +129,7 @@ flowchart TB
     class skill_metadata not_started
     class subagents not_started
     class luser done
-    class lsa not_started
+    class lsa done
     class lhs not_started
     class lps not_started
     class lprs not_started

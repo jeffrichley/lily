@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 
 from langchain_core.tools import tool
 
 from lily.runtime.agent_runtime import AgentRunResult, AgentRuntime
 from lily.runtime.config_loader import load_runtime_config
+from lily.runtime.config_schema import McpServerConfig
+from lily.runtime.tool_catalog import load_tool_catalog
+from lily.runtime.tool_registry import ToolLike
+from lily.runtime.tool_resolvers import ToolResolvers, build_mcp_server_providers
 
 
 @tool
@@ -33,6 +38,16 @@ def ping_tool() -> str:
     return "pong"
 
 
+@tool
+def mcp_ping_tool() -> str:
+    """Return deterministic MCP test response.
+
+    Returns:
+        Static string used for MCP test-path verification.
+    """
+    return "mcp-pong"
+
+
 class LilySupervisor:
     """Single supervisor surface for runtime-backed prompt execution."""
 
@@ -49,19 +64,66 @@ class LilySupervisor:
         cls,
         config_path: str | Path,
         override_config_path: str | Path | None = None,
+        tools_config_path: str | Path | None = None,
     ) -> LilySupervisor:
-        """Build supervisor from YAML config files.
+        """Build supervisor from config files.
 
         Args:
-            config_path: Base YAML config path.
-            override_config_path: Optional override YAML config path.
+            config_path: Base runtime config path (.yaml/.yml/.toml).
+            override_config_path: Optional override runtime config path.
+            tools_config_path: Optional explicit tool catalog config path.
+                When omitted, `.toml` runtime configs infer `tools.toml`
+                in the same directory; otherwise `tools.yaml`.
 
         Returns:
-            Supervisor with runtime and built-in tools configured.
+            Supervisor with runtime and catalog-resolved tools configured.
         """
+        resolved_tools_config_path = (
+            Path(tools_config_path)
+            if tools_config_path is not None
+            else cls._default_tools_config_path(config_path)
+        )
         config = load_runtime_config(config_path, override_config_path)
-        runtime = AgentRuntime(config=config, tools=[echo_tool, ping_tool])
+        resolved_tools = cls._load_tools_from_catalog(
+            resolved_tools_config_path,
+            mcp_servers=config.mcp_servers,
+        )
+        runtime = AgentRuntime(config=config, tools=resolved_tools)
         return cls(runtime=runtime)
+
+    @staticmethod
+    def _default_tools_config_path(config_path: str | Path) -> Path:
+        """Infer default tools config path from runtime config extension.
+
+        Args:
+            config_path: Runtime config file path.
+
+        Returns:
+            Inferred tool catalog path in same directory as runtime config.
+        """
+        resolved = Path(config_path)
+        if resolved.suffix.lower() == ".toml":
+            return resolved.with_name("tools.toml")
+        return resolved.with_name("tools.yaml")
+
+    @staticmethod
+    def _load_tools_from_catalog(
+        tools_config_path: str | Path,
+        mcp_servers: Mapping[str, McpServerConfig],
+    ) -> list[ToolLike]:
+        """Load and resolve runtime tools from one catalog config file.
+
+        Args:
+            tools_config_path: Tool catalog config path (.yaml/.yml/.toml).
+            mcp_servers: Runtime MCP server configuration mapping.
+
+        Returns:
+            Resolved runtime tools in catalog order.
+        """
+        tool_catalog = load_tool_catalog(tools_config_path)
+        providers = build_mcp_server_providers(mcp_servers)
+        resolvers = ToolResolvers(mcp_servers=providers)
+        return resolvers.resolve_catalog(tool_catalog)
 
     def run_prompt(
         self,

@@ -1,0 +1,38 @@
+schema_version = 1
+
+[agent]
+name = "lily"
+system_prompt = "You are Lily, a practical software engineering assistant."
+
+[models.profiles.default]
+provider = "openai"
+model = "gpt-5-nano"
+temperature = 0.1
+timeout_seconds = 30
+
+[models.profiles.long_context]
+provider = "openai"
+model = "gpt-5-nano"
+temperature = 0.1
+timeout_seconds = 60
+
+[models.routing]
+enabled = true
+default_profile = "default"
+long_context_profile = "long_context"
+complexity_threshold = 8000
+
+[tools]
+allowlist = ["echo_tool", "ping_tool", "search_langgraph_code"]
+
+[mcp_servers.langgraph_docs]
+transport = "streamable_http"
+url = "https://gitmcp.io/langchain-ai/langgraph"
+
+[policies]
+max_iterations = 20
+max_model_calls = 40
+max_tool_calls = 40
+
+[logging]
+level = "INFO"

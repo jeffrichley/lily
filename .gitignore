@@ -208,8 +208,16 @@ __marimo__/
 
 # Lily / Iris kernel
 #  Kernel run store and state - project-specific and should not be committed
-.lily/
 .iris/
+/.lily/
+!/.lily/
+/.lily/*
+!/.lily/config/
+/.lily/config/*
+!/.lily/config/*.yaml
+!/.lily/config/*.yml
+!/.lily/config/*.toml
+archive/.lily/
 
 # macOS Finder metadata
 .DS_Store

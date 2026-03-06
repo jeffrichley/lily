@@ -66,6 +66,59 @@ logging:
     assert config.policies.max_iterations == 12
 
 
+def test_load_runtime_config_valid_toml(tmp_path: Path) -> None:
+    """Loads a valid TOML config and returns parsed typed fields."""
+    # Arrange - write a valid runtime TOML fixture.
+    config_file = tmp_path / "agent.toml"
+    _write(
+        config_file,
+        """
+schema_version = 1
+
+[agent]
+name = "lily"
+system_prompt = "You are Lily."
+
+[models.profiles.default]
+provider = "openai"
+model = "gpt-4o-mini"
+temperature = 0.1
+timeout_seconds = 30
+
+[models.profiles.long_context]
+provider = "openai"
+model = "gpt-4o"
+temperature = 0.1
+timeout_seconds = 45
+
+[models.routing]
+enabled = true
+default_profile = "default"
+long_context_profile = "long_context"
+complexity_threshold = 8
+
+[tools]
+allowlist = ["filesystem_read", "web_search"]
+
+[policies]
+max_iterations = 12
+max_model_calls = 20
+max_tool_calls = 20
+
+[logging]
+level = "INFO"
+""",
+    )
+
+    # Act - load and validate the runtime config.
+    config = load_runtime_config(config_file)
+
+    # Assert - key typed values are available and normalized.
+    assert config.agent.name == "lily"
+    assert config.models.profiles["default"].provider == "openai"
+    assert config.policies.max_iterations == 12
+
+
 def test_load_runtime_config_missing_required_field_raises(tmp_path: Path) -> None:
     """Raises with field-specific errors when required keys are missing."""
     # Arrange - write YAML missing one required field.
@@ -236,3 +289,169 @@ logging:
 
     # Assert - error includes routing reference field path.
     assert "routing.long_context_profile" in str(err.value)
+
+
+def test_load_runtime_config_parses_mcp_server_mapping(tmp_path: Path) -> None:
+    """Parses runtime `mcp_servers` config for resolver wiring."""
+    # Arrange - write valid runtime YAML with one MCP test server.
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        """
+schema_version: 1
+agent:
+  name: lily
+  system_prompt: "You are Lily."
+models:
+  profiles:
+    default:
+      provider: openai
+      model: gpt-4o-mini
+      temperature: 0.1
+      timeout_seconds: 30
+    long_context:
+      provider: openai
+      model: gpt-4o
+      temperature: 0.1
+      timeout_seconds: 45
+  routing:
+    enabled: true
+    default_profile: default
+    long_context_profile: long_context
+    complexity_threshold: 8
+tools:
+  allowlist:
+    - mcp_ping_tool
+mcp_servers:
+  local_test:
+    transport: test
+    tool_targets:
+      ping_remote: lily.agents.lily_supervisor:mcp_ping_tool
+policies:
+  max_iterations: 12
+  max_model_calls: 20
+  max_tool_calls: 20
+logging:
+  level: INFO
+""",
+    )
+
+    # Act - load config with MCP server mapping.
+    config = load_runtime_config(config_file)
+
+    # Assert - server mapping is typed and available for runtime wiring.
+    assert "local_test" in config.mcp_servers
+    assert config.mcp_servers["local_test"].transport == "test"
+    assert (
+        config.mcp_servers["local_test"]
+        .tool_targets["ping_remote"]
+        .endswith(":mcp_ping_tool")
+    )
+
+
+def test_load_runtime_config_parses_streamable_http_mcp_server(tmp_path: Path) -> None:
+    """Parses streamable-http MCP server config used for real transports."""
+    # Arrange - write valid runtime YAML with one streamable-http MCP server.
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        """
+schema_version: 1
+agent:
+  name: lily
+  system_prompt: "You are Lily."
+models:
+  profiles:
+    default:
+      provider: openai
+      model: gpt-4o-mini
+      temperature: 0.1
+      timeout_seconds: 30
+    long_context:
+      provider: openai
+      model: gpt-4o
+      temperature: 0.1
+      timeout_seconds: 45
+  routing:
+    enabled: true
+    default_profile: default
+    long_context_profile: long_context
+    complexity_threshold: 8
+tools:
+  allowlist:
+    - search_langgraph_code
+mcp_servers:
+  langgraph_docs:
+    transport: streamable_http
+    url: https://gitmcp.io/langchain-ai/langgraph
+policies:
+  max_iterations: 12
+  max_model_calls: 20
+  max_tool_calls: 20
+logging:
+  level: INFO
+""",
+    )
+
+    # Act - load config with streamable-http MCP server mapping.
+    config = load_runtime_config(config_file)
+
+    # Assert - streamable-http server mapping is parsed with expected fields.
+    assert "langgraph_docs" in config.mcp_servers
+    assert config.mcp_servers["langgraph_docs"].transport == "streamable_http"
+
+
+def test_load_runtime_config_parses_toml_mcp_server_mapping(tmp_path: Path) -> None:
+    """Parses TOML `mcp_servers` table mapping used for resolver wiring."""
+    # Arrange - write valid runtime TOML with one streamable-http MCP server.
+    config_file = tmp_path / "agent.toml"
+    _write(
+        config_file,
+        """
+schema_version = 1
+
+[agent]
+name = "lily"
+system_prompt = "You are Lily."
+
+[models.profiles.default]
+provider = "openai"
+model = "gpt-4o-mini"
+temperature = 0.1
+timeout_seconds = 30
+
+[models.profiles.long_context]
+provider = "openai"
+model = "gpt-4o"
+temperature = 0.1
+timeout_seconds = 45
+
+[models.routing]
+enabled = true
+default_profile = "default"
+long_context_profile = "long_context"
+complexity_threshold = 8
+
+[tools]
+allowlist = ["search_langgraph_code"]
+
+[mcp_servers.langgraph_docs]
+transport = "streamable_http"
+url = "https://gitmcp.io/langchain-ai/langgraph"
+
+[policies]
+max_iterations = 12
+max_model_calls = 20
+max_tool_calls = 20
+
+[logging]
+level = "INFO"
+""",
+    )
+
+    # Act - load config with TOML MCP server mapping.
+    config = load_runtime_config(config_file)
+
+    # Assert - parsed server mapping is available for runtime wiring.
+    assert "langgraph_docs" in config.mcp_servers
+    assert config.mcp_servers["langgraph_docs"].transport == "streamable_http"

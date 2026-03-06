@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from langchain.agents.middleware import (
     AgentMiddleware,
     ModelRequest,
     ModelResponse,
-    wrap_model_call,
 )
 from langchain_core.language_models import BaseChatModel
 from pydantic import BaseModel, ConfigDict
@@ -65,14 +64,48 @@ class DynamicModelRouter(BaseModel):
         Returns:
             Agent middleware that swaps request model based on routing policy.
         """
+        router = self
 
-        @wrap_model_call
-        def _dynamic_model_selector(
-            request: ModelRequest[None],
-            handler: Callable[[ModelRequest[None]], ModelResponse[Any]],
-        ) -> ModelResponse[Any]:
-            selected_profile = self._select_profile_name(request)
-            selected_model = self.models[selected_profile]
-            return handler(request.override(model=selected_model))
+        class _DynamicModelRoutingMiddleware(AgentMiddleware[Any, Any]):
+            """Model selection middleware with sync and async handler support."""
 
-        return _dynamic_model_selector
+            def wrap_model_call(
+                self,
+                request: ModelRequest[None],
+                handler: Callable[[ModelRequest[None]], ModelResponse[Any]],
+            ) -> ModelResponse[Any]:
+                """Select model profile for sync model invocation.
+
+                Args:
+                    request: Current model call request.
+                    handler: Downstream sync model-call handler.
+
+                Returns:
+                    Model response from downstream handler.
+                """
+                selected_profile = router._select_profile_name(request)
+                selected_model = router.models[selected_profile]
+                return handler(request.override(model=selected_model))
+
+            async def awrap_model_call(
+                self,
+                request: ModelRequest[None],
+                handler: Callable[
+                    [ModelRequest[None]],
+                    Awaitable[ModelResponse[Any]],
+                ],
+            ) -> ModelResponse[Any]:
+                """Select model profile for async model invocation.
+
+                Args:
+                    request: Current model call request.
+                    handler: Downstream async model-call handler.
+
+                Returns:
+                    Model response from downstream handler.
+                """
+                selected_profile = router._select_profile_name(request)
+                selected_model = router.models[selected_profile]
+                return await handler(request.override(model=selected_model))
+
+        return _DynamicModelRoutingMiddleware()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -83,6 +84,30 @@ class ToolsConfig(BaseModel):
     allowlist: list[str] = Field(min_length=1)
 
 
+class McpServerConfig(BaseModel):
+    """Base marker type for runtime MCP server config variants."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    transport: str
+
+
+class McpServerTestConfig(McpServerConfig):
+    """Deterministic local MCP transport used for test fixtures."""
+
+    transport: Literal["test"]
+    tool_targets: dict[str, str] = Field(min_length=1)
+
+
+class McpServerStreamableHttpConfig(McpServerConfig):
+    """Real streamable HTTP MCP transport configuration."""
+
+    transport: Literal["streamable_http"]
+    url: str = Field(min_length=1)
+    headers: dict[str, str] = Field(default_factory=dict)
+    timeout_seconds: float | None = Field(default=None, gt=0.0)
+
+
 class PoliciesConfig(BaseModel):
     """Runtime safety and loop policies."""
 
@@ -110,5 +135,12 @@ class RuntimeConfig(BaseModel):
     agent: AgentConfig
     models: ModelsConfig
     tools: ToolsConfig
+    mcp_servers: dict[
+        str,
+        Annotated[
+            McpServerTestConfig | McpServerStreamableHttpConfig,
+            Field(discriminator="transport"),
+        ],
+    ] = Field(default_factory=dict)
     policies: PoliciesConfig
     logging: LoggingConfig
