@@ -9,8 +9,8 @@ source_of_truth: true
 
 ## Current Focus
 
-- Define SI-003 execution plan scope and acceptance gates before implementation (`docs/dev/roadmap.md`).
-- Keep SI-004 structured execution logging deferred until SI-003 runtime surfaces are scoped (`docs/dev/roadmap.md`).
+- Define SI-007 skills-system execution scope and acceptance gates before implementation (`docs/dev/roadmap.md`).
+- Implement SI-007 first-class skills runtime on top of the tool registry foundation (`docs/dev/roadmap.md`).
 
 ## Recently Completed
 
@@ -34,3 +34,4 @@ source_of_truth: true
 - 2026-03-05: Resolved SI-002 final gate blocker by upgrading `langgraph` to `1.0.10` (and `langgraph-prebuilt` to `1.0.8` via lock refresh), then re-ran `just quality` and `just test` successfully.
 - 2026-03-05: Completed SI-002 Phase 5 by wiring runtime MCP providers (`mcp_servers`) and verifying MCP tool execution via CLI plus automated TUI parity tests; opened SI-002 Phase 6 for TOML config parity follow-up.
 - 2026-03-06: Completed SI-002 Phase 6 with TOML runtime/catalog parity, inferred `agent.toml -> tools.toml` default behavior, and passing full quality/test + coverage gates.
+- 2026-03-06: Split roadmap tracking: SI-002 remains completed for tool-registry delivery, and SI-007 is now in progress for first-class skills-system delivery (`docs/dev/roadmap.md`).
