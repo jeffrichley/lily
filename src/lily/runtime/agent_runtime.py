@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
-import sqlite3
-from collections.abc import Callable, Sequence
+import asyncio
+import threading
+from collections.abc import Callable, Coroutine, Sequence
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol, TypeVar, cast
 from uuid import uuid4
 
+import aiosqlite
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
     ModelCallLimitMiddleware,
     ToolCallLimitMiddleware,
 )
 from langchain_core.messages import AIMessage, BaseMessage
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel, ConfigDict
 
 from lily.runtime.config_schema import RuntimeConfig
@@ -38,18 +40,19 @@ class AgentRunResult(BaseModel):
 
 
 AgentBuilder = Callable[..., object]
+_T = TypeVar("_T")
 
 
-class _InvokableAgent(Protocol):
-    """Structural protocol for compiled LangChain agent invoke surface."""
+class _AsyncInvokableAgent(Protocol):
+    """Structural protocol for compiled agent async invoke surface."""
 
-    def invoke(
+    async def ainvoke(
         self,
         request: dict[str, object],
         *,
         config: dict[str, object],
     ) -> dict[str, object]:
-        """Invoke one request and return mapping output.
+        """Asynchronously invoke one request and return mapping output.
 
         Args:
             request: Structured agent input mapping.
@@ -101,17 +104,73 @@ class AgentRuntime:
             Path(".lily") / "runtime-checkpoints.sqlite3"
         )
         self._agent_builder = agent_builder
-        self._agent: _InvokableAgent | None = None
-        self._checkpoint_conn: sqlite3.Connection | None = None
-        self._checkpointer: SqliteSaver | None = None
+        self._agent: object | None = None
+        self._checkpoint_conn: aiosqlite.Connection | None = None
+        self._checkpointer: AsyncSqliteSaver | None = None
+        self._async_loop: asyncio.AbstractEventLoop | None = None
+        self._async_loop_thread: threading.Thread | None = None
+
+    def _ensure_async_loop(self) -> asyncio.AbstractEventLoop:
+        """Create and memoize one dedicated async loop thread.
+
+        Returns:
+            Running event loop used for async checkpointing/invocation.
+        """
+        if self._async_loop is not None and self._async_loop.is_running():
+            return self._async_loop
+
+        ready = threading.Event()
+        loop_holder: dict[str, asyncio.AbstractEventLoop] = {}
+
+        def _loop_runner() -> None:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop_holder["loop"] = loop
+            ready.set()
+            loop.run_forever()
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            if pending:
+                loop.run_until_complete(
+                    asyncio.gather(*pending, return_exceptions=True)
+                )
+            loop.close()
+
+        loop_thread = threading.Thread(target=_loop_runner, daemon=True)
+        loop_thread.start()
+        ready.wait()
+
+        self._async_loop = loop_holder["loop"]
+        self._async_loop_thread = loop_thread
+        return self._async_loop
+
+    def _run_on_async_loop(self, coro: Coroutine[object, object, _T]) -> _T:
+        """Run one coroutine on runtime-owned background async loop.
+
+        Args:
+            coro: Coroutine to execute on loop thread.
+
+        Returns:
+            Coroutine result.
+        """
+        loop = self._ensure_async_loop()
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        return future.result()
 
     def close(self) -> None:
-        """Close held checkpoint database connection when present."""
-        if self._checkpoint_conn is None:
-            return
-        self._checkpoint_conn.close()
-        self._checkpoint_conn = None
+        """Close held async checkpoint resources and loop thread."""
+        if self._checkpoint_conn is not None:
+            self._run_on_async_loop(self._checkpoint_conn.close())
+            self._checkpoint_conn = None
         self._checkpointer = None
+        self._agent = None
+        if self._async_loop is not None:
+            self._async_loop.call_soon_threadsafe(self._async_loop.stop)
+            if self._async_loop_thread is not None:
+                self._async_loop_thread.join(timeout=2.0)
+            self._async_loop = None
+            self._async_loop_thread = None
 
     def __del__(self) -> None:
         """Best-effort cleanup for checkpoint connection."""
@@ -120,24 +179,30 @@ class AgentRuntime:
         except Exception:
             return
 
-    def _build_checkpointer(self) -> SqliteSaver:
-        """Create and memoize SQLite checkpointer for thread persistence.
+    def _build_checkpointer(self) -> AsyncSqliteSaver:
+        """Create and memoize async SQLite checkpointer for thread persistence.
 
         Returns:
-            LangGraph SQLite saver used as create_agent checkpointer.
+            LangGraph async SQLite saver used as create_agent checkpointer.
         """
         if self._checkpointer is not None:
             return self._checkpointer
 
         self._checkpoint_db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._checkpoint_conn = sqlite3.connect(
-            self._checkpoint_db_path,
-            check_same_thread=False,
-        )
-        self._checkpointer = SqliteSaver(self._checkpoint_conn)
+        db_path = str(self._checkpoint_db_path)
+
+        async def _create_async_checkpointer() -> tuple[
+            aiosqlite.Connection, AsyncSqliteSaver
+        ]:
+            conn = await aiosqlite.connect(db_path)
+            return conn, AsyncSqliteSaver(conn)
+
+        conn, checkpointer = self._run_on_async_loop(_create_async_checkpointer())
+        self._checkpoint_conn = conn
+        self._checkpointer = checkpointer
         return self._checkpointer
 
-    def _build_agent(self) -> _InvokableAgent:
+    def _build_agent(self) -> object:
         """Create and memoize the compiled LangChain agent graph.
 
         Returns:
@@ -170,10 +235,13 @@ class AgentRuntime:
             checkpointer=self._build_checkpointer(),
             name=self._config.agent.name,
         )
-        if not hasattr(built, "invoke"):
-            msg = "Agent builder must return an object with an invoke(...) method."
+        if not hasattr(built, "invoke") and not hasattr(built, "ainvoke"):
+            msg = (
+                "Agent builder must return an object with invoke(...) or "
+                "ainvoke(...) method."
+            )
             raise AgentRuntimeError(msg)
-        self._agent = cast(_InvokableAgent, built)
+        self._agent = cast(object, built)
         return self._agent
 
     def _invoke(
@@ -203,7 +271,16 @@ class AgentRuntime:
         thread_id = conversation_id or f"ephemeral-{uuid4()}"
         invoke_config["configurable"] = {"thread_id": thread_id}
 
-        result = agent.invoke(payload, config=invoke_config)
+        if hasattr(agent, "ainvoke"):
+            async_agent = cast(_AsyncInvokableAgent, agent)
+            result = self._run_on_async_loop(
+                async_agent.ainvoke(payload, config=invoke_config)
+            )
+        elif hasattr(agent, "invoke"):
+            result = agent.invoke(payload, config=invoke_config)
+        else:
+            msg = "Built agent exposes neither invoke(...) nor ainvoke(...)."
+            raise AgentRuntimeError(msg)
         if not isinstance(result, dict):
             msg = "Agent invocation returned non-dict output."
             raise AgentRuntimeError(msg)

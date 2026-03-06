@@ -53,6 +53,26 @@ class _SpyInvokableAgent:
         return {"messages": [AIMessage(content="SPY")]}
 
 
+class _SpyAsyncInvokableAgent:
+    """Async-only spy invokable capturing ainvoke payload/config."""
+
+    def __init__(self) -> None:
+        """Initialize empty capture fields."""
+        self.request: dict[str, object] | None = None
+        self.config: dict[str, object] | None = None
+
+    async def ainvoke(
+        self,
+        request: dict[str, object],
+        *,
+        config: dict[str, object],
+    ) -> dict[str, object]:
+        """Capture ainvoke details and return deterministic output."""
+        self.request = request
+        self.config = config
+        return {"messages": [AIMessage(content="ASYNC-SPY")]}
+
+
 def _runtime_config(
     *,
     allowlist: list[str],
@@ -293,6 +313,46 @@ def test_agent_runtime_omits_thread_config_when_conversation_id_absent() -> None
     assert "configurable" in spy_agent.config
     assert "thread_id" in dict(spy_agent.config["configurable"])
     assert result.conversation_id is None
+
+
+def test_agent_runtime_supports_async_invokable_agent() -> None:
+    """Uses `ainvoke` when the compiled agent exposes async-only invocation."""
+
+    # Arrange - build runtime with async-only spy agent builder.
+    @tool
+    def ping_tool() -> str:
+        """Return pong."""
+        return "pong"
+
+    spy_agent = _SpyAsyncInvokableAgent()
+
+    def _spy_agent_builder(**_kwargs: object) -> _SpyAsyncInvokableAgent:
+        return spy_agent
+
+    runtime = AgentRuntime(
+        config=_runtime_config(allowlist=["ping_tool"], routing_enabled=False),
+        tools=[ping_tool],
+        model_factory=_model_factory(
+            {
+                "default-model": ToolCapableFakeModel(
+                    responses=[AIMessage(content="ignored")]
+                ),
+                "long-model": ToolCapableFakeModel(
+                    responses=[AIMessage(content="ignored")]
+                ),
+            }
+        ),
+        agent_builder=_spy_agent_builder,
+    )
+
+    # Act - run runtime and exercise async invocation bridge.
+    with closing(runtime):
+        result = runtime.run("hello", conversation_id="conv-async")
+
+    # Assert - async spy captured config and produced deterministic output.
+    assert spy_agent.config is not None
+    assert spy_agent.config["configurable"] == {"thread_id": "conv-async"}
+    assert result.final_output == "ASYNC-SPY"
 
 
 def test_agent_runtime_persists_history_for_same_conversation_id(

@@ -1,7 +1,8 @@
-"""YAML loading and validation for Lily runtime configuration."""
+"""YAML/TOML loading and validation for Lily runtime configuration."""
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -12,20 +13,20 @@ from lily.runtime.config_schema import RuntimeConfig
 
 
 class ConfigLoadError(ValueError):
-    """Raised when runtime YAML config cannot be loaded or validated."""
+    """Raised when runtime config cannot be loaded or validated."""
 
 
-def _read_yaml_mapping(path: Path) -> dict[str, Any]:
-    """Read a YAML file and return it as a mapping.
+def _read_mapping(path: Path) -> dict[str, Any]:
+    """Read one YAML/TOML file and return it as a mapping.
 
     Args:
-        path: Path to the YAML file to read.
+        path: Path to the config file to read.
 
     Returns:
-        Parsed top-level mapping from YAML.
+        Parsed top-level mapping from YAML/TOML.
 
     Raises:
-        ConfigLoadError: If file read/parsing fails or root is not a mapping.
+        ConfigLoadError: If file read/parsing fails or root is not a mapping/object.
     """
     try:
         raw = path.read_text(encoding="utf-8")
@@ -33,11 +34,25 @@ def _read_yaml_mapping(path: Path) -> dict[str, Any]:
         msg = f"Unable to read config file '{path}': {exc}"
         raise ConfigLoadError(msg) from exc
 
-    try:
-        loaded = yaml.safe_load(raw)
-    except yaml.YAMLError as exc:
-        msg = f"Malformed YAML in '{path}': {exc}"
-        raise ConfigLoadError(msg) from exc
+    suffix = path.suffix.lower()
+    if suffix in {".yaml", ".yml"}:
+        try:
+            loaded = yaml.safe_load(raw)
+        except yaml.YAMLError as exc:
+            msg = f"Malformed YAML in '{path}': {exc}"
+            raise ConfigLoadError(msg) from exc
+    elif suffix == ".toml":
+        try:
+            loaded = tomllib.loads(raw)
+        except tomllib.TOMLDecodeError as exc:
+            msg = f"Malformed TOML in '{path}': {exc}"
+            raise ConfigLoadError(msg) from exc
+    else:
+        msg = (
+            f"Unsupported config file extension for '{path}'. "
+            "Expected .yaml, .yml, or .toml."
+        )
+        raise ConfigLoadError(msg)
 
     if loaded is None:
         return {}
@@ -87,25 +102,25 @@ def load_runtime_config(
     base_config_path: str | Path,
     override_config_path: str | Path | None = None,
 ) -> RuntimeConfig:
-    """Load, merge, and validate runtime config from YAML files.
+    """Load, merge, and validate runtime config from YAML/TOML files.
 
     Args:
-        base_config_path: Path to the base YAML config file.
-        override_config_path: Optional path to override YAML config file.
+        base_config_path: Path to the base config file.
+        override_config_path: Optional path to override config file.
 
     Returns:
         Fully validated runtime config object.
 
     Raises:
-        ConfigLoadError: If YAML cannot be read, parsed, or validated.
+        ConfigLoadError: If config cannot be read, parsed, or validated.
     """
     base_path = Path(base_config_path)
-    base_mapping = _read_yaml_mapping(base_path)
+    base_mapping = _read_mapping(base_path)
 
     merged_mapping = base_mapping
     if override_config_path is not None:
         override_path = Path(override_config_path)
-        override_mapping = _read_yaml_mapping(override_path)
+        override_mapping = _read_mapping(override_path)
         merged_mapping = _deep_merge(base_mapping, override_mapping)
 
     try:

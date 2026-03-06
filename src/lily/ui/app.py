@@ -40,8 +40,8 @@ def _default_supervisor_factory(
     """Build default supervisor from config paths.
 
     Args:
-        config_path: Base YAML config path.
-        override_config_path: Optional YAML override config path.
+        config_path: Base runtime config path.
+        override_config_path: Optional runtime override config path.
 
     Returns:
         Configured Lily supervisor instance.
@@ -71,8 +71,8 @@ class LilyTuiApp(App[None]):
         """Initialize TUI app with config-driven supervisor factory.
 
         Args:
-            config_path: Base YAML config path.
-            override_config_path: Optional YAML override config path.
+            config_path: Base runtime config path.
+            override_config_path: Optional runtime override config path.
             conversation_id: Active conversation id for this TUI process.
             supervisor_factory: Factory building supervisor runtime object.
         """
