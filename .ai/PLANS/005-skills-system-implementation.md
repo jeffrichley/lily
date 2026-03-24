@@ -190,6 +190,7 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - [ ] Phase 6: CLI surfaces (`skills list/inspect/doctor`) and UX
 - [ ] Phase 7: Telemetry/events, diagnostics, and observability
 - [ ] Phase 8: Testing, docs/status sync, and release hardening
+- [ ] Phase 9: Post-MVP distribution and packaging follow-up
 
 ### Phase 0: Execution framing and acceptance lock
 
@@ -219,7 +220,8 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - **Source of truth**: PRD `Skill package contract`; Architecture `SKILL.md contract` and metadata schema.
 - **Must**:
   - [ ] Implement strict pydantic models for skill metadata/frontmatter and normalized summaries.
-  - [ ] Enforce snake_case IDs, known enum types, and required fields.
+  - [ ] Enforce guide-aligned required fields (`name`, `description`) and parser normalization rules.
+  - [ ] Enforce canonical kebab-case recommendation as lint/doctor guidance (not hard reject for imported third-party skills).
   - [ ] Provide clear field-level errors (no generic parse failures).
 - **Must Not**:
   - [ ] Introduce implicit fallback defaults for required fields.
@@ -236,6 +238,8 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - [ ] ADD deterministic validation messages for each required field.
 - [ ] ADD fixture packs for success/failure contracts.
 - [ ] ADD unit tests for parsing, unknown fields, malformed versions, and ID validation.
+- [ ] ADD parser test matrix for malformed YAML/frontmatter edge cases (missing delimiters, unclosed quotes, bad YAML types, forbidden `<` `>` values, reserved provider prefixes).
+- [ ] ADD normalization tests for non-canonical names -> internal canonical key mapping.
 
 ### Phase 2: Discovery, indexing, precedence, and registry
 
@@ -293,6 +297,13 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
   - [ ] Implement playbook/procedural/agent adapters behind a registry dispatch map.
   - [ ] Enforce skill-level policy checks before execution.
   - [ ] Keep delegated agent execution context-bounded and auditable.
+  - [ ] Implement normative tool policy resolution:
+    - omitted `allowed-tools` follows config mode:
+      - `inherit_runtime` => inherit runtime-available tool set;
+      - `deny_unless_allowed` => empty skill candidate tool set;
+      - `use_default_packs` => tool union from configured default packs;
+    - present `allowed-tools` => explicit skill list wins, then intersect with runtime-available tool set;
+    - empty effective tool set => playbook-only allowed, tool-call paths fail fast.
 - **Must Not**:
   - [ ] Implement adapter selection with fragile long condition chains.
   - [ ] Allow explicit invocation to bypass deny policies.
@@ -301,6 +312,8 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - **Acceptance gates**:
   - [ ] Unit tests for each adapter success/failure path.
   - [ ] Integration tests for denylist, tool allowlist, and agent allowlist enforcement.
+  - [ ] Unit/integration tests proving omitted `allowed-tools` does not over-restrict skills and cannot expand runtime boundaries.
+  - [ ] Unit tests for all three default policy modes and explicit `allowed-tools` override precedence.
 
 **Tasks**
 - [ ] CREATE `skill_policies.py` with typed check results and rejection reasons.
@@ -308,6 +321,12 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - [ ] ADD procedural wrapper contract validation (input/output schema).
 - [ ] ADD agent adapter bounds (`max_iterations`, tool/model call limits).
 - [ ] ADD policy-focused tests preventing bypass via explicit invocation.
+- [ ] ADD policy tests for tool resolution matrix: omitted `allowed-tools`, explicit subset, explicit empty set, and out-of-runtime tool entries.
+- [ ] UPDATE config schema/loader to support:
+  - [ ] `skills.tools.default_policy`
+  - [ ] `skills.tools.default_packs`
+  - [ ] `skills.tools.packs`
+- [ ] ADD config validation tests for unknown pack IDs, unknown tool IDs in packs, and duplicate pack entries.
 
 ### Phase 5: Runtime integration into supervisor invoke path
 
@@ -341,6 +360,7 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
   - [ ] Add `skills list`, `skills inspect`, `skills doctor` user-facing commands.
   - [ ] Use Rich tables/panels for default outputs.
   - [ ] Surface collisions/shadowing/invalid packages with actionable messages.
+  - [ ] Surface trigger quality diagnostics (under-trigger and over-trigger heuristics) with actionable remediation guidance.
 - **Must Not**:
   - [ ] Default to raw JSON in interactive mode.
   - [ ] Hide policy-block reasons from operator diagnostics.
@@ -356,6 +376,8 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - [ ] ADD filtering/sorting flags and concise/verbose modes.
 - [ ] ADD e2e tests for no-skills, valid-skills, invalid-skills scenarios.
 - [ ] ADD docs snippets for command usage.
+- [ ] ADD `skills doctor` trigger test templates: should-trigger, paraphrase-trigger, should-not-trigger.
+- [ ] ADD operator remediation docs for under-trigger/over-trigger tuning in description/frontmatter.
 
 ### Phase 7: Telemetry/events and observability
 
@@ -387,6 +409,7 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - **Must**:
   - [ ] Run full quality/test gates warning-clean.
   - [ ] Update roadmap/status/backlog/debt docs to reflect completion/defer states.
+  - [ ] Record explicit guide-alignment evidence for parser matrix and trigger/UX diagnostics.
   - [ ] Produce phased commits following commit policy (feature, UX polish, docs-only as applicable).
 - **Must Not**:
   - [ ] Merge with unresolved warning debt undocumented.
@@ -403,6 +426,31 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - [ ] RUN full gates and capture output in execution report.
 - [ ] UPDATE docs status surfaces with SI-007 phase truth.
 - [ ] PREPARE PR using repository template headings exactly.
+- [ ] ADD implementation evidence section mapping guide checklist items -> shipped tests/commands.
+
+### Phase 9: Post-MVP distribution and packaging follow-up
+
+**Intent Lock**
+- **Source of truth**: SI-007 PRD `## 13. Future Considerations`; SKILLS_ARCHITECTURE `## 20. Tight Delta Checklist (Guide Realignment)`.
+- **Must**:
+  - [ ] Define zip/import-export package contract for portable skill bundles.
+  - [ ] Define API-managed skill lifecycle/versioning strategy for programmatic deployments.
+  - [ ] Define org-level distribution, rollout, and governance policy surfaces.
+- **Must Not**:
+  - [ ] Block SI-007 MVP closure on post-MVP distribution implementation.
+  - [ ] Ship ad hoc packaging behavior without documented contract/versioning.
+- **Provenance map**:
+  - [ ] Distribution requirements in architecture/PRD map to a tracked follow-up plan and backlog entries.
+- **Acceptance gates**:
+  - [ ] A follow-up implementation plan exists and is linked from roadmap/backlog.
+  - [ ] Deferred scope is explicitly documented in PR/status surfaces.
+
+**Tasks**
+- [ ] CREATE follow-up plan file for distribution work (next plan ID after current active plans).
+- [ ] DEFINE skill bundle archive format (layout, checksum, manifest metadata, compatibility fields).
+- [ ] DEFINE import/export CLI/API surfaces and validation error taxonomy.
+- [ ] DEFINE rollout strategy: org publish/update channels, version pinning, rollback semantics.
+- [ ] UPDATE roadmap/backlog/status docs to track distribution track separately from SI-007 MVP.
 
 ---
 

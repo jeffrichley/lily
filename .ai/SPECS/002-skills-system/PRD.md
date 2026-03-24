@@ -64,7 +64,7 @@ Core principles:
 ### In Scope
 
 #### Core functionality
-- ✅ Skill package contract with required `SKILL.md` and metadata/frontmatter.
+- ✅ Skill package contract with required `SKILL.md` and YAML frontmatter.
 - ✅ Local skill discovery from configured skill roots.
 - ✅ Skill indexing and deterministic selection pipeline.
 - ✅ Progressive disclosure loading model (summary index + full body on select).
@@ -183,8 +183,15 @@ src/lily/runtime/
 ### F1. Skill package specification
 
 - Required artifact: `SKILL.md`.
-- Required metadata fields (frontmatter or equivalent index): `id`, `name`, `description`, `type`, `tags`, `version`.
-- Optional artifacts: examples, references, scripts, tests, assets.
+- Required frontmatter fields: `name`, `description`.
+- Optional frontmatter fields (guide-aligned): `license`, `compatibility`, `allowed-tools`, `metadata`.
+- Optional artifacts: `scripts/`, `references/`, `assets/`.
+
+Naming and compatibility policy:
+- Canonical authoring recommendation: `name` should be kebab-case and should match folder name.
+- Runtime compatibility behavior: parser accepts non-canonical imported names but normalizes to an internal canonical key for indexing/matching.
+- Normalization is internal-only; original author-facing `name` is preserved in loaded metadata.
+- `SKILL.md` filename is exact/case-sensitive; no in-skill `README.md` (keep docs in `SKILL.md` and `references/`).
 
 Acceptance:
 - deterministic parse failures with field-specific errors.
@@ -230,6 +237,12 @@ Acceptance:
 - Enable/disable by scope or skill ID.
 - Agent-level skill allowlist/denylist.
 - Optional manual-approval gates for high-risk skills.
+
+Tool-access resolution policy (normative):
+- Runtime boundary remains authoritative: skills cannot grant access to tools outside `agent.* tools.allowlist` and global runtime policies.
+- If `allowed-tools` is omitted in skill frontmatter: apply no additional skill-level restriction (skill inherits runtime-available tools).
+- If `allowed-tools` is present: effective tools are `intersection(runtime_available_tools, skill_allowed_tools)`.
+- If `allowed-tools` resolves to an empty effective set: skill may still load for playbook-only behavior, but any tool-calling path must fail fast with deterministic policy error messaging.
 
 Acceptance:
 - blocked skills cannot be invoked implicitly or explicitly.
@@ -280,6 +293,10 @@ Acceptance:
 - Enforce skill allowlist/denylist and execution policy boundaries.
 - Restrict agent-skill delegation through explicit policy and max-call limits.
 - Log and surface unsafe/blocked invocation attempts.
+- Enforce frontmatter security restrictions aligned with the guide:
+  - reject XML angle brackets (`<` and `>`) in frontmatter values;
+  - reject reserved provider prefixes in skill `name` (`claude*`, `anthropic*`);
+  - parse YAML with safe loading only (no executable YAML tags).
 
 ### Security out of scope (post-MVP)
 
@@ -295,8 +312,59 @@ Agent config (`agent.yaml`/`agent.toml`):
 - `skills.allowlist` / `skills.denylist`
 - `skills.implicit_selection.enabled`
 - `skills.selection.max_candidates`
+- `skills.tools.default_policy` (`inherit_runtime` | `deny_unless_allowed` | `use_default_packs`)
+- `skills.tools.default_packs` (list of named pack IDs)
+- `skills.tools.packs` (map of pack ID -> ordered tool ID list)
 
 Optional skill catalog (`skills.yaml`/`skills.toml`) for explicit registrations.
+
+Tool-policy mode semantics:
+- `inherit_runtime`:
+  - if skill omits `allowed-tools`, skill inherits runtime-available tools.
+- `deny_unless_allowed`:
+  - if skill omits `allowed-tools`, skill has no tool access (playbook-only behavior still allowed).
+- `use_default_packs`:
+  - if skill omits `allowed-tools`, effective tools come from union of configured `default_packs`.
+
+Precedence and safety:
+- Runtime boundary remains authoritative; skills cannot grant tools outside runtime policy.
+- Effective skill tools are always intersected with runtime-available tools.
+- If both `allowed-tools` and default packs are present for one skill, explicit `allowed-tools` wins.
+
+Example config (YAML):
+```yaml
+skills:
+  enabled: true
+  roots:
+    - .lily/skills
+  scopes_precedence: [repository, user, system]
+  tools:
+    default_policy: use_default_packs
+    default_packs: [core-research, docs-safe]
+    packs:
+      core-research:
+        - web_search
+        - web_fetch
+      docs-safe:
+        - read_file
+        - rg
+```
+
+Example config (TOML):
+```toml
+[skills]
+enabled = true
+roots = [".lily/skills"]
+scopes_precedence = ["repository", "user", "system"]
+
+[skills.tools]
+default_policy = "use_default_packs"
+default_packs = ["core-research", "docs-safe"]
+
+[skills.tools.packs]
+core-research = ["web_search", "web_fetch"]
+docs-safe = ["read_file", "rg"]
+```
 
 ---
 
@@ -425,6 +493,11 @@ Estimated timeline (engineering weeks):
 - Skill effectiveness scoring and promotion workflows.
 - Remote skill package distribution with provenance checks.
 - Automated extraction of candidate skills from execution traces.
+- Distribution/packaging follow-up:
+  - zip/package validation and import/export workflow for skill bundles;
+  - compatibility profile for cross-platform skill portability;
+  - API-managed skill lifecycle and version rollout strategy;
+  - organization-wide publishing/update/governance controls.
 
 ---
 
