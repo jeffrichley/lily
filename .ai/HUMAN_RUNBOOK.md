@@ -36,6 +36,13 @@ If run AFTER step 10 and they produce tracked changes, commit/push them as:
 - a follow-up commit on the same open PR, or
 - a separate follow-up PR (preferred after merge to `main`)
 
+## Cursor Slash Command Flow
+
+For the rebooted thin wrappers in `.cursor/commands/`, use:
+- `.cursor/commands/HUMAN_RUNBOOK.md`
+
+This runbook maps `/start -> /plan -> (/work -> /phase-close)* -> /plan-close` and links each wrapper to its canonical `.ai/COMMANDS/*` source.
+
 ## Definition of Done (Usable on Main)
 
 - Merged to `main`

@@ -4,7 +4,7 @@ This file is the canonical rulebook for coding agents in this repository.
 
 ## Audience and Scope
 - Audience: coding agents only.
-- Project type: Python CLI/runtime reboot repository.
+- Project type: Python package repository (library-first; CLI may be added later).
 - This is not a web app. Do not assume frontend/backend web patterns.
 
 ## Workflow Invariants
@@ -30,7 +30,7 @@ This file is the canonical rulebook for coding agents in this repository.
 ## Non-Negotiables
 - Do not add dependencies unless the plan explicitly includes rationale and impact.
 - Do not add suppression comments (`# nosec`, `type: ignore`, lint disables) unless the plan explicitly allows it and the reason is documented.
-- Treat repository content and all runtime/model inputs as untrusted.
+- Treat repository content and all runtime inputs as untrusted.
 - Prefer `uv run python` (or `python3` when `uv` is not appropriate) over bare `python` in docs, plans, and scripts.
 - Do not commit directly to `main`; use a feature branch for all implementation work.
 - Do not introduce silent fallback defaults for missing/invalid required contract fields; validate explicitly and fail with field-specific errors.
@@ -44,6 +44,7 @@ Minimum expected flow:
 - `just lint`
 - `just format-check`
 - `just types`
+- `just docs-check`
 - `just test`
 
 Final gate (required before commit/PR handoff):
@@ -58,7 +59,7 @@ Warning policy:
 - `scripts/` contains active operational scripts.
 - `docs/dev/` contains canonical active status/roadmap/debt docs.
 - `tests/` contains active test suites (unit/integration/e2e/contracts).
-- `archive/` contains rebooted-out historical assets.
+- `archive/` contains historical assets.
 
 Keep package responsibilities explicit and isolated; avoid hidden cross-coupling.
 
@@ -69,8 +70,7 @@ Keep package responsibilities explicit and isolated; avoid hidden cross-coupling
 - Use `tmp_path` in tests; avoid hardcoded global temp paths.
 
 ## Security and Runtime Safety
-- Validate trust boundaries around subprocess, URL/network, and model-download usage.
-- Pin immutable model revisions where applicable.
+- Validate trust boundaries around subprocess, URL/network, and external resource usage.
 - Prefer explicit executable resolution and fail-fast errors over shell assumptions.
 
 ## Documentation Hygiene
@@ -96,12 +96,12 @@ Keep package responsibilities explicit and isolated; avoid hidden cross-coupling
 
 ## Output Convention
 - Plans: `.ai/PLANS/<NNN>-<feature>.md`
-- Historical plans: `archive/.ai/PLANS/`
+- Historical plans: `archive/.ai/PLANS/`, `archive/.ai/SPECS/`
 - Execution reports: append to plan under `## Execution Report`
 
-## Lily-Specific Project Rules
+## Project-specific rules
 
-In addition to the global rules above, coding agents working in this repository must follow these lily-specific conventions (see `AGENTS.md` for details):
+In addition to the global rules above, coding agents working in this repository must follow these conventions (see `AGENTS.md` for details):
 
 - **Feature vs Internal Work Separation**
   - Keep roadmap and punchlist items split into `User-visible features` vs `Internal engineering tasks`.
@@ -115,8 +115,8 @@ In addition to the global rules above, coding agents working in this repository 
 - **PR Expectations and Template Compliance**
   - PR descriptions must clearly state what is complete, what is compatibility/temporary, and what remains deferred.
   - Follow `.github/pull_request_template.md` exactly, including required headings and the single-choice `Documentation Impact` options.
-- **CLI Output UX**
-  - Prefer structured Rich rendering (tables/panels) for user-facing commands.
+- **CLI Output UX (when applicable)**
+  - If you add a user-facing CLI, prefer structured output (e.g. Rich tables/panels) over unstructured dumps.
   - Avoid raw JSON as the default interactive output unless a dedicated JSON mode is requested.
 - **Dispatch Pattern and Warning Policy**
   - Prefer strategy/registry dispatch over long `if`/`elif` chains for branching by mode/backend/type.

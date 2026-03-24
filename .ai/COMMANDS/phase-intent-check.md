@@ -32,7 +32,7 @@ The phase must have an `Intent Lock` block that includes:
 - Must Not (forbidden shortcuts/fallbacks)
 - Acceptance gates (required tests/commands)
 
-Lily requirement:
+Phase contract:
 - Before implementation, each phase must have explicit acceptance criteria, explicit non-goals, and required tests/gates.
 - If these are missing or ambiguous, stop and patch the plan.
 
