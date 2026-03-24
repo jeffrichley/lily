@@ -1,0 +1,11 @@
+version: 1
+bed:
+  id: lily
+  registered_at: '2026-02-21T00:53:28Z'
+  root: .
+garden:
+  id: default
+  profile: default
+overrides:
+  targets: {}
+  disabled_artifacts: []
