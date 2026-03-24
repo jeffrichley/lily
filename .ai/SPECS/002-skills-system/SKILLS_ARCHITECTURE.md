@@ -142,6 +142,11 @@ src/lily/commands/handlers/
   agents/<skill_id>.py
 ```
 
+Critical packaging rules (guide-aligned):
+- `SKILL.md` filename is exact and case-sensitive.
+- Skill folder naming recommendation is kebab-case (portability-friendly baseline).
+- Do not place `README.md` inside a skill folder; keep skill docs in `SKILL.md` and `references/`.
+
 ### `SKILL.md` contract
 
 Required:
@@ -160,25 +165,26 @@ Recommended:
 ### Metadata/frontmatter contract
 
 ```yaml
-id: literature_review
-name: Literature Review
-version: 0.1.0
-type: playbook
-description: Structured synthesis workflow for papers.
-tags: [research, synthesis, papers]
-triggers:
-  - literature review
-  - review related work
-policy:
-  enabled: true
-  allow_agents: [lily_supervisor]
-  tool_allowlist: [arxiv_search, summarize]
+name: literature-review
+description: Structured synthesis workflow for papers. Use when user asks for literature review or related-work synthesis.
+license: MIT
+compatibility: Claude Code / local Lily runtime with MCP enabled
+allowed-tools: "Bash(python:*) WebFetch"
+metadata:
+  author: Team
+  version: 0.1.0
+  mcp-server: arxiv
+  tags: [research, synthesis, papers]
 ```
 
 Validation rules:
-- `id` snake_case and unique after precedence resolution.
-- `type` in enum.
-- unknown required-contract fields fail fast.
+- required frontmatter keys are only `name` and `description`.
+- `name` authoring recommendation: kebab-case and folder-aligned.
+- parser accepts non-canonical imported names, then normalizes to an internal canonical key for index/matching.
+- `description` must include both WHAT the skill does and WHEN to use it (trigger guidance).
+- `description` max length: 1024 chars.
+- unknown required-contract violations fail fast with field-specific errors.
+- safe YAML parsing only (no executable YAML tags).
 
 ---
 
@@ -213,7 +219,7 @@ Proposed scope order (configurable):
 ### Routing order
 
 1. explicit invocation (`$skill:<id>`) when present
-2. exact `id` or alias match
+2. exact normalized-key or alias match
 3. implicit scoring match (description + tags + trigger cues)
 4. no-skill fallback to normal runtime path
 
@@ -319,6 +325,66 @@ Invariant:
 - restricted tool allowlist per skill (optional but recommended).
 - schema validation before execution.
 - refusal path for blocked skills with actionable diagnostics.
+- frontmatter content restrictions:
+  - reject XML angle brackets (`<` and `>`) in frontmatter values;
+  - reject reserved provider prefixes in `name` (`claude*`, `anthropic*`).
+
+### Tool access resolution (normative)
+
+Config inputs (agent config):
+- `skills.tools.default_policy`: `inherit_runtime` | `deny_unless_allowed` | `use_default_packs`
+- `skills.tools.default_packs`: list of pack IDs
+- `skills.tools.packs`: mapping of pack ID -> ordered tool ID list
+
+Resolution algorithm:
+1. Start with `runtime_available_tools` from existing runtime/tool registry policy boundaries.
+2. Resolve skill candidate set:
+   - if skill defines `allowed-tools`: `skill_candidate_tools = allowed-tools` (explicit wins)
+   - else if policy is `inherit_runtime`: `skill_candidate_tools = runtime_available_tools`
+   - else if policy is `deny_unless_allowed`: `skill_candidate_tools = []`
+   - else if policy is `use_default_packs`: `skill_candidate_tools = union(default_packs[*])`
+3. Compute effective tools:
+   - `effective_tools = runtime_available_tools ∩ skill_candidate_tools`
+4. If `effective_tools` is empty:
+   - playbook-only execution remains allowed;
+   - any procedural/agent/tool-call path fails fast with deterministic `SkillPolicyError`.
+
+Invariants:
+- skill metadata can only restrict tool access; it cannot expand tool access beyond runtime policy.
+- explicit invocation does not bypass tool policy resolution.
+- unknown pack IDs or unknown tools in packs fail fast at config-validation time.
+
+Reference config shapes:
+
+YAML:
+```yaml
+skills:
+  tools:
+    default_policy: deny_unless_allowed
+    default_packs: [safe-readonly]
+    packs:
+      safe-readonly:
+        - read_file
+        - rg
+        - web_fetch
+```
+
+TOML:
+```toml
+[skills.tools]
+default_policy = "deny_unless_allowed"
+default_packs = ["safe-readonly"]
+
+[skills.tools.packs]
+safe-readonly = ["read_file", "rg", "web_fetch"]
+```
+
+### Frontmatter optional fields (guide-aligned)
+
+- `license`
+- `compatibility`
+- `allowed-tools`
+- `metadata` (custom key-values such as author/version/mcp-server/tags/documentation/support)
 
 ### Provenance and audit
 
@@ -615,6 +681,38 @@ Benefit:
 2. Should agent-skill wrappers require explicit per-skill tool allowlists at launch?
 3. What is the minimum operator UX for skill debugging in TUI?
 4. Which tie-break signals are acceptable before adding embeddings?
+
+---
+
+## 20. Tight Delta Checklist (Guide Realignment)
+
+Status legend:
+- `[aligned]` complete in spec
+- `[partial]` present but needs refinement
+- `[missing]` not yet specified clearly
+
+Contract and naming:
+- `[aligned]` `SKILL.md` is required.
+- `[aligned]` required frontmatter is only `name` + `description`.
+- `[aligned]` kebab-case naming is recommended; normalization behavior is required via parser + `skills doctor` tests (planned in `.ai/PLANS/005-skills-system-implementation.md`, Phases 1 and 6).
+
+Progressive disclosure and execution:
+- `[aligned]` three-level load model is defined (summary, body, linked artifacts).
+- `[aligned]` playbook/procedural/agent execution paths are defined.
+
+Security guardrails:
+- `[aligned]` angle-bracket rejection in frontmatter is explicit.
+- `[aligned]` reserved provider prefixes (`claude*`, `anthropic*`) are blocked.
+- `[aligned]` parser test matrix for malformed YAML/frontmatter edge cases is required in implementation plan (`.ai/PLANS/005-skills-system-implementation.md`, Phase 1).
+
+Authoring and validation UX:
+- `[aligned]` trigger-test templates (trigger/paraphrase/negative) are required in docs + `skills doctor` (`.ai/PLANS/005-skills-system-implementation.md`, Phase 6).
+- `[aligned]` over-trigger/under-trigger remediation guidance is required in operator docs (`.ai/PLANS/005-skills-system-implementation.md`, Phase 6).
+
+Distribution and packaging (future work):
+- `[aligned]` zip/import-export package contract is tracked as post-MVP in `.ai/PLANS/005-skills-system-implementation.md` (Phase 9).
+- `[aligned]` API-managed skill lifecycle/versioning is tracked as post-MVP in `.ai/PLANS/005-skills-system-implementation.md` (Phase 9).
+- `[aligned]` org-level distribution, rollout, and governance surfaces are tracked as post-MVP in `.ai/PLANS/005-skills-system-implementation.md` (Phase 9).
 
 ---
 
