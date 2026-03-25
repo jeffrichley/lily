@@ -9,10 +9,11 @@ source_of_truth: true
 
 ## Current Focus
 
-- Implement SI-007 Phase 6 CLI skills surfaces (`skills list`, `skills inspect`, `skills doctor` with Rich output) per `.ai/PLANS/005-skills-system-implementation.md` (`SI-007`).
+- Implement SI-007 Phase 7 telemetry (`skill_events`, redaction, hooks on discovery/injection/loader/retrieval paths) per `.ai/PLANS/005-skills-system-implementation.md` (`SI-007`).
 
 ## Recently Completed
 
+- Delivered SI-007 Phase 6 CLI skills surfaces: `lily skills list|inspect|doctor` (Rich tables/panels), `SkillCliDiagnostics`, filtering/sorting (`--contains`, `--sort`), `cli_options` shared with root CLI; e2e `tests/e2e/test_cli_skills_commands.py`; user doc snippets for skills CLI deferred to Phase 8 (`.ai/PLANS/005-skills-system-implementation.md`).
 - Delivered SI-007 Phase 5 supervisor/runtime integration: `skill_retrieve` omitted from resolved tools when `skills.enabled` is false; `_effective_runtime_config` strips `skill_retrieve` from allowlist when needed; `AgentRunResult.skill_trace` (`SkillInvokeTrace`, `SkillRetrievalTraceEntry`); trace hooks in `skill_retrieve`; integration suite `tests/integration/test_skills_runtime_flow.py`; fixture config `tests/fixtures/config/skills_retrieval/` (`.ai/PLANS/005-skills-system-implementation.md`).
 - Delivered SI-007 Phase 4 retrieval policy + linked constraints: `skill_policies` (`effective_skill_tools`, `build_retrieval_blocked_keys`, `retrieval_config_denial_reason`), `SkillsRetrievalConfig` + normalized `skills.allowlist`/`denylist`, `SkillRetrievalDeniedError`, loader deny-before-content + path-bounding under skill package root; tests `test_skill_policies`, extended `test_skill_loader` (`.ai/PLANS/005-skills-system-implementation.md`).
 - Delivered SI-007 Phase 3 catalog injection + loader: `skill_prompt_injector`, `skill_loader` / `SkillBundle`, `skill_retrieve` tool + `ContextVar` binding in `AgentRuntime`, `LilySupervisor` + `build_skill_bundle`, `.lily/config/tools.toml` entry; tests `test_skill_prompt_injector`, `test_skill_loader`, `test_skill_retrieve_tool`, integration catalog append (`test_agent_runtime_appends_skill_catalog_to_system_prompt`) (`.ai/PLANS/005-skills-system-implementation.md`).
@@ -47,3 +48,4 @@ source_of_truth: true
 - 2026-03-25: Completed SI-007 Phase 3 (catalog injection, `skill_loader`, `skill_retrieve`, runtime wiring); `just quality` and `just test` green (97 tests).
 - 2026-03-25: Completed SI-007 Phase 4 (retrieval policy gates, F6 `effective_skill_tools`, linked-file constraints); `just quality` and `just test` green (111 tests).
 - 2026-03-25: Completed SI-007 Phase 5 (supervisor `skill_retrieve` gating, `skill_trace` on `AgentRunResult`, integration tests `test_skills_runtime_flow`); `just quality && just test` green (119 tests).
+- 2026-03-25: Completed SI-007 Phase 6 (`cli_skills`, `cli_skills_presenters`, `skill_cli_diagnostics`, e2e CLI tests); `just quality && just test` green (124 tests); skills CLI usage docs follow-up in Phase 8.

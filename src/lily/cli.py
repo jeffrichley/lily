@@ -11,6 +11,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from lily.agents.lily_supervisor import LilySupervisor
+from lily.cli_options import ConfigOption, OverrideOption
+from lily.cli_skills import skills_app
 from lily.runtime.agent_runtime import AgentRuntimeError
 from lily.runtime.config_loader import ConfigLoadError
 from lily.runtime.conversation_sessions import (
@@ -25,34 +27,11 @@ from lily.runtime.tool_resolvers import ToolResolverError
 from lily.ui.app import LilyTuiApp
 
 app = typer.Typer(no_args_is_help=True)
+app.add_typer(skills_app, name="skills")
 _console = Console()
 PromptOption = Annotated[
     str,
     typer.Option(..., "--prompt", help="Prompt text to send to Lily."),
-]
-ConfigOption = Annotated[
-    Path,
-    typer.Option(
-        "--config",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        readable=True,
-        resolve_path=False,
-        help="Path to base runtime config (.yaml/.yml/.toml).",
-    ),
-]
-OverrideOption = Annotated[
-    Path | None,
-    typer.Option(
-        "--override",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        readable=True,
-        resolve_path=False,
-        help="Optional path to runtime override config (.yaml/.yml/.toml).",
-    ),
 ]
 ConversationIdOption = Annotated[
     str | None,

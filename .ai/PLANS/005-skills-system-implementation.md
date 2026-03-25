@@ -118,7 +118,7 @@ flowchart LR
 | 3 | Done | @jeffrichley | 2 | `skill_prompt_injector`, `skill_loader`, `skill_retrieve`, runtime wiring |
 | 4 | Done | @jeffrichley | 3 | `skill_policies`, `SkillsRetrievalConfig`, deny-before-content, F6 `effective_skill_tools` |
 | 5 | Done | @jeffrichley | 3–4 | Supervisor tool gating, `skill_trace`, integration tests |
-| 6 | Not started | @jeffrichley | 5 | `skills list|inspect|doctor` (Rich) |
+| 6 | Done | @jeffrichley | 5 | `skills list|inspect|doctor` (Rich), `cli_skills` + presenters + diagnostics |
 | 7 | Not started | @jeffrichley | 5–6 | `skill_events`, redaction tests |
 | 8 | Not started | @jeffrichley | 1–7 | Full gates, docs/status, PR evidence |
 | 9 | Not started | @jeffrichley | 8 | Distribution follow-up (not MVP-blocking) |
@@ -276,7 +276,7 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - [x] Phase 3: System-prompt skill catalog injection + retrieval-by-name loader
 - [x] Phase 4: Linked-file hydration + retrieval policy gates (retrieval-only MVP)
 - [x] Phase 5: Runtime integration into supervisor invoke path
-- [ ] Phase 6: CLI surfaces (`skills list/inspect/doctor`) and UX
+- [x] Phase 6: CLI surfaces (`skills list/inspect/doctor`) and UX
 - [ ] Phase 7: Telemetry/events, diagnostics, and observability
 - [ ] Phase 8: Testing, docs/status sync, and release hardening
 - [ ] Phase 9: Post-MVP distribution and packaging follow-up
@@ -447,27 +447,27 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 **Intent Lock**
 - **Source of truth**: PRD CLI visibility requirement; AGENTS CLI UX Rich-render rule.
 - **Must**:
-  - [ ] Add `skills list`, `skills inspect`, `skills doctor` user-facing commands.
-  - [ ] Use Rich tables/panels for default outputs.
-  - [ ] Surface collisions/shadowing/invalid packages with actionable messages.
-  - [ ] Surface **catalog and policy** diagnostics (what is indexed, what is blocked, why retrieval would fail).
+  - [x] Add `skills list`, `skills inspect`, `skills doctor` user-facing commands.
+  - [x] Use Rich tables/panels for default outputs.
+  - [x] Surface collisions/shadowing/invalid packages with actionable messages.
+  - [x] Surface **catalog and policy** diagnostics (what is indexed, what is blocked, why retrieval would fail).
 - **Should (post-MVP / backlog)**:
   - [ ] Trigger-quality heuristics (under/over-trigger templates for skill descriptions) — **not** required for SI-007 retrieval MVP; link follow-up in backlog if descoped.
 - **Must Not**:
-  - [ ] Default to raw JSON in interactive mode.
-  - [ ] Hide policy-block reasons from operator diagnostics.
+  - [x] Default to raw JSON in interactive mode.
+  - [x] Hide policy-block reasons from operator diagnostics.
 - **Provenance map**:
-  - [ ] Registry + diagnostics -> CLI presenter models -> rendered table/panel output.
+  - [x] Registry + diagnostics -> CLI presenter models -> rendered table/panel output.
 - **Acceptance gates**:
-  - [ ] E2E CLI tests for command outputs and exit codes.
-  - [ ] Snapshot-like assertions for key table headers/rows.
+  - [x] E2E CLI tests for command outputs and exit codes.
+  - [x] Snapshot-like assertions for key table headers/rows.
 
 **Tasks**
-- [ ] CREATE handlers for list/inspect/doctor commands.
-- [ ] UPDATE `src/lily/cli.py` command tree and options.
-- [ ] ADD filtering/sorting flags and concise/verbose modes.
-- [ ] ADD e2e tests for no-skills, valid-skills, invalid-skills scenarios.
-- [ ] ADD docs snippets for command usage (where repo conventions allow; otherwise defer to a single reference doc slice in Phase 8).
+- [x] CREATE handlers for list/inspect/doctor commands.
+- [x] UPDATE `src/lily/cli.py` command tree and options.
+- [x] ADD filtering/sorting flags and concise/verbose modes.
+- [x] ADD e2e tests for no-skills, valid-skills, invalid-skills scenarios.
+- [x] ADD docs snippets for command usage (deferred to Phase 8 reference slice per plan; no new user doc in this phase).
 
 ### Phase 7: Telemetry/events and observability
 
@@ -607,9 +607,9 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
   - [x] **IMPLEMENT**: Wire skill pipeline, retrieval tool into resolved registry, trace payload; sample configs include retrieval tool id on allowlist.
   - [x] **VALIDATE**: `uv run pytest tests/integration/test_skills_runtime_flow.py -q`
 
-- [ ] **UPDATE/CREATE** CLI handlers + `src/lily/cli.py`
-  - [ ] **IMPLEMENT**: `skills list|inspect|doctor` commands and rich output.
-  - [ ] **VALIDATE**: `uv run pytest tests/e2e/test_cli_skills_commands.py -q`
+- [x] **UPDATE/CREATE** CLI handlers + `src/lily/cli.py`
+  - [x] **IMPLEMENT**: `skills list|inspect|doctor` commands and rich output.
+  - [x] **VALIDATE**: `uv run pytest tests/e2e/test_cli_skills_commands.py -q`
 
 ### 6. EVENTS + HARDENING
 
@@ -711,7 +711,8 @@ Docs/status checks:
 - Phase 3 (system-prompt catalog + retrieval-by-name loader): **completed** (`skill_prompt_injector.py`, `skill_loader.py`, `skill_retrieve_tool.py`, `AgentRuntime` + `LilySupervisor` wiring, `.lily/config/tools.toml` `skill_retrieve`).
 - Phase 4 (retrieval policy + linked constraints + F6 helpers): **completed** (`skill_policies.py`, `SkillsRetrievalConfig`, `SkillRetrievalDeniedError`, `build_retrieval_blocked_keys`, `effective_skill_tools`, tests).
 - Phase 5 (supervisor tool gating + `skill_trace` + integration tests): **completed** (`skill_invoke_trace.py`, `tests/fixtures/config/skills_retrieval/`, `tests/integration/test_skills_runtime_flow.py`).
-- Phases 6–9: not started (implementation follows phase order).
+- Phase 6 (CLI `skills list|inspect|doctor`, Rich presenters, policy diagnostics): **completed** (`cli_skills.py`, `cli_skills_presenters.py`, `skill_cli_diagnostics.py`, `cli_options.py`, `tests/e2e/test_cli_skills_commands.py`).
+- Phases 7–9: not started (implementation follows phase order).
 
 ### Artifacts Created
 
@@ -725,6 +726,7 @@ Docs/status checks:
 - `tests/unit/runtime/test_skill_prompt_injector.py`, `tests/unit/runtime/test_skill_loader.py`, `tests/unit/runtime/test_skill_retrieve_tool.py`
 - `src/lily/runtime/skill_policies.py`, `tests/unit/runtime/test_skill_policies.py`
 - `src/lily/runtime/skill_invoke_trace.py`, `tests/integration/test_skills_runtime_flow.py`, `tests/fixtures/config/skills_retrieval/`
+- `src/lily/runtime/skill_cli_diagnostics.py`, `src/lily/cli_skills.py`, `src/lily/cli_skills_presenters.py`, `src/lily/cli_options.py` (shared `ConfigOption` / `OverrideOption`); `tests/e2e/test_cli_skills_commands.py`
 
 ### Phase 0 — intent check and gates
 
@@ -783,6 +785,14 @@ Docs/status checks:
   - `uv run pytest tests/integration/test_skills_runtime_flow.py -q` -> pass.
   - Fixtures: `tests/fixtures/config/skills_retrieval/` (`agent.toml`, `tools.toml`, sample `SKILL.md`).
 
+### Phase 6 — intent check and gates
+
+- **Phase intent check**: Phase 6 — `lily skills` Typer sub-app (`list`, `inspect`, `doctor`); `SkillCliDiagnostics` loads config and runs discovery/registry/blocked-keys; Rich tables/panels via `cli_skills_presenters`; `--sort`, `--contains`, `--verbose`; `cli_options` dedupes config/override options with root `cli.py`.
+- **Acceptance evidence**:
+  - `just quality && just test` -> pass (124 tests, 2026-03-25).
+  - `uv run pytest tests/e2e/test_cli_skills_commands.py -q` -> pass.
+- **Deferred within phase**: User-facing docs snippets for skills CLI deferred to Phase 8 reference slice (per task note).
+
 ### Partial/Blocked Items
 
 - None for Phase 0.
@@ -791,3 +801,4 @@ Docs/status checks:
 - None for Phase 3.
 - None for Phase 4.
 - None for Phase 5.
+- None for Phase 6 (docs snippets deferred to Phase 8 as planned).
