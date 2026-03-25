@@ -33,10 +33,10 @@ def format_skill_catalog_block(registry: SkillRegistry) -> str:
         "the **canonical id** in backticks—either form works.",
         "- That returns the **entire** `SKILL.md` (frontmatter + body). Read it and "
         "follow it for that turn or task.",
-        "- To pull an extra file bundled with the skill (under its `references/` "
-        "folder), call `skill_retrieve` again with the same **`name`** and "
-        "**`reference_subpath`** set to the path relative to `references/` (for "
-        "example `notes.md` or `guides/setup.md`).",
+        "- To pull an extra file bundled with the skill (anywhere under that "
+        "skill's directory), call `skill_retrieve` again with the same **`name`** "
+        "and **`reference_subpath`** set to the path relative to the skill folder "
+        "(for example `references/notes.md`, `assets/palette.json`, or `SKILL.md`).",
         "",
     ]
     for key in keys:

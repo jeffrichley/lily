@@ -11,6 +11,7 @@ from lily.runtime.skill_loader import (
     SkillLoadError,
     SkillNotFoundError,
     SkillReferenceError,
+    SkillRetrievalDeniedError,
 )
 
 _skill_loader_ctx: ContextVar[SkillLoader | None] = ContextVar(
@@ -42,13 +43,13 @@ def reset_skill_loader(token: Token) -> None:
 
 @tool
 def skill_retrieve(name: str, reference_subpath: str | None = None) -> str:
-    """Load a skill's full SKILL.md or a UTF-8 file under its references/ directory.
+    """Load a skill's full SKILL.md or a UTF-8 file under its package directory.
 
     Args:
         name: Skill name as listed in the catalog (matches frontmatter ``name``).
-        reference_subpath: Optional file path relative to ``references/``
-            (for example ``notes.md`` or ``subdir/guide.md``). Omit to return
-            the full ``SKILL.md`` file text.
+        reference_subpath: Optional file path relative to the skill directory
+            (for example ``references/notes.md``, ``assets/data.json``, or
+            ``SKILL.md``). Omit to return the full ``SKILL.md`` file text.
 
     Returns:
         Raw file contents, or an error message when the loader is not bound.
@@ -62,6 +63,8 @@ def skill_retrieve(name: str, reference_subpath: str | None = None) -> str:
     try:
         return loader.retrieve(name.strip(), ref)
     except SkillNotFoundError as exc:
+        return str(exc)
+    except SkillRetrievalDeniedError as exc:
         return str(exc)
     except SkillReferenceError as exc:
         return str(exc)

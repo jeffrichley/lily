@@ -8,6 +8,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from lily.runtime.skill_types import SkillValidationError, normalize_skill_name
+
 _SKILL_SCOPE_NAMES = frozenset({"repository", "user", "system"})
 _TOOL_ID_PATTERN = re.compile(r"^[a-z0-9_]+$")
 _PACK_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
@@ -203,6 +205,21 @@ class SkillsToolsConfig(BaseModel):
         return self
 
 
+class SkillsRetrievalConfig(BaseModel):
+    """Gates for progressive disclosure (tool-based ``SKILL.md`` / linked files)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    scopes_allowlist: list[Literal["repository", "user", "system"]] = Field(
+        default_factory=list,
+        description=(
+            "When non-empty, only skills whose winning scope is listed here may be "
+            "retrieved. When empty, no extra scope restriction applies."
+        ),
+    )
+
+
 class SkillsConfig(BaseModel):
     """Skill discovery roots, precedence, and policy lists."""
 
@@ -216,6 +233,38 @@ class SkillsConfig(BaseModel):
     allowlist: list[str] = Field(default_factory=list)
     denylist: list[str] = Field(default_factory=list)
     tools: SkillsToolsConfig = Field(default_factory=SkillsToolsConfig)
+    retrieval: SkillsRetrievalConfig = Field(default_factory=SkillsRetrievalConfig)
+
+    @field_validator("allowlist", "denylist", mode="before")
+    @classmethod
+    def _normalize_skill_policy_lists(cls, value: object) -> list[str]:
+        """Normalize allow/deny entries to canonical skill keys.
+
+        Args:
+            value: Raw list from YAML/TOML.
+
+        Returns:
+            List of normalized keys suitable for policy membership checks.
+
+        Raises:
+            ValueError: If the value is not a list of normalizable skill name strings.
+        """
+        if not isinstance(value, list):
+            msg = "skills allowlist and denylist must be lists of skill name strings"
+            raise ValueError(msg)
+
+        out: list[str] = []
+        for raw in value:
+            s = str(raw).strip()
+            if not s:
+                msg = "skills allowlist/denylist entries must be non-empty strings"
+                raise ValueError(msg)
+            try:
+                out.append(normalize_skill_name(s))
+            except SkillValidationError as exc:
+                msg = f"invalid skill name in policy list: {exc}"
+                raise ValueError(msg) from exc
+        return out
 
     @field_validator("roots", mode="before")
     @classmethod

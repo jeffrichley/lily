@@ -116,7 +116,7 @@ flowchart LR
 | 1 | Done | @jeffrichley | 0 | `skill_types`, `skill_catalog`, parser/validation matrix |
 | 2 | Done | @jeffrichley | 1 | `skill_discovery`, `skill_registry`, config `skills.*` |
 | 3 | Done | @jeffrichley | 2 | `skill_prompt_injector`, `skill_loader`, `skill_retrieve`, runtime wiring |
-| 4 | Not started | @jeffrichley | 3 | `skill_policies`, linked-file bounds, F6 tool intersection |
+| 4 | Done | @jeffrichley | 3 | `skill_policies`, `SkillsRetrievalConfig`, deny-before-content, F6 `effective_skill_tools` |
 | 5 | Not started | @jeffrichley | 3–4 | Supervisor/runtime wiring, trace payload |
 | 6 | Not started | @jeffrichley | 5 | `skills list|inspect|doctor` (Rich) |
 | 7 | Not started | @jeffrichley | 5–6 | `skill_events`, redaction tests |
@@ -274,7 +274,7 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - [x] Phase 1: Skill contract + schema foundation
 - [x] Phase 2: Discovery, indexing, precedence, and registry
 - [x] Phase 3: System-prompt skill catalog injection + retrieval-by-name loader
-- [ ] Phase 4: Linked-file hydration + retrieval policy gates (retrieval-only MVP)
+- [x] Phase 4: Linked-file hydration + retrieval policy gates (retrieval-only MVP)
 - [ ] Phase 5: Runtime integration into supervisor invoke path
 - [ ] Phase 6: CLI surfaces (`skills list/inspect/doctor`) and UX
 - [ ] Phase 7: Telemetry/events, diagnostics, and observability
@@ -389,30 +389,31 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - [x] ADD unit tests for retrieval-by-name hydration and linked-file error taxonomy.
 
 **Deferred to Phase 4+**
-- Retrieval **policy** gates (deny-before-content beyond registry allow/deny), F6 effective-tool intersection, and richer linked-path whitelists beyond `references/`.
+- ~~Richer linked-path whitelists beyond `references/`~~ — **superseded**: `reference_subpath` is relative to the **skill package root** (any subdirectory; still no `..` escapes).
+- Wiring **F6 empty effective-tools** checks into future tool-calling / execution paths (retrieval-only MVP does not block `SKILL.md` on empty intersection per PRD).
 
 ### Phase 4: Retrieval policy gates + linked-file constraints (retrieval-only MVP)
 
 **Intent Lock**
 - **Source of truth**: PRD retrieval policy + linked-file constraints; Architecture section 11 policy/safety.
 - **Must**:
-  - [ ] Enforce skill-level enable/disable and retrieval allow/deny before returning content.
-  - [ ] Enforce linked-file constraints: only allow `references/...` (and optionally other whitelisted subpaths) that stay inside the skill directory.
-  - [ ] Enforce **effective tools** for skills per PRD F6: `intersection(runtime_available_tools, skill_allowed_tools_or_packs)` when `allowed-tools` / pack policy applies; fail fast with deterministic errors when the effective set is empty **for tool-calling paths** (retrieval of `SKILL.md` may still be allowed per PRD).
-  - [ ] Keep retrieval tool failures deterministic and field-specific.
+  - [x] Enforce skill-level enable/disable and retrieval allow/deny before returning content.
+  - [x] Enforce linked-file constraints: only allow `references/...` (and optionally other whitelisted subpaths) that stay inside the skill directory.
+  - [x] Enforce **effective tools** for skills per PRD F6: `intersection(runtime_available_tools, skill_allowed_tools_or_packs)` when `allowed-tools` / pack policy applies; fail fast with deterministic errors when the effective set is empty **for tool-calling paths** (retrieval of `SKILL.md` may still be allowed per PRD). *(F6 intersection implemented in `effective_skill_tools` for policy resolution; tool-calling enforcement deferred until procedural paths.)*
+  - [x] Keep retrieval tool failures deterministic and field-specific.
 - **Must Not**:
-  - [ ] Implement playbook/procedural/agent execution adapters.
+  - [x] Implement playbook/procedural/agent execution adapters.
 - **Provenance map**:
-  - [ ] Tool request (skill name + optional linked path) -> policy evaluation -> retrieval result/error.
+  - [x] Tool request (skill name + optional linked path) -> policy evaluation -> retrieval result/error.
 - **Acceptance gates**:
-  - [ ] Unit tests for retrieval allow/deny + disabled-skill errors.
-  - [ ] Unit/integration tests for linked-file path bounding and missing-file errors.
+  - [x] Unit tests for retrieval allow/deny + disabled-skill errors.
+  - [x] Unit/integration tests for linked-file path bounding and missing-file errors.
 
 **Tasks**
-- [ ] CREATE `skill_policies.py` for retrieval allow/deny checks and deterministic rejection reasons.
-- [ ] UPDATE config schema/loader to support retrieval enable/disable semantics by scope.
-- [ ] ADD linked-file path bounding checks and deterministic error taxonomy.
-- [ ] ADD unit/integration tests for **skills.denylist / allowlist**, **blocked retrieval**, and **effective tool intersection** (include at least one fixture where `allowed-tools` narrows to a subset of runtime tools).
+- [x] CREATE `skill_policies.py` for retrieval allow/deny checks and deterministic rejection reasons.
+- [x] UPDATE config schema/loader to support retrieval enable/disable semantics by scope (`skills.retrieval.enabled`, `skills.retrieval.scopes_allowlist`; `skills.allowlist` / `skills.denylist` normalized to canonical keys).
+- [x] ADD linked-file path bounding checks and deterministic error taxonomy (directory vs file; paths stay inside the skill package directory).
+- [x] ADD unit/integration tests for **skills.denylist / allowlist**, **blocked retrieval**, and **effective tool intersection** (include at least one fixture where `allowed-tools` narrows to a subset of runtime tools).
 
 ### Phase 5: Runtime integration into supervisor invoke path
 
@@ -596,9 +597,9 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 
 ### 4. RETRIEVAL POLICY + CONSTRAINTS
 
-- [ ] **CREATE** `src/lily/runtime/skill_policies.py`
-  - [ ] **IMPLEMENT**: Enable/deny/allowlist checks; effective tool intersection (PRD F6); linked-path bounding.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_policies.py -q`
+- [x] **CREATE** `src/lily/runtime/skill_policies.py`
+  - [x] **IMPLEMENT**: Enable/deny/allowlist checks; effective tool intersection (PRD F6); linked-path bounding.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_policies.py -q`
 
 ### 5. RUNTIME + CLI INTEGRATION
 
@@ -631,7 +632,7 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 - [x] Collision and precedence tests (scope + semver + deterministic fallback).
 - [x] System-prompt catalog injection correctness and retrieval-by-name (agent-chosen skill `name`, not implicit ranking).
 - [x] Loader caching tests and failure taxonomy tests.
-- [ ] Retrieval policy tests and linked-file constraint tests (deny/missing/off-scope).
+- [x] Retrieval policy tests and linked-file constraint tests (deny/missing/off-scope).
 - [ ] Event schema serialization and redaction tests.
 
 ### Integration Tests
@@ -708,7 +709,8 @@ Docs/status checks:
 - Phase 1 (skill contract + schema foundation): **completed** (`skill_types.py`, `skill_catalog.py`, `tests/unit/runtime/test_skill_catalog.py`, `tests/fixtures/skills/`).
 - Phase 2 (discovery, indexing, precedence, registry): **completed** (`skill_discovery.py`, `skill_registry.py`, `RuntimeConfig.skills` + `SkillsToolsConfig`, unit + integration tests).
 - Phase 3 (system-prompt catalog + retrieval-by-name loader): **completed** (`skill_prompt_injector.py`, `skill_loader.py`, `skill_retrieve_tool.py`, `AgentRuntime` + `LilySupervisor` wiring, `.lily/config/tools.toml` `skill_retrieve`).
-- Phases 4–9: not started (implementation follows phase order).
+- Phase 4 (retrieval policy + linked constraints + F6 helpers): **completed** (`skill_policies.py`, `SkillsRetrievalConfig`, `SkillRetrievalDeniedError`, `build_retrieval_blocked_keys`, `effective_skill_tools`, tests).
+- Phases 5–9: not started (implementation follows phase order).
 
 ### Artifacts Created
 
@@ -720,6 +722,7 @@ Docs/status checks:
 - `tests/integration/test_skills_discovery_registry.py`
 - `src/lily/runtime/skill_prompt_injector.py`, `src/lily/runtime/skill_loader.py`, `src/lily/runtime/skill_retrieve_tool.py`
 - `tests/unit/runtime/test_skill_prompt_injector.py`, `tests/unit/runtime/test_skill_loader.py`, `tests/unit/runtime/test_skill_retrieve_tool.py`
+- `src/lily/runtime/skill_policies.py`, `tests/unit/runtime/test_skill_policies.py`
 
 ### Phase 0 — intent check and gates
 

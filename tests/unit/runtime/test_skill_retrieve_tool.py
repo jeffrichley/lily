@@ -10,6 +10,7 @@ from langchain_core.tools import BaseTool
 from lily.runtime.config_schema import SkillsConfig
 from lily.runtime.skill_discovery import discover_skill_candidates
 from lily.runtime.skill_loader import SkillLoader
+from lily.runtime.skill_policies import build_retrieval_blocked_keys
 from lily.runtime.skill_registry import build_skill_registry
 from lily.runtime.skill_retrieve_tool import (
     bind_skill_loader,
@@ -38,7 +39,12 @@ def _loader_with_one_skill(tmp_path: Path) -> SkillLoader:
     )
     candidates, _ = discover_skill_candidates(cfg, base_path=tmp_path)
     registry = build_skill_registry(candidates, cfg)
-    return SkillLoader(registry)
+    blocked = build_retrieval_blocked_keys(candidates, cfg)
+    return SkillLoader(
+        registry,
+        skills_config=cfg,
+        retrieval_blocked_keys=blocked,
+    )
 
 
 def test_skill_retrieve_tool_resolves_via_catalog() -> None:

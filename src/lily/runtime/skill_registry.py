@@ -11,6 +11,7 @@ from packaging.version import InvalidVersion, Version
 
 from lily.runtime.config_schema import SkillsConfig
 from lily.runtime.skill_discovery import SkillCandidate, SkillDiscoveryEvent
+from lily.runtime.skill_policies import candidate_allowed_by_lists
 from lily.runtime.skill_types import SkillSummary
 
 
@@ -87,7 +88,7 @@ def build_skill_registry(
     filtered: list[SkillCandidate] = []
     for cand in candidates:
         key = cand.summary.canonical_key
-        if not _candidate_allowed(key, skills_config):
+        if not candidate_allowed_by_lists(key, skills_config):
             continue
         filtered.append(cand)
 
@@ -128,14 +129,6 @@ def build_skill_registry(
             )
 
     return SkillRegistry(winners, events)
-
-
-def _candidate_allowed(canonical_key: str, skills_config: SkillsConfig) -> bool:
-    if canonical_key in skills_config.denylist:
-        return False
-    return not (
-        bool(skills_config.allowlist) and canonical_key not in skills_config.allowlist
-    )
 
 
 def _pick_winner(

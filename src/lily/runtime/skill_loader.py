@@ -1,4 +1,4 @@
-"""Progressive disclosure: load full ``SKILL.md`` and bounded ``references/`` files."""
+"""Progressive disclosure: load ``SKILL.md`` and other files under the skill dir."""
 
 from __future__ import annotations
 
@@ -7,6 +7,10 @@ from pathlib import Path
 
 from lily.runtime.config_schema import SkillsConfig
 from lily.runtime.skill_discovery import discover_skill_candidates
+from lily.runtime.skill_policies import (
+    build_retrieval_blocked_keys,
+    retrieval_config_denial_reason,
+)
 from lily.runtime.skill_prompt_injector import format_skill_catalog_block
 from lily.runtime.skill_registry import (
     SkillRegistry,
@@ -22,6 +26,10 @@ class SkillLoadError(ValueError):
 
 class SkillNotFoundError(SkillLoadError):
     """Raised when no registry entry matches the requested skill name."""
+
+
+class SkillRetrievalDeniedError(SkillLoadError):
+    """Raised when policy blocks retrieval before reading skill content."""
 
 
 class SkillReferenceError(SkillLoadError):
@@ -40,41 +48,71 @@ class SkillBundle:
 class SkillLoader:
     """Load full skill files on demand with bounded path checks and memoization."""
 
-    def __init__(self, registry: SkillRegistry) -> None:
+    def __init__(
+        self,
+        registry: SkillRegistry,
+        *,
+        skills_config: SkillsConfig | None = None,
+        retrieval_blocked_keys: dict[str, str] | None = None,
+    ) -> None:
         """Store registry used to resolve skill names to on-disk paths.
 
         Args:
             registry: Merged registry from ``build_skill_registry``.
+            skills_config: Skills policy configuration (required for retrieval gates).
+            retrieval_blocked_keys: Canonical keys excluded from the registry by
+                allow/deny lists, mapped to deterministic denial reasons.
         """
         self._registry = registry
+        self._skills_config = skills_config or SkillsConfig(enabled=True)
+        self._retrieval_blocked = dict(retrieval_blocked_keys or {})
         self._full_file_cache: dict[str, str] = {}
         self._reference_cache: dict[tuple[str, str], str] = {}
 
     def retrieve(self, name: str, reference_subpath: str | None = None) -> str:
-        """Load full ``SKILL.md`` text, or a UTF-8 file under ``references/``.
+        """Load full ``SKILL.md`` text, or a UTF-8 file under the skill package root.
 
         Args:
             name: Skill name or canonical key (matched case-insensitively on name).
-            reference_subpath: Optional path relative to ``references/`` (no ``..``).
+            reference_subpath: Path relative to the skill directory (no ``..``), e.g.
+                ``references/notes.md``, ``assets/palette.json``, or ``SKILL.md``.
 
         Returns:
             Raw file contents.
 
-        Note:
-            Propagates ``SkillNotFoundError``, ``SkillReferenceError``, and
-            ``SkillLoadError`` from resolution and file reads.
-        """
-        entry = self._resolve_entry(name)
-        key = entry.summary.canonical_key
-        if reference_subpath is None or not reference_subpath.strip():
-            return self._load_skill_md_file(key, entry)
-        return self._load_reference_file(key, entry, reference_subpath.strip())
+        Raises:
+            SkillRetrievalDeniedError: When allow/deny lists or ``skills.retrieval``
+                policy blocks access before reading files.
 
-    def _resolve_entry(self, name: str) -> SkillRegistryEntry:
+        Note:
+            Lookup and file reads may raise ``SkillNotFoundError``,
+            ``SkillReferenceError``, or ``SkillLoadError``.
+        """
+        stripped = name.strip()
+        key = normalize_skill_name(stripped)
+        if key in self._retrieval_blocked:
+            raise SkillRetrievalDeniedError(self._retrieval_blocked[key])
+        entry = self._lookup_registry_entry(stripped, key)
+        denied = retrieval_config_denial_reason(
+            self._skills_config,
+            skill_scope=entry.scope,
+        )
+        if denied:
+            raise SkillRetrievalDeniedError(denied)
+        if reference_subpath is None or not reference_subpath.strip():
+            return self._load_skill_md_file(entry.summary.canonical_key, entry)
+        return self._load_reference_file(
+            entry.summary.canonical_key,
+            entry,
+            reference_subpath.strip(),
+        )
+
+    def _lookup_registry_entry(self, name: str, key: str) -> SkillRegistryEntry:
         """Find registry entry by normalized key or display name.
 
         Args:
-            name: User-supplied skill label.
+            name: User-supplied skill label (trimmed).
+            key: Normalized canonical key for ``name``.
 
         Returns:
             Matching registry entry.
@@ -82,7 +120,6 @@ class SkillLoader:
         Raises:
             SkillNotFoundError: If no entry matches.
         """
-        key = normalize_skill_name(name)
         got = self._registry.get(key)
         if got is not None:
             return got
@@ -124,12 +161,12 @@ class SkillLoader:
         entry: SkillRegistryEntry,
         reference_subpath: str,
     ) -> str:
-        """Read a UTF-8 file under ``skill_dir/references/`` with path bounding.
+        """Read a UTF-8 file under ``skill_dir`` with path bounding.
 
         Args:
             canonical_key: Stable registry key (cache key).
             entry: Registry row for the skill.
-            reference_subpath: Relative path inside ``references/``.
+            reference_subpath: Relative path inside the skill package directory.
 
         Returns:
             File contents.
@@ -141,7 +178,7 @@ class SkillLoader:
         if cache_key in self._reference_cache:
             return self._reference_cache[cache_key]
 
-        target = _safe_reference_path(entry.skill_dir, reference_subpath)
+        target = _safe_path_within_skill_dir(entry.skill_dir, reference_subpath)
         try:
             text = target.read_text(encoding="utf-8")
         except OSError as exc:
@@ -151,18 +188,19 @@ class SkillLoader:
         return text
 
 
-def _safe_reference_path(skill_dir: Path, reference_subpath: str) -> Path:
-    """Resolve ``references/<reference_subpath>`` and ensure it stays bounded.
+def _safe_path_within_skill_dir(skill_dir: Path, reference_subpath: str) -> Path:
+    """Resolve a path under ``skill_dir`` without parent-segment escapes.
 
     Args:
         skill_dir: Skill package root (contains ``SKILL.md``).
         reference_subpath: Relative path with no ``..`` segments.
 
     Returns:
-        Absolute path to an existing file under ``references/``.
+        Absolute path to an existing file inside ``skill_dir``.
 
     Raises:
-        SkillReferenceError: If the path is malformed or escapes ``references/``.
+        SkillReferenceError: If the path is malformed, escapes the skill directory,
+            is not a file, or is missing.
     """
     tail = Path(reference_subpath)
     if tail.is_absolute():
@@ -171,13 +209,16 @@ def _safe_reference_path(skill_dir: Path, reference_subpath: str) -> Path:
     if ".." in tail.parts:
         msg = "reference_subpath must not contain '..' components"
         raise SkillReferenceError(msg)
-    ref_root = (skill_dir / "references").resolve()
-    candidate = (ref_root / tail).resolve()
-    if not candidate.is_relative_to(ref_root):
-        msg = f"resolved path escapes references directory: {reference_subpath!r}"
+    root = skill_dir.resolve()
+    candidate = (root / tail).resolve()
+    if not candidate.is_relative_to(root):
+        msg = f"resolved path escapes skill directory: {reference_subpath!r}"
+        raise SkillReferenceError(msg)
+    if candidate.is_dir():
+        msg = f"path is not a file: {reference_subpath!r}"
         raise SkillReferenceError(msg)
     if not candidate.is_file():
-        msg = f"reference file not found: {reference_subpath!r}"
+        msg = f"file not found: {reference_subpath!r}"
         raise SkillReferenceError(msg)
     return candidate
 
@@ -200,7 +241,12 @@ def build_skill_bundle(
     candidates, _events = discover_skill_candidates(skills_config, base_path=base_path)
     registry = build_skill_registry(candidates, skills_config)
     catalog = format_skill_catalog_block(registry)
-    loader = SkillLoader(registry)
+    blocked = build_retrieval_blocked_keys(candidates, skills_config)
+    loader = SkillLoader(
+        registry,
+        skills_config=skills_config,
+        retrieval_blocked_keys=blocked,
+    )
     return SkillBundle(
         registry=registry,
         loader=loader,

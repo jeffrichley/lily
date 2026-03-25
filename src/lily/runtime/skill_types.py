@@ -78,6 +78,7 @@ class SkillMetadata(BaseModel):
             description=self.description,
             canonical_key=canonical_key,
             skill_type=self.skill_type,
+            allowed_tools=self.allowed_tools,
         )
 
 
@@ -90,6 +91,7 @@ class SkillSummary(BaseModel):
     description: str
     canonical_key: str
     skill_type: SkillTypeName | None = None
+    allowed_tools: str | None = None
 
 
 def normalize_skill_name(name: str) -> str:

@@ -6,14 +6,16 @@ from pathlib import Path
 
 import pytest
 
-from lily.runtime.config_schema import SkillsConfig
+from lily.runtime.config_schema import SkillsConfig, SkillsRetrievalConfig
 from lily.runtime.skill_discovery import discover_skill_candidates
 from lily.runtime.skill_loader import (
     SkillLoader,
     SkillNotFoundError,
     SkillReferenceError,
+    SkillRetrievalDeniedError,
     build_skill_bundle,
 )
+from lily.runtime.skill_policies import build_retrieval_blocked_keys
 from lily.runtime.skill_registry import build_skill_registry
 
 pytestmark = pytest.mark.unit
@@ -42,7 +44,12 @@ def _registry_and_loader(tmp_path: Path) -> SkillLoader:
     )
     candidates, _ = discover_skill_candidates(cfg, base_path=tmp_path)
     registry = build_skill_registry(candidates, cfg)
-    return SkillLoader(registry)
+    blocked = build_retrieval_blocked_keys(candidates, cfg)
+    return SkillLoader(
+        registry,
+        skills_config=cfg,
+        retrieval_blocked_keys=blocked,
+    )
 
 
 def test_skill_loader_returns_full_skill_md_text(tmp_path: Path) -> None:
@@ -73,7 +80,7 @@ def test_skill_loader_cache_returns_same_second_hit(tmp_path: Path) -> None:
 
 
 def test_skill_loader_resolves_reference_file(tmp_path: Path) -> None:
-    """Loads UTF-8 text from references/ with a safe relative path."""
+    """Loads UTF-8 text from a path under the skill directory."""
     # Arrange - skill with references/extra.md
     root = tmp_path / "skills"
     pkg = root / "pkg"
@@ -88,17 +95,52 @@ def test_skill_loader_resolves_reference_file(tmp_path: Path) -> None:
     )
     candidates, _ = discover_skill_candidates(cfg, base_path=tmp_path)
     registry = build_skill_registry(candidates, cfg)
-    loader = SkillLoader(registry)
+    blocked = build_retrieval_blocked_keys(candidates, cfg)
+    loader = SkillLoader(
+        registry,
+        skills_config=cfg,
+        retrieval_blocked_keys=blocked,
+    )
 
-    # Act - load reference file by subpath under references/
-    text = loader.retrieve("ref", reference_subpath="extra.md")
+    # Act - load file by path relative to skill package root
+    text = loader.retrieve("ref", reference_subpath="references/extra.md")
 
     # Assert - UTF-8 contents match file on disk
     assert text == "extra content"
 
 
+def test_skill_loader_resolves_file_under_assets_dir(tmp_path: Path) -> None:
+    """Loads UTF-8 text from assets/ or any other subdirectory of the skill."""
+    # Arrange - skill with assets/palette.json beside SKILL.md
+    root = tmp_path / "skills"
+    pkg = root / "pkg"
+    assets = pkg / "assets"
+    assets.mkdir(parents=True)
+    _write_skill(pkg, name="asset-skill", desc="Has assets")
+    (assets / "palette.json").write_text('{"primary": "#000"}', encoding="utf-8")
+    cfg = SkillsConfig(
+        enabled=True,
+        roots={"repository": [str(root.relative_to(tmp_path))]},
+        scopes_precedence=["repository", "user", "system"],
+    )
+    candidates, _ = discover_skill_candidates(cfg, base_path=tmp_path)
+    registry = build_skill_registry(candidates, cfg)
+    blocked = build_retrieval_blocked_keys(candidates, cfg)
+    loader = SkillLoader(
+        registry,
+        skills_config=cfg,
+        retrieval_blocked_keys=blocked,
+    )
+
+    # Act - load nested file outside references/
+    text = loader.retrieve("asset-skill", reference_subpath="assets/palette.json")
+
+    # Assert - JSON body is returned
+    assert '"primary"' in text
+
+
 def test_skill_loader_rejects_reference_escape(tmp_path: Path) -> None:
-    """Rejects paths that escape the references directory."""
+    """Rejects paths that escape the skill package directory."""
     # Arrange - skill with nested references file
     root = tmp_path / "skills"
     pkg = root / "pkg"
@@ -113,14 +155,20 @@ def test_skill_loader_rejects_reference_escape(tmp_path: Path) -> None:
     )
     candidates, _ = discover_skill_candidates(cfg, base_path=tmp_path)
     registry = build_skill_registry(candidates, cfg)
-    loader = SkillLoader(registry)
+    blocked = build_retrieval_blocked_keys(candidates, cfg)
+    loader = SkillLoader(
+        registry,
+        skills_config=cfg,
+        retrieval_blocked_keys=blocked,
+    )
 
     # Act - attempt directory traversal via parent segments
     with pytest.raises(SkillReferenceError) as err:
         loader.retrieve("x", reference_subpath="../SKILL.md")
 
-    # Assert - error mentions unsafe path components
-    assert ".." in str(err.value).lower() or ".." in str(err.value)
+    # Assert - error mentions unsafe path components or escape
+    out = str(err.value).lower()
+    assert ".." in out or "escape" in out
 
 
 def test_skill_loader_raises_not_found_for_unknown_name(tmp_path: Path) -> None:
@@ -168,3 +216,92 @@ def test_build_skill_bundle_skills_enabled_returns_loader_and_catalog(
     assert bundle is not None
     assert "one" in bundle.catalog_markdown
     assert bundle.loader.retrieve("one").startswith("---")
+
+
+def test_skill_loader_denies_denylisted_skill_with_policy_error(tmp_path: Path) -> None:
+    """A skill excluded by denylist raises SkillRetrievalDeniedError, not not-found."""
+    # Arrange - build loader with denylisted canonical key in blocked map
+    root = tmp_path / "skills"
+    _write_skill(root / "pkg", name="blocked", desc="blocked desc")
+    cfg = SkillsConfig(
+        enabled=True,
+        roots={"repository": [str(root.relative_to(tmp_path))]},
+        scopes_precedence=["repository", "user", "system"],
+        denylist=["blocked"],
+    )
+    candidates, _ = discover_skill_candidates(cfg, base_path=tmp_path)
+    registry = build_skill_registry(candidates, cfg)
+    blocked = build_retrieval_blocked_keys(candidates, cfg)
+    loader = SkillLoader(
+        registry,
+        skills_config=cfg,
+        retrieval_blocked_keys=blocked,
+    )
+
+    # Act - attempt retrieval of a denylisted skill name
+    with pytest.raises(SkillRetrievalDeniedError) as err:
+        loader.retrieve("blocked")
+
+    # Assert - error cites denylist policy
+    assert "denylist" in str(err.value).lower()
+
+
+def test_skill_loader_denies_when_retrieval_scopes_exclude_winner(
+    tmp_path: Path,
+) -> None:
+    """skills.retrieval.scopes_allowlist can block an otherwise valid skill."""
+    # Arrange - registry winner is repository scope but retrieval allows only user
+    root = tmp_path / "skills"
+    _write_skill(root / "pkg", name="scoped", desc="d")
+    cfg = SkillsConfig(
+        enabled=True,
+        roots={"repository": [str(root.relative_to(tmp_path))]},
+        scopes_precedence=["repository", "user", "system"],
+        retrieval=SkillsRetrievalConfig(scopes_allowlist=["user"]),
+    )
+    candidates, _ = discover_skill_candidates(cfg, base_path=tmp_path)
+    registry = build_skill_registry(candidates, cfg)
+    blocked = build_retrieval_blocked_keys(candidates, cfg)
+    loader = SkillLoader(
+        registry,
+        skills_config=cfg,
+        retrieval_blocked_keys=blocked,
+    )
+
+    # Act - attempt retrieval when winning scope is not allowed
+    with pytest.raises(SkillRetrievalDeniedError) as err:
+        loader.retrieve("scoped")
+
+    # Assert - error explains scope restriction
+    assert "scope" in str(err.value).lower()
+
+
+def test_skill_loader_rejects_reference_path_that_is_directory(tmp_path: Path) -> None:
+    """A references/ subpath that resolves to a directory is rejected."""
+    # Arrange - skill package with references/sub as a directory only
+    root = tmp_path / "skills"
+    pkg = root / "pkg"
+    ref_dir = pkg / "references" / "sub"
+    ref_dir.mkdir(parents=True)
+    _write_skill(pkg, name="dirref", desc="d")
+
+    cfg = SkillsConfig(
+        enabled=True,
+        roots={"repository": [str(root.relative_to(tmp_path))]},
+        scopes_precedence=["repository", "user", "system"],
+    )
+    candidates, _ = discover_skill_candidates(cfg, base_path=tmp_path)
+    registry = build_skill_registry(candidates, cfg)
+    blocked = build_retrieval_blocked_keys(candidates, cfg)
+    loader = SkillLoader(
+        registry,
+        skills_config=cfg,
+        retrieval_blocked_keys=blocked,
+    )
+
+    # Act - request a path that is a directory
+    with pytest.raises(SkillReferenceError) as err:
+        loader.retrieve("dirref", reference_subpath="references/sub")
+
+    # Assert - error distinguishes files from directories
+    assert "not a file" in str(err.value).lower()
