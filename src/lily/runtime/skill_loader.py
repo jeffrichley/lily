@@ -7,6 +7,7 @@ from pathlib import Path
 
 from lily.runtime.config_schema import SkillsConfig
 from lily.runtime.skill_discovery import discover_skill_candidates
+from lily.runtime.skill_events import emit_skill_discovery_events, emit_skill_loaded
 from lily.runtime.skill_policies import (
     build_retrieval_blocked_keys,
     retrieval_config_denial_reason,
@@ -68,6 +69,16 @@ class SkillLoader:
         self._retrieval_blocked = dict(retrieval_blocked_keys or {})
         self._full_file_cache: dict[str, str] = {}
         self._reference_cache: dict[tuple[str, str], str] = {}
+        self._last_retrieval_canonical_key: str | None = None
+
+    @property
+    def last_resolved_canonical_key(self) -> str | None:
+        """Canonical key from the last successful ``retrieve``, if any.
+
+        Returns:
+            Registry key set after the most recent successful load, else ``None``.
+        """
+        return self._last_retrieval_canonical_key
 
     def retrieve(self, name: str, reference_subpath: str | None = None) -> str:
         """Load full ``SKILL.md`` text, or a UTF-8 file under the skill package root.
@@ -100,12 +111,16 @@ class SkillLoader:
         if denied:
             raise SkillRetrievalDeniedError(denied)
         if reference_subpath is None or not reference_subpath.strip():
-            return self._load_skill_md_file(entry.summary.canonical_key, entry)
-        return self._load_reference_file(
+            text = self._load_skill_md_file(entry.summary.canonical_key, entry)
+            self._last_retrieval_canonical_key = entry.summary.canonical_key
+            return text
+        text = self._load_reference_file(
             entry.summary.canonical_key,
             entry,
             reference_subpath.strip(),
         )
+        self._last_retrieval_canonical_key = entry.summary.canonical_key
+        return text
 
     def _lookup_registry_entry(self, name: str, key: str) -> SkillRegistryEntry:
         """Find registry entry by normalized key or display name.
@@ -153,6 +168,12 @@ class SkillLoader:
             msg = f"unable to read SKILL.md at {path}: {exc}"
             raise SkillLoadError(msg) from exc
         self._full_file_cache[canonical_key] = text
+        emit_skill_loaded(
+            canonical_key=canonical_key,
+            load_kind="skill_md",
+            relative_path="SKILL.md",
+            content_length=len(text),
+        )
         return text
 
     def _load_reference_file(
@@ -185,6 +206,12 @@ class SkillLoader:
             msg = f"unable to read reference file {target}: {exc}"
             raise SkillLoadError(msg) from exc
         self._reference_cache[cache_key] = text
+        emit_skill_loaded(
+            canonical_key=canonical_key,
+            load_kind="reference",
+            relative_path=reference_subpath,
+            content_length=len(text),
+        )
         return text
 
 
@@ -238,8 +265,14 @@ def build_skill_bundle(
     """
     if not skills_config.enabled:
         return None
-    candidates, _events = discover_skill_candidates(skills_config, base_path=base_path)
+    candidates, discovery_events = discover_skill_candidates(
+        skills_config,
+        base_path=base_path,
+    )
     registry = build_skill_registry(candidates, skills_config)
+    emit_skill_discovery_events(
+        tuple((*discovery_events, *registry.events)),
+    )
     catalog = format_skill_catalog_block(registry)
     blocked = build_retrieval_blocked_keys(candidates, skills_config)
     loader = SkillLoader(

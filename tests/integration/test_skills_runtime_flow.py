@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from contextlib import closing
 from pathlib import Path
 
@@ -279,6 +281,72 @@ def test_agent_runtime_skill_trace_records_successful_retrieval(tmp_path: Path) 
     assert entry.outcome == "success"
     assert entry.name == "listed-skill"
     assert entry.reference_subpath is None
+
+
+def test_skill_telemetry_emits_retrieval_flow_events(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Key F7 telemetry events appear during catalog + retrieval success path."""
+    # Arrange - one skill package, telemetry logger at INFO, tool-call fake model
+    caplog.set_level(logging.INFO, "lily.skill.telemetry")
+    skills_root = tmp_path / "skills"
+    pkg = skills_root / "pkg"
+    pkg.mkdir(parents=True)
+    (pkg / "SKILL.md").write_text(
+        '---\nname: listed-skill\ndescription: "Listed."\n---\n# Body\n',
+        encoding="utf-8",
+    )
+    cfg = SkillsConfig(
+        enabled=True,
+        roots={"repository": [str(skills_root.relative_to(tmp_path))]},
+        scopes_precedence=["repository", "user", "system"],
+    )
+    bundle = build_skill_bundle(cfg, tmp_path)
+    assert bundle is not None
+
+    fake_model = ToolCapableFakeModel(
+        responses=[
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": SKILL_RETRIEVE_TOOL_ID,
+                        "args": {"name": "listed-skill"},
+                        "id": "c1",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            AIMessage(content="done"),
+        ]
+    )
+    runtime = AgentRuntime(
+        config=_runtime_config(
+            allowlist=[SKILL_RETRIEVE_TOOL_ID],
+            routing_enabled=False,
+        ),
+        tools=[skill_retrieve],
+        model_factory=_model_factory(
+            {"default-model": fake_model, "long-model": fake_model}
+        ),
+        skill_bundle=bundle,
+    )
+    # Act - run prompt so discovery, catalog injection, and retrieval all fire
+    with closing(runtime):
+        runtime.run("retrieve the skill")
+
+    # Assert - JSON telemetry lines include discovery, catalog, and retrieval flow
+    telemetry_names = {
+        json.loads(rec.getMessage())["event"]
+        for rec in caplog.records
+        if rec.name == "lily.skill.telemetry"
+    }
+    assert "skill_discovered" in telemetry_names
+    assert "skill_catalog_injected" in telemetry_names
+    assert "skill_selected" in telemetry_names
+    assert "skill_loaded" in telemetry_names
+    assert "skill_executed" in telemetry_names
 
 
 def test_agent_runtime_skill_trace_records_policy_denial(tmp_path: Path) -> None:

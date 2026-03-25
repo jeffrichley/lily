@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from lily.runtime.config_schema import RuntimeConfig
 from lily.runtime.model_factory import ModelFactory
 from lily.runtime.model_router import DynamicModelRouter
+from lily.runtime.skill_events import emit_skill_catalog_injected
 from lily.runtime.skill_invoke_trace import (
     SkillInvokeTrace,
     SkillRetrievalTraceEntry,
@@ -245,9 +246,12 @@ class AgentRuntime:
             self._skill_bundle is not None
             and self._skill_bundle.catalog_markdown.strip()
         ):
-            system_prompt = (
-                f"{system_prompt.rstrip()}\n\n{self._skill_bundle.catalog_markdown}"
+            catalog = self._skill_bundle.catalog_markdown
+            emit_skill_catalog_injected(
+                skills_count=len(self._skill_bundle.registry.canonical_keys()),
+                catalog_char_count=len(catalog),
             )
+            system_prompt = f"{system_prompt.rstrip()}\n\n{catalog}"
 
         built = self._agent_builder(
             model=model_map[self._config.models.routing.default_profile],

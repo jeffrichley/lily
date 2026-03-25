@@ -6,6 +6,11 @@ from contextvars import ContextVar, Token
 
 from langchain_core.tools import tool
 
+from lily.runtime.skill_events import (
+    emit_skill_executed,
+    emit_skill_failed,
+    emit_skill_selected,
+)
 from lily.runtime.skill_invoke_trace import (
     SkillRetrievalTraceEntry,
     record_skill_retrieval_trace,
@@ -66,6 +71,8 @@ def skill_retrieve(name: str, reference_subpath: str | None = None) -> str:
     if ref is not None and ref.strip() == "":
         ref = None
 
+    emit_skill_selected(requested_name=stripped_name, reference_subpath=ref)
+
     def _trace_error(detail: str) -> None:
         record_skill_retrieval_trace(
             SkillRetrievalTraceEntry(
@@ -78,26 +85,57 @@ def skill_retrieve(name: str, reference_subpath: str | None = None) -> str:
 
     if loader is None:
         msg = "Skill retrieval is not available: runtime did not bind a skill loader."
+        emit_skill_failed(
+            phase="retrieval",
+            error_kind="no_loader",
+            detail=msg,
+        )
         _trace_error(msg)
         return msg
     try:
         text = loader.retrieve(stripped_name, ref)
     except SkillNotFoundError as exc:
         detail = str(exc)
+        emit_skill_failed(
+            phase="retrieval",
+            error_kind="not_found",
+            detail=detail,
+        )
         _trace_error(detail)
         return detail
     except SkillRetrievalDeniedError as exc:
         detail = str(exc)
+        emit_skill_failed(
+            phase="retrieval",
+            error_kind="denied",
+            detail=detail,
+        )
         _trace_error(detail)
         return detail
     except SkillReferenceError as exc:
         detail = str(exc)
+        emit_skill_failed(
+            phase="load",
+            error_kind="reference",
+            detail=detail,
+        )
         _trace_error(detail)
         return detail
     except SkillLoadError as exc:
         detail = str(exc)
+        emit_skill_failed(
+            phase="load",
+            error_kind="load",
+            detail=detail,
+        )
         _trace_error(detail)
         return detail
+    emit_skill_executed(
+        requested_name=stripped_name,
+        canonical_key=loader.last_resolved_canonical_key,
+        reference_subpath=ref,
+        result_length=len(text),
+    )
     record_skill_retrieval_trace(
         SkillRetrievalTraceEntry(
             name=stripped_name,

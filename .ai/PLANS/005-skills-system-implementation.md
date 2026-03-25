@@ -119,7 +119,7 @@ flowchart LR
 | 4 | Done | @jeffrichley | 3 | `skill_policies`, `SkillsRetrievalConfig`, deny-before-content, F6 `effective_skill_tools` |
 | 5 | Done | @jeffrichley | 3–4 | Supervisor tool gating, `skill_trace`, integration tests |
 | 6 | Done | @jeffrichley | 5 | `skills list|inspect|doctor` (Rich), `cli_skills` + presenters + diagnostics |
-| 7 | Not started | @jeffrichley | 5–6 | `skill_events`, redaction tests |
+| 7 | Done | @jeffrichley | 5–6 | `skill_events` JSON on `lily.skill.telemetry`, hooks + redaction tests |
 | 8 | Not started | @jeffrichley | 1–7 | Full gates, docs/status, PR evidence |
 | 9 | Not started | @jeffrichley | 8 | Distribution follow-up (not MVP-blocking) |
 
@@ -277,7 +277,7 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - [x] Phase 4: Linked-file hydration + retrieval policy gates (retrieval-only MVP)
 - [x] Phase 5: Runtime integration into supervisor invoke path
 - [x] Phase 6: CLI surfaces (`skills list/inspect/doctor`) and UX
-- [ ] Phase 7: Telemetry/events, diagnostics, and observability
+- [x] Phase 7: Telemetry/events, diagnostics, and observability
 - [ ] Phase 8: Testing, docs/status sync, and release hardening
 - [ ] Phase 9: Post-MVP distribution and packaging follow-up
 
@@ -474,24 +474,24 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 **Intent Lock**
 - **Source of truth**: PRD structured telemetry requirement; Architecture `skill_events` component.
 - **Must**:
-  - [ ] Emit stable structured events for discover/request/load/outcome.
-  - [ ] Include rationale and policy decisions without leaking secrets.
-  - [ ] Keep event schema versioned and test-covered.
+  - [x] Emit stable structured events for discover/request/load/outcome.
+  - [x] Include rationale and policy decisions without leaking secrets.
+  - [x] Keep event schema versioned and test-covered.
 - **Must Not**:
-  - [ ] Emit only free-form logs with no schema guarantee.
-  - [ ] Log full prompt/skill body when policy forbids it.
+  - [x] Emit only free-form logs with no schema guarantee.
+  - [x] Log full prompt/skill body when policy forbids it.
 - **Provenance map**:
-  - [ ] Runtime decision points -> typed event model -> logger sink.
+  - [x] Runtime decision points -> typed event model -> logger sink.
 - **Acceptance gates**:
-  - [ ] Unit tests for event schema and serialization.
-  - [ ] Integration check that key events appear in retrieval-only tool-request flows.
+  - [x] Unit tests for event schema and serialization.
+  - [x] Integration check that key events appear in retrieval-only tool-request flows.
 
 **Tasks**
-- [ ] CREATE `skill_events.py` typed event models and emit helpers.
-- [ ] MAP PRD F7 names (`skill_discovered`, `skill_selected`, `skill_loaded`, `skill_executed`, `skill_failed`) onto retrieval semantics: e.g. treat **`skill_selected` / `skill_executed` as retrieval-request / content-applied** for playbook-style injection in MVP (document enum mapping in `skill_events` docstring). Adjust if PRD is updated to retrieval-specific names later.
-- [ ] ADD event hooks across discovery, system-prompt injection, loader, and retrieval tool request paths.
-- [ ] ADD redaction/sanitization rules and tests.
-- [ ] ADD event schema version constant and compatibility tests.
+- [x] CREATE `skill_events.py` typed event models and emit helpers.
+- [x] MAP PRD F7 names (`skill_discovered`, `skill_selected`, `skill_loaded`, `skill_executed`, `skill_failed`) onto retrieval semantics: e.g. treat **`skill_selected` / `skill_executed` as retrieval-request / content-applied** for playbook-style injection in MVP (document enum mapping in `skill_events` docstring). Adjust if PRD is updated to retrieval-specific names later.
+- [x] ADD event hooks across discovery, system-prompt injection, loader, and retrieval tool request paths.
+- [x] ADD redaction/sanitization rules and tests.
+- [x] ADD event schema version constant and compatibility tests.
 
 ### Phase 8: Testing, docs/status sync, and release hardening
 
@@ -613,11 +613,11 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 
 ### 6. EVENTS + HARDENING
 
-- [ ] **CREATE** `src/lily/runtime/skill_events.py`
-  - [ ] **IMPLEMENT**: Typed event schema (PRD F7 mapping for retrieval MVP), redacted emitters.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime -k skill_events -q`
+- [x] **CREATE** `src/lily/runtime/skill_events.py`
+  - [x] **IMPLEMENT**: Typed event schema (PRD F7 mapping for retrieval MVP), redacted emitters.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime -k skill_events -q`
 
-- [ ] **UPDATE** docs/status and finish gates
+- [ ] **UPDATE** docs/status and finish gates (Phase 8)
   - [ ] **VALIDATE**: `just quality && just test`
   - [ ] **VALIDATE**: `just docs-check && just status`
 
@@ -633,12 +633,13 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 - [x] System-prompt catalog injection correctness and retrieval-by-name (agent-chosen skill `name`, not implicit ranking).
 - [x] Loader caching tests and failure taxonomy tests.
 - [x] Retrieval policy tests and linked-file constraint tests (deny/missing/off-scope).
-- [ ] Event schema serialization and redaction tests.
+- [x] Event schema serialization and redaction tests.
 
 ### Integration Tests
 
 - [x] Deterministic skill registry across repeated discover+merge (repo/user overlap); see `tests/integration/test_skills_discovery_registry.py`.
 - [x] End-to-end runtime path from prompt -> system-prompt catalog injection -> skill retrieval tool request -> output.
+- [x] Skill telemetry JSON events (`lily.skill.telemetry`) for discovery + catalog injection + retrieval success path.
 - [x] Config-driven toggles (skills enabled/disabled) preserve existing behavior.
 - [ ] Policy constraints enforced under realistic runtime wiring.
 
@@ -712,7 +713,8 @@ Docs/status checks:
 - Phase 4 (retrieval policy + linked constraints + F6 helpers): **completed** (`skill_policies.py`, `SkillsRetrievalConfig`, `SkillRetrievalDeniedError`, `build_retrieval_blocked_keys`, `effective_skill_tools`, tests).
 - Phase 5 (supervisor tool gating + `skill_trace` + integration tests): **completed** (`skill_invoke_trace.py`, `tests/fixtures/config/skills_retrieval/`, `tests/integration/test_skills_runtime_flow.py`).
 - Phase 6 (CLI `skills list|inspect|doctor`, Rich presenters, policy diagnostics): **completed** (`cli_skills.py`, `cli_skills_presenters.py`, `skill_cli_diagnostics.py`, `cli_options.py`, `tests/e2e/test_cli_skills_commands.py`).
-- Phases 7–9: not started (implementation follows phase order).
+- Phase 7 (typed `skill_events`, JSON telemetry on `lily.skill.telemetry`, hooks in bundle build / catalog injection / loader / `skill_retrieve`): **completed** (`skill_events.py`, `tests/unit/runtime/test_skill_events.py`, integration `test_skill_telemetry_emits_retrieval_flow_events`).
+- Phases 8–9: not started (implementation follows phase order).
 
 ### Artifacts Created
 
@@ -727,6 +729,7 @@ Docs/status checks:
 - `src/lily/runtime/skill_policies.py`, `tests/unit/runtime/test_skill_policies.py`
 - `src/lily/runtime/skill_invoke_trace.py`, `tests/integration/test_skills_runtime_flow.py`, `tests/fixtures/config/skills_retrieval/`
 - `src/lily/runtime/skill_cli_diagnostics.py`, `src/lily/cli_skills.py`, `src/lily/cli_skills_presenters.py`, `src/lily/cli_options.py` (shared `ConfigOption` / `OverrideOption`); `tests/e2e/test_cli_skills_commands.py`
+- `src/lily/runtime/skill_events.py`; `tests/unit/runtime/test_skill_events.py` (schema/redaction); integration telemetry assertion in `tests/integration/test_skills_runtime_flow.py`
 
 ### Phase 0 — intent check and gates
 
@@ -793,6 +796,14 @@ Docs/status checks:
   - `uv run pytest tests/e2e/test_cli_skills_commands.py -q` -> pass.
 - **Deferred within phase**: User-facing docs snippets for skills CLI deferred to Phase 8 reference slice (per task note).
 
+### Phase 7 — intent check and gates
+
+- **Phase intent check**: Phase 7 — `SKILL_EVENT_SCHEMA_VERSION` + Pydantic payloads; JSON lines on logger `lily.skill.telemetry`; PRD F7 name mapping documented in `skill_events` module docstring; extension event `skill_catalog_injected` for system-prompt injection observability; `sanitize_telemetry_detail` bounds error strings; hooks in `build_skill_bundle` (discovery + registry events), `AgentRuntime._build_agent` (catalog injected), `SkillLoader` file reads (`skill_loaded`), `skill_retrieve` (`skill_selected` / `skill_executed` / `skill_failed`).
+- **Acceptance evidence**:
+  - `just quality && just test` -> pass (132 tests, 2026-03-25).
+  - `uv run pytest tests/unit/runtime/test_skill_events.py -q` -> pass.
+  - `uv run pytest tests/integration/test_skills_runtime_flow.py::test_skill_telemetry_emits_retrieval_flow_events -q` -> pass.
+
 ### Partial/Blocked Items
 
 - None for Phase 0.
@@ -802,3 +813,4 @@ Docs/status checks:
 - None for Phase 4.
 - None for Phase 5.
 - None for Phase 6 (docs snippets deferred to Phase 8 as planned).
+- None for Phase 7.
