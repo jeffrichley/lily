@@ -114,7 +114,7 @@ flowchart LR
 |---|:---:|---|---|---|
 | 0 | Done | @team | — | Execution framing, acceptance lock, tracker below |
 | 1 | Done | @team | 0 | `skill_types`, `skill_catalog`, parser/validation matrix |
-| 2 | Not started | @team | 1 | `skill_discovery`, `skill_registry`, config `skills.*` |
+| 2 | Done | @team | 1 | `skill_discovery`, `skill_registry`, config `skills.*` |
 | 3 | Not started | @team | 2 | Catalog injection, retrieval tool, `skill_loader` |
 | 4 | Not started | @team | 3 | `skill_policies`, linked-file bounds, F6 tool intersection |
 | 5 | Not started | @team | 3–4 | Supervisor/runtime wiring, trace payload |
@@ -270,7 +270,7 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 
 - [x] Phase 0: Execution framing and acceptance lock
 - [x] Phase 1: Skill contract + schema foundation
-- [ ] Phase 2: Discovery, indexing, precedence, and registry
+- [x] Phase 2: Discovery, indexing, precedence, and registry
 - [ ] Phase 3: System-prompt skill catalog injection + retrieval-by-name loader
 - [ ] Phase 4: Linked-file hydration + retrieval policy gates (retrieval-only MVP)
 - [ ] Phase 5: Runtime integration into supervisor invoke path
@@ -335,25 +335,25 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 **Intent Lock**
 - **Source of truth**: PRD `Local skill discovery`, `collision policy`; Architecture sections 7 and 8 prerequisites.
 - **Must**:
-  - [ ] Discover skills from configured roots/scopes in deterministic order.
-  - [ ] Resolve collisions via precedence + semantic version tie-break.
-  - [ ] Emit discover/shadow diagnostics records.
+  - [x] Discover skills from configured roots/scopes in deterministic order.
+  - [x] Resolve collisions via precedence + semantic version tie-break.
+  - [x] Emit discover/shadow diagnostics records.
 - **Must Not**:
-  - [ ] Use filesystem iteration order without explicit sorting.
-  - [ ] Allow duplicate winner outcomes between runs.
+  - [x] Use filesystem iteration order without explicit sorting.
+  - [x] Allow duplicate winner outcomes between runs.
 - **Provenance map**:
-  - [ ] Scope order + semantic version -> registry winner record.
+  - [x] Scope order + semantic version -> registry winner record.
 - **Acceptance gates**:
-  - [ ] Unit tests for precedence and tie-break matrix.
-  - [ ] Integration test proving deterministic registry across repeated runs.
+  - [x] Unit tests for precedence and tie-break matrix.
+  - [x] Integration test proving deterministic registry across repeated runs.
 
 **Tasks**
-- [ ] CREATE `skill_discovery.py` for root walking and candidate collection.
-- [ ] CREATE `skill_registry.py` for index build, collision resolution, and query APIs.
-- [ ] UPDATE `config_schema.py` / loader to include `skills.enabled`, `skills.roots`, `skills.scopes_precedence`, `skills.allowlist` / `skills.denylist` per PRD §9.
-- [ ] UPDATE `config_schema.py` for **`skills.tools`** per PRD §9: `default_policy` (`inherit_runtime` | `deny_unless_allowed` | `use_default_packs`), `default_packs`, `packs` (map pack id → ordered tool id list). Add unit tests for invalid references and forbidden combinations.
-- [ ] ADD unit tests for same-id collisions and lexical deterministic fallback.
-- [ ] ADD integration test for merged repo/user/system roots.
+- [x] CREATE `skill_discovery.py` for root walking and candidate collection.
+- [x] CREATE `skill_registry.py` for index build, collision resolution, and query APIs.
+- [x] UPDATE `config_schema.py` / loader to include `skills.enabled`, `skills.roots`, `skills.scopes_precedence`, `skills.allowlist` / `skills.denylist` per PRD §9.
+- [x] UPDATE `config_schema.py` for **`skills.tools`** per PRD §9: `default_policy` (`inherit_runtime` | `deny_unless_allowed` | `use_default_packs`), `default_packs`, `packs` (map pack id → ordered tool id list). Add unit tests for invalid references and forbidden combinations.
+- [x] ADD unit tests for same-id collisions and lexical deterministic fallback.
+- [x] ADD integration test for merged repo/user/system roots.
 
 ### Phase 3: System-prompt skill catalog injection + retrieval-by-name loader
 
@@ -561,16 +561,18 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 
 ### 2. CONFIG + DISCOVERY + REGISTRY
 
-- [ ] **EXTEND** `src/lily/runtime/config_schema.py` (+ loader) with `skills.*` and nested `skills.tools.*` per PRD §9.
-  - [ ] **VALIDATE**: dedicated unit tests for config parsing (new file or existing config tests).
+- [x] **EXTEND** `src/lily/runtime/config_schema.py` (+ loader) with `skills.*` and nested `skills.tools.*` per PRD §9.
+  - [x] **VALIDATE**: `tests/unit/runtime/test_config_loader.py` (skills YAML + invalid `skills.tools` cases); `just test`.
 
-- [ ] **CREATE** `src/lily/runtime/skill_discovery.py`
-  - [ ] **IMPLEMENT**: Scope-root traversal and deterministic candidate ordering.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_discovery.py -q`
+- [x] **CREATE** `src/lily/runtime/skill_discovery.py`
+  - [x] **IMPLEMENT**: Scope-root traversal and deterministic candidate ordering.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_discovery.py -q`
 
-- [ ] **CREATE** `src/lily/runtime/skill_registry.py`
-  - [ ] **IMPLEMENT**: Collision resolution and query interface.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_registry.py -q`
+- [x] **CREATE** `src/lily/runtime/skill_registry.py`
+  - [x] **IMPLEMENT**: Collision resolution and query interface.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_registry.py -q`
+
+- [x] **ADD** `tests/integration/test_skills_discovery_registry.py` (deterministic registry across repeated runs).
 
 ### 3. PROMPT INJECTION + LOADER + RETRIEVAL TOOL
 
@@ -617,9 +619,9 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 
 ### Unit Tests
 
-- [ ] Parser/contract tests for SKILL.md metadata validity matrix.
-- [ ] Discovery order tests across repo/user/system roots.
-- [ ] Collision and precedence tests (scope + semver + deterministic fallback).
+- [x] Parser/contract tests for SKILL.md metadata validity matrix.
+- [x] Discovery order tests across repo/user/system roots.
+- [x] Collision and precedence tests (scope + semver + deterministic fallback).
 - [ ] System-prompt catalog injection correctness and retrieval-by-name (agent-chosen skill `name`, not implicit ranking).
 - [ ] Loader caching tests and failure taxonomy tests.
 - [ ] Retrieval policy tests and linked-file constraint tests (deny/missing/off-scope).
@@ -627,6 +629,7 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 
 ### Integration Tests
 
+- [x] Deterministic skill registry across repeated discover+merge (repo/user overlap); see `tests/integration/test_skills_discovery_registry.py`.
 - [ ] End-to-end runtime path from prompt -> system-prompt catalog injection -> skill retrieval tool request -> output.
 - [ ] Config-driven toggles (skills enabled/disabled) preserve existing behavior.
 - [ ] Policy constraints enforced under realistic runtime wiring.
@@ -696,13 +699,17 @@ Docs/status checks:
 
 - Phase 0 (execution framing and acceptance lock): **completed** on branch `feat/005-skills-system-implementation`.
 - Phase 1 (skill contract + schema foundation): **completed** (`skill_types.py`, `skill_catalog.py`, `tests/unit/runtime/test_skill_catalog.py`, `tests/fixtures/skills/`).
-- Phases 2–9: not started (implementation follows phase order).
+- Phase 2 (discovery, indexing, precedence, registry): **completed** (`skill_discovery.py`, `skill_registry.py`, `RuntimeConfig.skills` + `SkillsToolsConfig`, unit + integration tests).
+- Phases 3–9: not started (implementation follows phase order).
 
 ### Artifacts Created
 
 - `.ai/PLANS/005-skills-system-implementation.md`
 - `src/lily/runtime/skill_types.py`, `src/lily/runtime/skill_catalog.py`
 - `tests/unit/runtime/test_skill_catalog.py`, `tests/fixtures/skills/`
+- `src/lily/runtime/skill_discovery.py`, `src/lily/runtime/skill_registry.py`
+- `tests/unit/runtime/test_skill_discovery.py`, `tests/unit/runtime/test_skill_registry.py`
+- `tests/integration/test_skills_discovery_registry.py`
 
 ### Phase 0 — intent check and gates
 
@@ -732,7 +739,16 @@ Docs/status checks:
   - `just quality` -> pass; `just test` -> pass (67 tests).
   - `uv run pytest tests/unit/runtime/test_skill_catalog.py -q` -> pass.
 
+### Phase 2 — intent check and gates
+
+- **Phase intent check** (`.ai/COMMANDS/phase-intent-check.md`): Phase 2 “Discovery, indexing, precedence, and registry” — deterministic discovery (`sorted` roots/children), `build_skill_registry` collision policy (scope > semver > lexical path), `discovered` / `shadowed` events; `skills` + `skills.tools` on `RuntimeConfig`; `skills.roots` list normalizes to `repository`.
+- **Acceptance evidence**:
+  - `just quality` -> pass; `just test` -> pass (84 tests).
+  - `uv run pytest tests/unit/runtime/test_skill_discovery.py tests/unit/runtime/test_skill_registry.py tests/unit/runtime/test_config_loader.py -k skills -q` -> pass.
+  - `uv run pytest tests/integration/test_skills_discovery_registry.py -q` -> pass.
+
 ### Partial/Blocked Items
 
 - None for Phase 0.
 - None for Phase 1.
+- None for Phase 2.
