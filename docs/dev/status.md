@@ -9,10 +9,11 @@ source_of_truth: true
 
 ## Current Focus
 
-- Implement SI-007 Phase 1 skill contract and schema foundation (parser + `skill_types` / `skill_catalog`) (`SI-007`, `.ai/PLANS/005-skills-system-implementation.md`, `.ai/SPECS/002-skills-system/`).
+- Implement SI-007 Phase 2 discovery, indexing, precedence, and registry (`skill_discovery`, `skill_registry`, config `skills.*`) (`SI-007`, `.ai/PLANS/005-skills-system-implementation.md`).
 
 ## Recently Completed
 
+- Delivered SI-007 Phase 1 skill contract: `SkillMetadata` / `SkillSummary`, `skill_catalog` parser (`python-frontmatter`), fixtures under `tests/fixtures/skills/`, unit tests `tests/unit/runtime/test_skill_catalog.py` (`.ai/PLANS/005-skills-system-implementation.md`).
 - Locked SI-007 execution framing: MVP traceability matrix, phase tracker, dependency graph, risk register (R-001–R-005), rollback-by-phase table, and non-goals in `.ai/PLANS/005-skills-system-implementation.md` (Phase 0).
 - Delivered LangChain kernel runtime with YAML config validation and dynamic model routing (SI-001) (`.ai/PLANS/001-langchain-agent-kernel-yaml.md`).
 - Delivered CLI + basic Textual TUI surfaces wired to one supervisor/runtime path (SI-001) (`src/lily/cli.py`, `src/lily/ui/`).
@@ -37,3 +38,4 @@ source_of_truth: true
 - 2026-03-06: Split roadmap tracking: SI-002 remains completed for tool-registry delivery, and SI-007 is now in progress for first-class skills-system delivery (`docs/dev/roadmap.md`).
 - 2026-03-25: Completed SI-007 Phase 0 (execution framing and acceptance lock) on branch `feat/005-skills-system-implementation`; Phase 1 implementation is next.
 - 2026-03-25: Phase 0 close validation: `just quality && just test` green; bumped `requests` to 2.33.0 in `uv.lock`; `pip-audit` gate documents **DEBT-017** for CVE-2026-4539 (no `pygments` fix on PyPI yet).
+- 2026-03-25: Completed SI-007 Phase 1 (`skill_types`, `skill_catalog`, unit tests + fixtures); full `just quality` and `just test` green on `feat/005-skills-system-implementation`.

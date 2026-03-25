@@ -358,7 +358,7 @@ class SkillSummary(BaseModel):
     id: str
     name: str
     description: str
-    type: Literal["playbook", "procedural", "agent"]
+    type: Literal["standard", "playbook", "procedural", "agent"]
     tags: list[str]
     version: str
     source_path: str

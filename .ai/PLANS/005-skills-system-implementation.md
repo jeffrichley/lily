@@ -113,7 +113,7 @@ flowchart LR
 | Phase | Status | Owner | Depends on | Notes |
 |---|:---:|---|---|---|
 | 0 | Done | @team | — | Execution framing, acceptance lock, tracker below |
-| 1 | Not started | @team | 0 | `skill_types`, `skill_catalog`, parser/validation matrix |
+| 1 | Done | @team | 0 | `skill_types`, `skill_catalog`, parser/validation matrix |
 | 2 | Not started | @team | 1 | `skill_discovery`, `skill_registry`, config `skills.*` |
 | 3 | Not started | @team | 2 | Catalog injection, retrieval tool, `skill_loader` |
 | 4 | Not started | @team | 3 | `skill_policies`, linked-file bounds, F6 tool intersection |
@@ -269,7 +269,7 @@ Scripts/docs (optional but recommended):
 Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so execution progress can be tracked live.
 
 - [x] Phase 0: Execution framing and acceptance lock
-- [ ] Phase 1: Skill contract + schema foundation
+- [x] Phase 1: Skill contract + schema foundation
 - [ ] Phase 2: Discovery, indexing, precedence, and registry
 - [ ] Phase 3: System-prompt skill catalog injection + retrieval-by-name loader
 - [ ] Phase 4: Linked-file hydration + retrieval policy gates (retrieval-only MVP)
@@ -307,28 +307,28 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 **Intent Lock**
 - **Source of truth**: PRD `Skill package contract`; Architecture `SKILL.md contract` and metadata schema.
 - **Must**:
-  - [ ] Implement strict pydantic models for skill metadata/frontmatter and normalized summaries.
-  - [ ] Enforce guide-aligned required fields (`name`, `description`) and parser normalization rules.
-  - [ ] Enforce canonical kebab-case recommendation as lint/doctor guidance (not hard reject for imported third-party skills).
-  - [ ] Provide clear field-level errors (no generic parse failures).
+  - [x] Implement strict pydantic models for skill metadata/frontmatter and normalized summaries.
+  - [x] Enforce guide-aligned required fields (`name`, `description`) and parser normalization rules.
+  - [x] Enforce canonical kebab-case recommendation as lint/doctor guidance (not hard reject for imported third-party skills).
+  - [x] Provide clear field-level errors (no generic parse failures).
 - **Must Not**:
-  - [ ] Introduce implicit fallback defaults for required fields.
-  - [ ] Accept unknown required-contract fields silently.
+  - [x] Introduce implicit fallback defaults for required fields.
+  - [x] Accept unknown required-contract fields silently.
 - **Provenance map**:
-  - [ ] `SKILL.md` frontmatter -> `SkillMetadata` model -> `SkillSummary` index record.
+  - [x] `SKILL.md` frontmatter -> `SkillMetadata` model -> `SkillSummary` index record.
 - **Acceptance gates**:
-  - [ ] Unit tests for valid/invalid frontmatter permutations.
-  - [ ] Fixture packs for **valid/invalid `SKILL.md`** contracts (retrieval-only MVP: one operational package shape; optional `type` field may exist for forward compatibility but **no** distinct execution paths per type in MVP).
+  - [x] Unit tests for valid/invalid frontmatter permutations.
+  - [x] Fixture packs for **valid/invalid `SKILL.md`** contracts (retrieval-only MVP: one operational package shape; optional `type` field may exist for forward compatibility but **no** distinct execution paths per type in MVP).
 
 **Tasks**
-- [ ] ADD `python-frontmatter` to `pyproject.toml` and refresh the lockfile (`uv lock`); verify import in CI/local before merging parser work.
-- [ ] CREATE `skill_types.py` with enums, summary/full models, and typed errors.
-- [ ] CREATE `skill_catalog.py` parser for markdown+frontmatter extraction.
-- [ ] ADD deterministic validation messages for each required field.
-- [ ] ADD fixture packs for success/failure contracts.
-- [ ] ADD unit tests for parsing, unknown fields, malformed versions, and ID validation.
-- [ ] ADD parser test matrix for malformed YAML/frontmatter edge cases (missing delimiters, unclosed quotes, bad YAML types, forbidden `<` `>` values, reserved provider prefixes).
-- [ ] ADD normalization tests for non-canonical names -> internal canonical key mapping.
+- [x] ADD `python-frontmatter` to `pyproject.toml` and refresh the lockfile (`uv lock`); verify import in CI/local before merging parser work.
+- [x] CREATE `skill_types.py` with enums, summary/full models, and typed errors.
+- [x] CREATE `skill_catalog.py` parser for markdown+frontmatter extraction.
+- [x] ADD deterministic validation messages for each required field.
+- [x] ADD fixture packs for success/failure contracts.
+- [x] ADD unit tests for parsing, unknown fields, malformed versions, and ID validation.
+- [x] ADD parser test matrix for malformed YAML/frontmatter edge cases (missing delimiters, unclosed quotes, bad YAML types, forbidden `<` `>` values, reserved provider prefixes).
+- [x] ADD normalization tests for non-canonical names -> internal canonical key mapping.
 
 ### Phase 2: Discovery, indexing, precedence, and registry
 
@@ -550,14 +550,14 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 
 ### 1. DEPENDENCY + CONTRACT MODELS
 
-- [ ] **ADD** `python-frontmatter` to `pyproject.toml` and refresh `uv.lock` (`uv lock`).
-- [ ] **CREATE** `src/lily/runtime/skill_types.py`
-  - [ ] **IMPLEMENT**: Core skill metadata/summary/full models and error taxonomy.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_catalog.py -q`
+- [x] **ADD** `python-frontmatter` to `pyproject.toml` and refresh `uv.lock` (`uv lock`).
+- [x] **CREATE** `src/lily/runtime/skill_types.py`
+  - [x] **IMPLEMENT**: Core skill metadata/summary/full models and error taxonomy.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_catalog.py -q`
 
-- [ ] **CREATE** `src/lily/runtime/skill_catalog.py`
-  - [ ] **IMPLEMENT**: SKILL.md parser and strict frontmatter validator (`python-frontmatter` + safe YAML).
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_catalog.py -q`
+- [x] **CREATE** `src/lily/runtime/skill_catalog.py`
+  - [x] **IMPLEMENT**: SKILL.md parser and strict frontmatter validator (`python-frontmatter` + safe YAML).
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_catalog.py -q`
 
 ### 2. CONFIG + DISCOVERY + REGISTRY
 
@@ -695,11 +695,14 @@ Docs/status checks:
 ### Completion Status
 
 - Phase 0 (execution framing and acceptance lock): **completed** on branch `feat/005-skills-system-implementation`.
-- Phases 1–9: not started (implementation follows phase order).
+- Phase 1 (skill contract + schema foundation): **completed** (`skill_types.py`, `skill_catalog.py`, `tests/unit/runtime/test_skill_catalog.py`, `tests/fixtures/skills/`).
+- Phases 2–9: not started (implementation follows phase order).
 
 ### Artifacts Created
 
 - `.ai/PLANS/005-skills-system-implementation.md`
+- `src/lily/runtime/skill_types.py`, `src/lily/runtime/skill_catalog.py`
+- `tests/unit/runtime/test_skill_catalog.py`, `tests/fixtures/skills/`
 
 ### Phase 0 — intent check and gates
 
@@ -722,6 +725,14 @@ Docs/status checks:
 - `just status` -> pass
 - Phase 0 close (pre-commit): `just quality && just test` -> pass (2026-03-25); `uv.lock` updated `requests` 2.32.5 -> 2.33.0 (CVE-2026-25645); `justfile` `audit` uses `pip-audit --ignore-vuln CVE-2026-4539` with `docs/dev/debt/debt_tracker.md` **DEBT-017** until `pygments` publishes a fix on PyPI.
 
+### Phase 1 — intent check and gates
+
+- **Phase intent check** (`.ai/COMMANDS/phase-intent-check.md`): Phase 1 “Skill contract + schema foundation” — Intent Lock satisfied; `SkillMetadata` / `SkillSummary` / `SkillValidationError`; `parse_skill_markdown` + `load_skill_md`; `python-frontmatter` + `packaging.version` semver validation for `metadata.version`.
+- **Acceptance evidence**:
+  - `just quality` -> pass; `just test` -> pass (67 tests).
+  - `uv run pytest tests/unit/runtime/test_skill_catalog.py -q` -> pass.
+
 ### Partial/Blocked Items
 
 - None for Phase 0.
+- None for Phase 1.

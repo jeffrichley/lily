@@ -84,8 +84,11 @@ This document describes:
 ### Canonical type enum
 
 ```python
-SkillType = Literal["playbook", "procedural", "agent"]
+SkillType = Literal["standard", "playbook", "procedural", "agent"]
 ```
+
+- **`standard`**: default flat package — `SKILL.md` at the skill directory root (for example `skills/<skill-name>/SKILL.md`), with optional `references/`, `assets/`, `scripts/` alongside; not an execution-adapter subfolder layout.
+- **`playbook` / `procedural` / `agent`**: reserved for post-MVP execution-adapter distinctions; optional in frontmatter for forward compatibility.
 
 ---
 
