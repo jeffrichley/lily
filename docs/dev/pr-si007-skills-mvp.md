@@ -67,7 +67,7 @@ uv run lily skills doctor --config tests/fixtures/config/skills_retrieval/agent.
 - [x] Docs updated in this PR (list paths below)
 - [ ] Docs follow-up required (owner + target date below)
 
-`docs/dev/status.md`, `docs/dev/roadmap.md`, `docs/dev/backlog.md`, `docs/dev/references/skills-si007-mvp.md`, `.ai/PLANS/005-skills-system-implementation.md`, `docs/dev/pr-si007-skills-mvp.md` (this draft file)
+`docs/dev/status.md`, `docs/dev/roadmap.md`, `docs/dev/backlog.md`, `docs/dev/backlog/skills-distribution-packaging.md`, `docs/dev/references/skills-si007-mvp.md`, `.ai/PLANS/005-skills-system-implementation.md`, `docs/dev/pr-si007-skills-mvp.md` (this draft file)
 
 ---
 

@@ -121,7 +121,7 @@ flowchart LR
 | 6 | Done | @jeffrichley | 5 | `skills list|inspect|doctor` (Rich), `cli_skills` + presenters + diagnostics |
 | 7 | Done | @jeffrichley | 5–6 | `skill_events` JSON on `lily.skill.telemetry`, hooks + redaction tests |
 | 8 | Done | @jeffrichley | 1–7 | Gates, roadmap/status/backlog, alignment doc, PR draft |
-| 9 | Not started | @jeffrichley | 8 | Distribution follow-up (not MVP-blocking) |
+| 9 | Done | @jeffrichley | 8 | Contract in `docs/dev/backlog/skills-distribution-packaging.md` (no code); SI-008 / BL-007 |
 
 ### Phase → PRD / architecture provenance (summary)
 
@@ -279,7 +279,7 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - [x] Phase 6: CLI surfaces (`skills list/inspect/doctor`) and UX
 - [x] Phase 7: Telemetry/events, diagnostics, and observability
 - [x] Phase 8: Testing, docs/status sync, and release hardening
-- [ ] Phase 9: Post-MVP distribution and packaging follow-up
+- [x] Phase 9: Post-MVP distribution and packaging follow-up
 
 ### Phase 0: Execution framing and acceptance lock
 
@@ -524,24 +524,24 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 **Intent Lock**
 - **Source of truth**: SI-007 PRD `## 13. Future Considerations`; SKILLS_ARCHITECTURE `## 20. Tight Delta Checklist (Guide Realignment)`.
 - **Must**:
-  - [ ] Define zip/import-export package contract for portable skill bundles.
-  - [ ] Define API-managed skill lifecycle/versioning strategy for programmatic deployments.
-  - [ ] Define org-level distribution, rollout, and governance policy surfaces.
+  - [x] Define zip/import-export package contract for portable skill bundles.
+  - [x] Define API-managed skill lifecycle/versioning strategy for programmatic deployments.
+  - [x] Define org-level distribution, rollout, and governance policy surfaces.
 - **Must Not**:
-  - [ ] Block SI-007 MVP closure on post-MVP distribution implementation.
-  - [ ] Ship ad hoc packaging behavior without documented contract/versioning.
+  - [x] Block SI-007 MVP closure on post-MVP distribution implementation.
+  - [x] Ship ad hoc packaging behavior without documented contract/versioning.
 - **Provenance map**:
-  - [ ] Distribution requirements in architecture/PRD map to a tracked follow-up plan and backlog entries.
+  - [x] Distribution requirements in architecture/PRD map to a backlog-owned spec and backlog entries.
 - **Acceptance gates**:
-  - [ ] A follow-up implementation plan exists and is linked from roadmap/backlog.
-  - [ ] Deferred scope is explicitly documented in PR/status surfaces.
+  - [x] A backlog specification exists and is linked from roadmap/backlog.
+  - [x] Deferred scope is explicitly documented in PR/status surfaces.
 
 **Tasks**
-- [ ] CREATE follow-up plan file for distribution work (next plan ID after current active plans).
-- [ ] DEFINE skill bundle archive format (layout, checksum, manifest metadata, compatibility fields).
-- [ ] DEFINE import/export CLI/API surfaces and validation error taxonomy.
-- [ ] DEFINE rollout strategy: org publish/update channels, version pinning, rollback semantics.
-- [ ] UPDATE roadmap/backlog/status docs to track distribution track separately from SI-007 MVP.
+- [x] CREATE backlog specification doc for distribution work (`docs/dev/backlog/skills-distribution-packaging.md`).
+- [x] DEFINE skill bundle archive format (layout, checksum, manifest metadata, compatibility fields).
+- [x] DEFINE import/export CLI/API surfaces and validation error taxonomy.
+- [x] DEFINE rollout strategy: org publish/update channels, version pinning, rollback semantics.
+- [x] UPDATE roadmap/backlog/status docs to track distribution track separately from SI-007 MVP.
 
 ---
 
@@ -715,7 +715,7 @@ Docs/status checks:
 - Phase 6 (CLI `skills list|inspect|doctor`, Rich presenters, policy diagnostics): **completed** (`cli_skills.py`, `cli_skills_presenters.py`, `skill_cli_diagnostics.py`, `cli_options.py`, `tests/e2e/test_cli_skills_commands.py`).
 - Phase 7 (typed `skill_events`, JSON telemetry on `lily.skill.telemetry`, hooks in bundle build / catalog injection / loader / `skill_retrieve`): **completed** (`skill_events.py`, `tests/unit/runtime/test_skill_events.py`, integration `test_skill_telemetry_emits_retrieval_flow_events`).
 - Phase 8 (hardening: expanded tests, docs/status/roadmap/backlog sync, guide-alignment reference, PR draft): **completed** (`docs/dev/references/skills-si007-mvp.md`, `docs/dev/pr-si007-skills-mvp.md`, e2e `test_cli_run_smoke_with_skills_fixture_config`, loader UTF-8 test).
-- Phase 9: not started (post-MVP distribution; see plan Phase 9 tasks).
+- Phase 9 (distribution **contract** in backlog; no runtime code): **completed** (`docs/dev/backlog/skills-distribution-packaging.md`; SI-008 / BL-007).
 
 ### Artifacts Created
 
@@ -732,6 +732,7 @@ Docs/status checks:
 - `src/lily/runtime/skill_cli_diagnostics.py`, `src/lily/cli_skills.py`, `src/lily/cli_skills_presenters.py`, `src/lily/cli_options.py` (shared `ConfigOption` / `OverrideOption`); `tests/e2e/test_cli_skills_commands.py`
 - `src/lily/runtime/skill_events.py`; `tests/unit/runtime/test_skill_events.py` (schema/redaction); integration telemetry assertion in `tests/integration/test_skills_runtime_flow.py`
 - `docs/dev/references/skills-si007-mvp.md` (verification + alignment matrix); `docs/dev/pr-si007-skills-mvp.md` (PR body draft for SI-007 merge)
+- `docs/dev/backlog/skills-distribution-packaging.md` (post-MVP `.lily-skill` bundle contract, manifest schema v1, error taxonomy, CLI/API/rollout sketches)
 
 ### Implementation evidence (guide §20 / PRD security)
 
@@ -836,7 +837,15 @@ Docs/status checks:
 - None for Phase 5.
 - None for Phase 6 (docs snippets deferred to Phase 8 as planned).
 - None for Phase 7.
-- None for Phase 8. SI-007 closure scope is **retrieval MVP** (Phases 1–8); distribution/zip (Phase 9) and trigger heuristics remain explicitly deferred.
+- None for Phase 8. SI-007 closure scope is **retrieval MVP** (Phases 1–8); distribution **runtime implementation** is deferred to `docs/dev/backlog/skills-distribution-packaging.md` / **SI-008**; trigger heuristics (**BL-006**) remain deferred.
+- None for Phase 9 contract closure; executable phases in that backlog spec are not started.
+
+### Phase 9 — intent check and gates
+
+- **Phase intent check**: Phase 9 — portable `.lily-skill` ZIP contract, `manifest.json` schema v1, SHA-256 file map, `lily_compat` range, deterministic import error codes, future CLI (`bundle verify|export|import`), API sketch, org channel/pin/rollback semantics; **no** shipping code in this phase.
+- **Acceptance evidence**:
+  - `docs/dev/backlog/skills-distribution-packaging.md` created and linked from `docs/dev/roadmap.md` (SI-008), `docs/dev/backlog.md` (BL-007), `docs/dev/status.md`.
+  - `just docs-check` -> pass.
 
 ### Commands Run and Outcomes (Phase 8 close)
 

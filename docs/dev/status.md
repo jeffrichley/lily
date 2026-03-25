@@ -10,10 +10,11 @@ source_of_truth: true
 ## Current Focus
 
 - Open or refresh the skills retrieval MVP PR using `docs/dev/pr-si007-skills-mvp.md` (branch `feat/005-skills-system-implementation`).
-- Execute backlog **BL-007** (Phase 9 skills distribution) per `.ai/PLANS/005-skills-system-implementation.md` (post-MVP; not blocking merge of retrieval MVP).
+- When prioritized, implement **SI-008** / backlog **BL-007** against `docs/dev/backlog/skills-distribution-packaging.md` (bundle tooling; not part of retrieval MVP).
 
 ## Recently Completed
 
+- Closed plan **005** Phase 9 (post-MVP distribution **contract**): `docs/dev/backlog/skills-distribution-packaging.md` (`.lily-skill` layout, manifest schema v1, error taxonomy, CLI/API/rollout sketches); roadmap **SI-008**, backlog **BL-007** updated; no runtime code in this slice (`.ai/PLANS/005-skills-system-implementation.md`).
 - Closed SI-007 Phase 8 (hardening): full gates, `docs/dev/references/skills-si007-mvp.md` alignment + verification, PR draft `docs/dev/pr-si007-skills-mvp.md`, roadmap SI-007 → Completed (retrieval MVP), backlog **BL-006**/ **BL-007** for deferred heuristics and Phase 9 distribution; extra tests `test_cli_run_smoke_with_skills_fixture_config`, `test_skill_loader_utf8_non_ascii_body_round_trips` (`.ai/PLANS/005-skills-system-implementation.md`).
 - Delivered SI-007 Phase 7 skill telemetry: `skill_events` (`SKILL_EVENT_SCHEMA_VERSION`, JSON on `lily.skill.telemetry`), hooks in `build_skill_bundle`, `AgentRuntime._build_agent`, `SkillLoader`, `skill_retrieve`; `sanitize_telemetry_detail`; unit `tests/unit/runtime/test_skill_events.py`; integration `test_skill_telemetry_emits_retrieval_flow_events` (`.ai/PLANS/005-skills-system-implementation.md`).
 - Delivered SI-007 Phase 6 CLI skills surfaces: `lily skills list|inspect|doctor` (Rich tables/panels), `SkillCliDiagnostics`, filtering/sorting (`--contains`, `--sort`), `cli_options` shared with root CLI; e2e `tests/e2e/test_cli_skills_commands.py`; user doc snippets for skills CLI deferred to Phase 8 (`.ai/PLANS/005-skills-system-implementation.md`).
@@ -54,3 +55,4 @@ source_of_truth: true
 - 2026-03-25: Completed SI-007 Phase 6 (`cli_skills`, `cli_skills_presenters`, `skill_cli_diagnostics`, e2e CLI tests); `just quality && just test` green (124 tests); skills CLI usage docs follow-up in Phase 8.
 - 2026-03-25: Completed SI-007 Phase 7 (`skill_events`, telemetry hooks, redaction tests); `just quality && just test` green (132 tests).
 - 2026-03-25: Completed SI-007 Phase 8 (docs/status/roadmap/backlog sync, skills SI-007 reference + PR draft, e2e/loader tests); `just quality && just test` green; SI-007 retrieval MVP scope complete per plan 005 Phases 1–8.
+- 2026-03-25: Completed plan 005 Phase 9 (distribution contract + plan `007`; SI-008 / BL-007); `just docs-check` green.

@@ -52,5 +52,6 @@ uv run lily skills doctor --config tests/fixtures/config/skills_retrieval/agent.
 ## Related paths
 
 - Plan: `.ai/PLANS/005-skills-system-implementation.md`
+- Post-MVP **distribution** (bundle format, import/export — not retrieval MVP): `docs/dev/backlog/skills-distribution-packaging.md` (roadmap **SI-008**, backlog **BL-007**)
 - PRD: `.ai/SPECS/002-skills-system/PRD.md`
 - Architecture: `.ai/SPECS/002-skills-system/SKILLS_ARCHITECTURE.md`

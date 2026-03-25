@@ -9,6 +9,8 @@ source_of_truth: true
 
 Track upcoming work items that are not yet in an active implementation plan.
 
+**Deep specs (backlog-owned):** `docs/dev/backlog/skills-distribution-packaging.md` (**BL-007** / **SI-008**).
+
 ## User-visible Features
 
 | ID | Item | Priority | Status | Notes |
@@ -24,5 +26,5 @@ Track upcoming work items that are not yet in an active implementation plan.
 | BL-003 | Defer `$skill:<id>` explicit invocation + deterministic selection/ranking until after MVP retrieval-only. | 4 | Open | MVP uses tool-based retrieval by skill name; explicit invocation and ranking remain backlog. |
 | BL-004 | Defer playbook/procedural/agent “execution adapters” for skills until after retrieval-only SKILL.md injection. | 4 | Open | Skills in MVP are context/retrieval artifacts only; no autonomous execution modes. |
 | BL-006 | Add trigger-test / under-over-trigger heuristics and richer `lily skills doctor` authoring guidance (architecture §20). | 3 | Open | Explicitly deferred from SI-007 retrieval MVP; not required for MVP closure. |
-| BL-007 | Implement SI-007 Phase 9 skills distribution (zip/import-export, org rollout) per `.ai/PLANS/005-skills-system-implementation.md`. | 3 | Open | Post-MVP; tracked in-plan Phase 9. |
+| BL-007 | Implement **SI-008** skills distribution (bundle verify/import/export, optional API) per `docs/dev/backlog/skills-distribution-packaging.md`. | 3 | Open | Spec lives under backlog, not `.ai/PLANS/`; code TBD. |
 
