@@ -65,6 +65,37 @@ def test_skill_loader_returns_full_skill_md_text(tmp_path: Path) -> None:
     assert "# Body" in text
 
 
+def test_skill_loader_utf8_non_ascii_body_round_trips(tmp_path: Path) -> None:
+    """Full SKILL.md bodies with non-ASCII characters load correctly."""
+    # Arrange - skill package with Unicode in markdown body
+    root = tmp_path / "skills"
+    pkg = root / "pkg"
+    _write_skill(
+        pkg,
+        name="demo",
+        desc="Unicode",
+        body="# Body\n你好\némoji\n",
+    )
+    cfg = SkillsConfig(
+        enabled=True,
+        roots={"repository": [str(root.relative_to(tmp_path))]},
+        scopes_precedence=["repository", "user", "system"],
+    )
+    candidates, _ = discover_skill_candidates(cfg, base_path=tmp_path)
+    registry = build_skill_registry(candidates, cfg)
+    blocked = build_retrieval_blocked_keys(candidates, cfg)
+    loader = SkillLoader(
+        registry,
+        skills_config=cfg,
+        retrieval_blocked_keys=blocked,
+    )
+    # Act - retrieve full SKILL.md
+    text = loader.retrieve("demo")
+    # Assert - UTF-8 round-trip preserved
+    assert "你好" in text
+    assert "émoji" in text
+
+
 def test_skill_loader_cache_returns_same_second_hit(tmp_path: Path) -> None:
     """Second load of the same skill reuses the cached file text."""
     # Arrange - loader and first retrieval

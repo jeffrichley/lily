@@ -14,6 +14,9 @@ from lily.runtime.agent_runtime import AgentRunResult
 
 pytestmark = pytest.mark.e2e
 
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_SKILLS_FIXTURE_AGENT = _REPO_ROOT / "tests/fixtures/config/skills_retrieval/agent.toml"
+
 
 class _FakeSupervisor:
     """Test double supervisor used to avoid external model calls in e2e tests."""
@@ -76,6 +79,34 @@ def test_cli_run_command_smoke_with_config(
     assert "Conversation ID" in result.stdout
     assert "Active conversation id:" in result.stdout
     assert len(_FakeSupervisor.captured_conversation_ids) == 1
+
+
+def test_cli_run_smoke_with_skills_fixture_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CLI run accepts the checked-in skills fixture config (fake supervisor)."""
+    # Arrange - fake supervisor and cwd at fixture dir so ./skills roots resolve
+    monkeypatch.setattr("lily.cli.LilySupervisor", _FakeSupervisor)
+    _FakeSupervisor.captured_conversation_ids = []
+    runner = CliRunner()
+    fixture_dir = _SKILLS_FIXTURE_AGENT.parent
+    # Act - invoke run with skills-enabled agent.toml
+    with monkeypatch.context() as context:
+        context.chdir(fixture_dir)
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                "--config",
+                str(_SKILLS_FIXTURE_AGENT),
+                "--prompt",
+                "skills fixture e2e prompt",
+            ],
+        )
+    # Assert - same visible contract as baseline smoke
+    assert result.exit_code == 0
+    assert "fake: skills fixture e2e prompt" in result.stdout
+    assert "Conversation ID" in result.stdout
     generated_id = _FakeSupervisor.captured_conversation_ids[0]
     assert generated_id is not None
     UUID(generated_id)
