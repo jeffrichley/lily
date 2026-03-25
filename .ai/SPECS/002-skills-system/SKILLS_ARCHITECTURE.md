@@ -95,9 +95,9 @@ SkillType = Literal["playbook", "procedural", "agent"]
 
 ```text
 Prompt Ingress
-  -> Skill Selection Layer
-  -> Skill Loading Layer
-  -> Skill Execution Layer
+  -> Skill Catalog Injection Layer
+  -> Skill Retrieval Tool Layer
+  -> Context Injection Layer
   -> Existing Tool + Runtime Layer
   -> External Systems (Python tools, MCP tools, files, APIs)
 ```
@@ -110,9 +110,8 @@ src/lily/runtime/
   skill_catalog.py      # parse/validate package metadata
   skill_discovery.py    # filesystem discovery by roots/scopes
   skill_registry.py     # indexed summaries + collision resolution
-  skill_selector.py     # routing and ranking
-  skill_loader.py       # progressive disclosure hydration
-  skill_executor.py     # playbook/procedural/agent execution adapters
+  skill_prompt_injector.py  # inject enabled skill catalog into system prompt
+  skill_loader.py       # retrieval-only hydration of SKILL.md + linked references
   skill_policies.py     # allow/deny + safety gates
   skill_events.py       # event schema + emit helpers
 ```
@@ -134,12 +133,11 @@ src/lily/commands/handlers/
 
 ```text
 .lily/skills/
-  playbooks/<skill_id>/
+  <skill_id>/
     SKILL.md
-    examples.md            # optional
-    references/            # optional
-  procedures/<skill_id>.py
-  agents/<skill_id>.py
+    references/            # optional linked guidance for the agent
+    scripts/               # optional helper code (post-MVP in this repo)
+    assets/                # optional templates/assets
 ```
 
 Critical packaging rules (guide-aligned):
@@ -184,7 +182,7 @@ Validation rules:
 - `description` must include both WHAT the skill does and WHEN to use it (trigger guidance).
 - `description` max length: 1024 chars.
 - unknown required-contract violations fail fast with field-specific errors.
-- safe YAML parsing only (no executable YAML tags).
+- frontmatter parsed via `python-frontmatter` (safe YAML loading only; no executable YAML tags).
 
 ---
 
@@ -217,47 +215,22 @@ Proposed scope order (configurable):
 ## 8. Selection and Routing
 
 ### Routing order
+- MVP uses model-driven selection by skill `name` from the system-prompt catalog.
+- `$skill:<id>` explicit invocation and deterministic implicit scoring are deferred/backlog.
 
-1. explicit invocation (`$skill:<id>`) when present
-2. exact normalized-key or alias match
-3. implicit scoring match (description + tags + trigger cues)
-4. no-skill fallback to normal runtime path
+### Eligibility filters (pre-tool invocation)
 
-### Eligibility filters (pre-ranking)
-
-- enabled flag
-- agent allowlist
-- policy denylist
-- environment/runtime constraints
-
-### Deterministic scoring baseline
-
-MVP baseline:
-- weighted lexical overlap across prompt and skill fields
-- trigger phrase boost
-- recent-success tie-break optional
-
-No vector dependency required for MVP.
-
-### Selection output model
-
-```python
-class SkillSelection(BaseModel):
-    selected_ids: list[str]
-    rationale: str
-    candidate_scores: list[tuple[str, float]]
-    mode: Literal["explicit", "implicit", "none"]
-```
+- enabled flag in the deterministic skill catalog
+- retrieval-tool allow/deny constraints (not execution-mode constraints)
 
 ---
 
 ## 9. Progressive Disclosure Loader
 
 ### Load phases
-
-- Phase A (index time): load summary metadata only.
-- Phase B (selection time): hydrate full `SKILL.md` and optional assets.
-- Phase C (execution time): materialize adapters/wrappers.
+- Phase A (catalog build / index time): load frontmatter-derived metadata only (for system-prompt catalog injection).
+- Phase B (tool request time): hydrate full `SKILL.md` and optional linked `references/...` content.
+- Phase C (context injection time): inject retrieved content into the agent context. (MVP does not materialize playbook/procedural/agent adapters.)
 
 ### Caching
 
@@ -266,47 +239,26 @@ class SkillSelection(BaseModel):
 - cache events emitted for hit/miss.
 
 ### Failure handling
-
-- missing body after summary selection -> deterministic `SkillLoadError`.
+- missing body for a requested skill name -> deterministic `SkillLoadError`.
 - parse failure -> deterministic `SkillValidationError`.
 - blocked by policy -> deterministic `SkillPolicyError`.
 
 ---
 
-## 10. Execution Model by Skill Type
+## 10. Retrieval and Context Injection Model
 
-### 10.1 Playbook skills
-
+### MVP behavior (retrieval-only)
 Execution path:
-1. load skill text
-2. convert to bounded context block
-3. inject into next reasoning turn
-4. continue normal tool-calling loop
+1. agent requests `SKILL.md` by skill `name` via the skills retrieval tool
+2. tool hydrates full `SKILL.md` (and optionally linked `references/...`) from the skill directory
+3. retrieved content is injected into the agent context for the next reasoning/tool-calling step
+4. continue normal runtime tool-calling loop
 
 Invariant:
-- playbook skill does not execute side effects directly.
+- MVP skills have no autonomous execution modes; they provide content/context only.
 
-### 10.2 Procedural skills
-
-Execution path:
-1. resolve wrapper callable
-2. validate input schema
-3. execute deterministic pipeline
-4. return structured output
-
-Invariant:
-- procedural skill side effects must remain policy-gated and auditable.
-
-### 10.3 Agent skills
-
-Execution path:
-1. resolve delegated agent wrapper
-2. create restricted runtime context (tool/policy subset)
-3. execute with bounded iteration/call limits
-4. return summarized artifacts/outcome
-
-Invariant:
-- delegated context isolation must be explicit.
+### Deferred (backlog)
+- Playbook/procedural/agent execution adapters and delegated subagent runtime behavior are deferred until after retrieval-only MVP is validated.
 
 ---
 
@@ -316,12 +268,12 @@ Invariant:
 
 1. Global runtime policies (existing)
 2. Skill-level enablement and allow/deny
-3. Execution-mode policy checks (playbook/procedural/agent)
+3. Retrieval-tool policy checks (content return + linked-file constraints)
 4. Optional approval gates for sensitive skills
 
 ### Safety controls
 
-- explicit denylist precedence over explicit invocation.
+- denylist precedence over retrieval requests.
 - restricted tool allowlist per skill (optional but recommended).
 - schema validation before execution.
 - refusal path for blocked skills with actionable diagnostics.
@@ -346,12 +298,12 @@ Resolution algorithm:
 3. Compute effective tools:
    - `effective_tools = runtime_available_tools ∩ skill_candidate_tools`
 4. If `effective_tools` is empty:
-   - playbook-only execution remains allowed;
-   - any procedural/agent/tool-call path fails fast with deterministic `SkillPolicyError`.
+  - tool-calling paths that depend on disallowed tools fail fast with deterministic `SkillPolicyError`;
+  - content retrieval/injection may still be allowed (MVP retrieval-only).
 
 Invariants:
 - skill metadata can only restrict tool access; it cannot expand tool access beyond runtime policy.
-- explicit invocation does not bypass tool policy resolution.
+- retrieval requests do not bypass tool policy resolution.
 - unknown pack IDs or unknown tools in packs fail fast at config-validation time.
 
 Reference config shapes:
@@ -389,10 +341,10 @@ safe-readonly = ["read_file", "rg", "web_fetch"]
 ### Provenance and audit
 
 Each execution trace includes:
-- selected skill IDs and versions
+- requested skill names and versions
 - source path and scope
 - policy decisions applied
-- execution mode and result
+- retrieval mode and result
 
 ---
 
@@ -403,12 +355,10 @@ Each execution trace includes:
 ```text
 skill_discovered
 skill_shadowed
-skill_selected
+skill_requested
 skill_load_started
 skill_loaded
-skill_execution_started
-skill_execution_completed
-skill_execution_failed
+skill_failed
 ```
 
 ### Minimum event payload
@@ -439,21 +389,20 @@ class SkillEvent(BaseModel):
 
 - metadata parsing and validation matrix
 - collision and precedence behavior
-- ranking and tie-break determinism
+- retrieval-by-name correctness (including missing/disabled skill and linked-file errors)
 - policy filter correctness
 - progressive loader cache behavior
 
 ### Integration tests
-
-- explicit and implicit selection through runtime
-- playbook/procedural/agent mode execution
-- policy blocks and error messaging
-- tool allowlist preservation with skill wrappers
+- tool-based retrieval by skill `name` hydrates full `SKILL.md` and linked `references/...`
+- context injection correctness (retrieved content is available to the agent for subsequent reasoning)
+- policy blocks and error messaging for retrieval + linked-file constraints
+- tool allowlist preservation with retrieval tool
 
 ### E2E tests
 
-- CLI `lily run` with explicit skill invocation
-- CLI/TUI implicit skill routing smoke path
+- CLI `lily run` where the agent requests a known skill by `name` (retrieval-only MVP smoke path)
+- CLI/TUI retrieval smoke path for system-prompt catalog injection -> tool request -> content hydration
 - operator commands (`skills list`, `skills inspect`) output sanity
 
 ### Gate expectations
@@ -470,23 +419,20 @@ class SkillEvent(BaseModel):
 
 ### Author workflow
 
-1. choose skill type (`playbook`, `procedural`, `agent`).
-2. create package/file under `.lily/skills/...`.
-3. author `SKILL.md` with clear triggers, goal, guardrails.
-4. add metadata/frontmatter and examples.
-5. run `lily skills doctor` (or equivalent) for validation.
-6. run tests for discovery/selection/execution paths.
+1. create a skill directory containing required `SKILL.md` under a configured skill root
+2. author `SKILL.md` with `name` + `description` frontmatter and clear usage guidance
+3. optionally include linked guidance/docs under `references/...` for on-demand retrieval
+4. run `lily skills doctor` (or equivalent) for validation
 
 ### Engineering workflow
 
-1. implement parser and schema models.
+1. implement parser and schema models (use `python-frontmatter` for YAML frontmatter extraction).
 2. implement discovery + precedence resolver.
-3. implement selector and routing contracts.
-4. implement loader with progressive disclosure.
-5. implement mode-specific executors.
-6. wire policy checks and event emission.
-7. add CLI inspect/list tooling.
-8. add unit/integration/e2e tests.
+3. implement system-prompt skill catalog injection (frontmatter-only).
+4. implement retrieval tool (by skill `name`) with linked-file hydration.
+5. wire policy checks and event emission for retrieval/loading.
+6. add CLI inspect/list tooling.
+7. add unit/integration/e2e tests.
 
 ### Release workflow
 
@@ -503,34 +449,33 @@ This section maps Gang of Four patterns to concrete Lily skills components.
 ### 15.1 Strategy
 
 Use case:
-- multiple selection/ranking algorithms without rewriting selector flow.
+- multiple system-prompt skill catalog formatting/injection strategies without rewriting the prompt injection flow.
 
 Mapping:
-- `SkillScoringStrategy` interface
-- `LexicalScoringStrategy` (MVP)
-- `EmbeddingScoringStrategy` (future)
+- `SkillCatalogInjectionStrategy` interface
+- `DeterministicCatalogInjectionStrategy` (MVP)
+- `SemanticRe-rankingStrategy` (post-MVP)
 
 Benefit:
-- easy swap/extension of ranking behavior.
+- easy swap/extension of catalog injection/formatting behavior.
 
 ### 15.2 Abstract Factory
 
 Use case:
-- create mode-specific executors with consistent interfaces.
+- create retrieval/injection adapters with consistent interfaces.
 
 Mapping:
-- `SkillExecutorFactory`
-  - `PlaybookExecutor`
-  - `ProceduralExecutor`
-  - `AgentExecutor`
+- `SkillInjectionAdapterFactory`
+  - `SkillMarkdownInjectionAdapter`
+  - `SkillReferenceFileInjectionAdapter`
 
 Benefit:
-- type-safe construction and centralized policy wiring.
+- type-safe construction and centralized policy wiring for retrieval/injection.
 
 ### 15.3 Builder
 
 Use case:
-- build complex loaded-skill objects in stages (summary -> hydrated -> executable).
+- build complex retrieved-skill content in stages (summary -> hydrated -> injected).
 
 Mapping:
 - `LoadedSkillBuilder` with steps:
@@ -584,7 +529,7 @@ Benefit:
 ### 15.7 Chain of Responsibility
 
 Use case:
-- staged filters for eligibility and safety before scoring.
+- staged filters for retrieval eligibility and safety before hydration/injection.
 
 Mapping:
 - `EnabledFilter -> AgentAllowlistFilter -> DenylistFilter -> CapabilityFilter`
@@ -595,15 +540,15 @@ Benefit:
 ### 15.8 Template Method
 
 Use case:
-- standard selection flow with overridable scoring details.
+- standard retrieval request flow with controlled validation and deterministic hydration/injection.
 
 Mapping:
-- base selector workflow:
-  - normalize prompt
-  - filter candidates
-  - score
-  - tie-break
-  - emit rationale
+- base retrieval request workflow:
+  - normalize prompt / identify requested skill name
+  - validate requested skill against catalog + policy
+  - hydrate `SKILL.md` (and linked `references/...` if requested)
+  - inject retrieved content into context
+  - emit retrieval diagnostics
 
 Benefit:
 - strict deterministic flow with controlled extension points.

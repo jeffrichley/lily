@@ -1,6 +1,6 @@
 ---
 owner: "@team"
-last_updated: "2026-03-06"
+last_updated: "2026-03-25"
 status: "active"
 source_of_truth: true
 ---
@@ -9,11 +9,11 @@ source_of_truth: true
 
 ## Current Focus
 
-- Define SI-007 skills-system execution scope and acceptance gates before implementation (`docs/dev/roadmap.md`).
-- Implement SI-007 first-class skills runtime on top of the tool registry foundation (`docs/dev/roadmap.md`).
+- Implement SI-007 Phase 1 skill contract and schema foundation (parser + `skill_types` / `skill_catalog`) (`SI-007`, `.ai/PLANS/005-skills-system-implementation.md`, `.ai/SPECS/002-skills-system/`).
 
 ## Recently Completed
 
+- Locked SI-007 execution framing: MVP traceability matrix, phase tracker, dependency graph, risk register (R-001–R-005), rollback-by-phase table, and non-goals in `.ai/PLANS/005-skills-system-implementation.md` (Phase 0).
 - Delivered LangChain kernel runtime with YAML config validation and dynamic model routing (SI-001) (`.ai/PLANS/001-langchain-agent-kernel-yaml.md`).
 - Delivered CLI + basic Textual TUI surfaces wired to one supervisor/runtime path (SI-001) (`src/lily/cli.py`, `src/lily/ui/`).
 - Delivered conversation session attach/resume across CLI and TUI with persisted IDs and thread continuity (SI-006) (`.ai/PLANS/002-conversation-session-attach-resume.md`).
@@ -35,3 +35,5 @@ source_of_truth: true
 - 2026-03-05: Completed SI-002 Phase 5 by wiring runtime MCP providers (`mcp_servers`) and verifying MCP tool execution via CLI plus automated TUI parity tests; opened SI-002 Phase 6 for TOML config parity follow-up.
 - 2026-03-06: Completed SI-002 Phase 6 with TOML runtime/catalog parity, inferred `agent.toml -> tools.toml` default behavior, and passing full quality/test + coverage gates.
 - 2026-03-06: Split roadmap tracking: SI-002 remains completed for tool-registry delivery, and SI-007 is now in progress for first-class skills-system delivery (`docs/dev/roadmap.md`).
+- 2026-03-25: Completed SI-007 Phase 0 (execution framing and acceptance lock) on branch `feat/005-skills-system-implementation`; Phase 1 implementation is next.
+- 2026-03-25: Phase 0 close validation: `just quality && just test` green; bumped `requests` to 2.33.0 in `uv.lock`; `pip-audit` gate documents **DEBT-017** for CVE-2026-4539 (no `pygments` fix on PyPI yet).

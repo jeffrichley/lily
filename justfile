@@ -53,8 +53,10 @@ docstr-coverage:
     uv run docstr-coverage src --skip-private --skip-magic --skip-init -v 2
 
 # Security: dependency vulnerabilities (pip-audit)
+# CVE-2026-4539 (pygments): no release >2.19.2 on PyPI yet; low-severity local ReDoS.
+# Tracked: docs/dev/debt/debt_tracker.md (DEBT-017). Remove --ignore-vuln when upstream ships a fix.
 audit:
-    uv run pip-audit
+    uv run pip-audit --ignore-vuln CVE-2026-4539
 
 # Security: static analysis (bandit); config in pyproject.toml
 bandit:
