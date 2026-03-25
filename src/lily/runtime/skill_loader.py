@@ -1,0 +1,208 @@
+"""Progressive disclosure: load full ``SKILL.md`` and bounded ``references/`` files."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+from lily.runtime.config_schema import SkillsConfig
+from lily.runtime.skill_discovery import discover_skill_candidates
+from lily.runtime.skill_prompt_injector import format_skill_catalog_block
+from lily.runtime.skill_registry import (
+    SkillRegistry,
+    SkillRegistryEntry,
+    build_skill_registry,
+)
+from lily.runtime.skill_types import normalize_skill_name
+
+
+class SkillLoadError(ValueError):
+    """Base error for skill retrieval failures."""
+
+
+class SkillNotFoundError(SkillLoadError):
+    """Raised when no registry entry matches the requested skill name."""
+
+
+class SkillReferenceError(SkillLoadError):
+    """Raised when a reference path is invalid, escapes bounds, or is missing."""
+
+
+@dataclass(frozen=True, slots=True)
+class SkillBundle:
+    """Discovery output plus loader and catalog text for runtime wiring."""
+
+    registry: SkillRegistry
+    loader: SkillLoader
+    catalog_markdown: str
+
+
+class SkillLoader:
+    """Load full skill files on demand with bounded path checks and memoization."""
+
+    def __init__(self, registry: SkillRegistry) -> None:
+        """Store registry used to resolve skill names to on-disk paths.
+
+        Args:
+            registry: Merged registry from ``build_skill_registry``.
+        """
+        self._registry = registry
+        self._full_file_cache: dict[str, str] = {}
+        self._reference_cache: dict[tuple[str, str], str] = {}
+
+    def retrieve(self, name: str, reference_subpath: str | None = None) -> str:
+        """Load full ``SKILL.md`` text, or a UTF-8 file under ``references/``.
+
+        Args:
+            name: Skill name or canonical key (matched case-insensitively on name).
+            reference_subpath: Optional path relative to ``references/`` (no ``..``).
+
+        Returns:
+            Raw file contents.
+
+        Note:
+            Propagates ``SkillNotFoundError``, ``SkillReferenceError``, and
+            ``SkillLoadError`` from resolution and file reads.
+        """
+        entry = self._resolve_entry(name)
+        key = entry.summary.canonical_key
+        if reference_subpath is None or not reference_subpath.strip():
+            return self._load_skill_md_file(key, entry)
+        return self._load_reference_file(key, entry, reference_subpath.strip())
+
+    def _resolve_entry(self, name: str) -> SkillRegistryEntry:
+        """Find registry entry by normalized key or display name.
+
+        Args:
+            name: User-supplied skill label.
+
+        Returns:
+            Matching registry entry.
+
+        Raises:
+            SkillNotFoundError: If no entry matches.
+        """
+        key = normalize_skill_name(name)
+        got = self._registry.get(key)
+        if got is not None:
+            return got
+        lowered = name.strip().lower()
+        for ck in self._registry.canonical_keys():
+            entry = self._registry.get(ck)
+            if entry is not None and entry.summary.name.strip().lower() == lowered:
+                return entry
+        msg = f"no skill matches name {name!r}"
+        raise SkillNotFoundError(msg)
+
+    def _load_skill_md_file(self, canonical_key: str, entry: SkillRegistryEntry) -> str:
+        """Read and cache full ``SKILL.md`` text for one canonical key.
+
+        Args:
+            canonical_key: Stable registry key.
+            entry: Registry row for the skill.
+
+        Returns:
+            Full file text (frontmatter + body).
+
+        Raises:
+            SkillLoadError: On read errors.
+        """
+        if canonical_key in self._full_file_cache:
+            return self._full_file_cache[canonical_key]
+        path = entry.skill_md_path
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            msg = f"unable to read SKILL.md at {path}: {exc}"
+            raise SkillLoadError(msg) from exc
+        self._full_file_cache[canonical_key] = text
+        return text
+
+    def _load_reference_file(
+        self,
+        canonical_key: str,
+        entry: SkillRegistryEntry,
+        reference_subpath: str,
+    ) -> str:
+        """Read a UTF-8 file under ``skill_dir/references/`` with path bounding.
+
+        Args:
+            canonical_key: Stable registry key (cache key).
+            entry: Registry row for the skill.
+            reference_subpath: Relative path inside ``references/``.
+
+        Returns:
+            File contents.
+
+        Raises:
+            SkillLoadError: On read errors after path resolution.
+        """
+        cache_key = (canonical_key, reference_subpath)
+        if cache_key in self._reference_cache:
+            return self._reference_cache[cache_key]
+
+        target = _safe_reference_path(entry.skill_dir, reference_subpath)
+        try:
+            text = target.read_text(encoding="utf-8")
+        except OSError as exc:
+            msg = f"unable to read reference file {target}: {exc}"
+            raise SkillLoadError(msg) from exc
+        self._reference_cache[cache_key] = text
+        return text
+
+
+def _safe_reference_path(skill_dir: Path, reference_subpath: str) -> Path:
+    """Resolve ``references/<reference_subpath>`` and ensure it stays bounded.
+
+    Args:
+        skill_dir: Skill package root (contains ``SKILL.md``).
+        reference_subpath: Relative path with no ``..`` segments.
+
+    Returns:
+        Absolute path to an existing file under ``references/``.
+
+    Raises:
+        SkillReferenceError: If the path is malformed or escapes ``references/``.
+    """
+    tail = Path(reference_subpath)
+    if tail.is_absolute():
+        msg = "reference_subpath must be a relative path"
+        raise SkillReferenceError(msg)
+    if ".." in tail.parts:
+        msg = "reference_subpath must not contain '..' components"
+        raise SkillReferenceError(msg)
+    ref_root = (skill_dir / "references").resolve()
+    candidate = (ref_root / tail).resolve()
+    if not candidate.is_relative_to(ref_root):
+        msg = f"resolved path escapes references directory: {reference_subpath!r}"
+        raise SkillReferenceError(msg)
+    if not candidate.is_file():
+        msg = f"reference file not found: {reference_subpath!r}"
+        raise SkillReferenceError(msg)
+    return candidate
+
+
+def build_skill_bundle(
+    skills_config: SkillsConfig,
+    base_path: Path,
+) -> SkillBundle | None:
+    """Discover and merge skills, then build a loader and catalog markdown.
+
+    Args:
+        skills_config: Validated ``skills`` section from runtime config.
+        base_path: Directory used to resolve relative skill roots (config dir).
+
+    Returns:
+        Bundle when skills are enabled, otherwise ``None``.
+    """
+    if not skills_config.enabled:
+        return None
+    candidates, _events = discover_skill_candidates(skills_config, base_path=base_path)
+    registry = build_skill_registry(candidates, skills_config)
+    catalog = format_skill_catalog_block(registry)
+    loader = SkillLoader(registry)
+    return SkillBundle(
+        registry=registry,
+        loader=loader,
+        catalog_markdown=catalog,
+    )

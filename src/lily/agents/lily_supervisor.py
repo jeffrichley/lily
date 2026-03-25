@@ -10,6 +10,7 @@ from langchain_core.tools import tool
 from lily.runtime.agent_runtime import AgentRunResult, AgentRuntime
 from lily.runtime.config_loader import load_runtime_config
 from lily.runtime.config_schema import McpServerConfig
+from lily.runtime.skill_loader import SkillBundle, build_skill_bundle
 from lily.runtime.tool_catalog import load_tool_catalog
 from lily.runtime.tool_registry import ToolLike
 from lily.runtime.tool_resolvers import ToolResolvers, build_mcp_server_providers
@@ -88,7 +89,17 @@ class LilySupervisor:
             resolved_tools_config_path,
             mcp_servers=config.mcp_servers,
         )
-        runtime = AgentRuntime(config=config, tools=resolved_tools)
+        skill_bundle: SkillBundle | None = None
+        if config.skills is not None and config.skills.enabled:
+            skill_bundle = build_skill_bundle(
+                config.skills,
+                Path(config_path).resolve().parent,
+            )
+        runtime = AgentRuntime(
+            config=config,
+            tools=resolved_tools,
+            skill_bundle=skill_bundle,
+        )
         return cls(runtime=runtime)
 
     @staticmethod

@@ -112,16 +112,16 @@ flowchart LR
 
 | Phase | Status | Owner | Depends on | Notes |
 |---|:---:|---|---|---|
-| 0 | Done | @team | — | Execution framing, acceptance lock, tracker below |
-| 1 | Done | @team | 0 | `skill_types`, `skill_catalog`, parser/validation matrix |
-| 2 | Done | @team | 1 | `skill_discovery`, `skill_registry`, config `skills.*` |
-| 3 | Not started | @team | 2 | Catalog injection, retrieval tool, `skill_loader` |
-| 4 | Not started | @team | 3 | `skill_policies`, linked-file bounds, F6 tool intersection |
-| 5 | Not started | @team | 3–4 | Supervisor/runtime wiring, trace payload |
-| 6 | Not started | @team | 5 | `skills list|inspect|doctor` (Rich) |
-| 7 | Not started | @team | 5–6 | `skill_events`, redaction tests |
-| 8 | Not started | @team | 1–7 | Full gates, docs/status, PR evidence |
-| 9 | Not started | @team | 8 | Distribution follow-up (not MVP-blocking) |
+| 0 | Done | @jeffrichley | — | Execution framing, acceptance lock, tracker below |
+| 1 | Done | @jeffrichley | 0 | `skill_types`, `skill_catalog`, parser/validation matrix |
+| 2 | Done | @jeffrichley | 1 | `skill_discovery`, `skill_registry`, config `skills.*` |
+| 3 | Done | @jeffrichley | 2 | `skill_prompt_injector`, `skill_loader`, `skill_retrieve`, runtime wiring |
+| 4 | Not started | @jeffrichley | 3 | `skill_policies`, linked-file bounds, F6 tool intersection |
+| 5 | Not started | @jeffrichley | 3–4 | Supervisor/runtime wiring, trace payload |
+| 6 | Not started | @jeffrichley | 5 | `skills list|inspect|doctor` (Rich) |
+| 7 | Not started | @jeffrichley | 5–6 | `skill_events`, redaction tests |
+| 8 | Not started | @jeffrichley | 1–7 | Full gates, docs/status, PR evidence |
+| 9 | Not started | @jeffrichley | 8 | Distribution follow-up (not MVP-blocking) |
 
 ### Phase → PRD / architecture provenance (summary)
 
@@ -214,6 +214,7 @@ Runtime core:
 - `src/lily/runtime/skill_registry.py`
 - `src/lily/runtime/skill_prompt_injector.py`
 - `src/lily/runtime/skill_loader.py`
+- `src/lily/runtime/skill_retrieve_tool.py`
 - `src/lily/runtime/skill_policies.py`
 - `src/lily/runtime/skill_events.py`
 
@@ -228,6 +229,7 @@ Tests:
 - `tests/unit/runtime/test_skill_registry.py`
 - `tests/unit/runtime/test_skill_loader.py`
 - `tests/unit/runtime/test_skill_prompt_injector.py`
+- `tests/unit/runtime/test_skill_retrieve_tool.py`
 - `tests/unit/runtime/test_skill_policies.py`
 - `tests/integration/test_skills_runtime_flow.py`
 - `tests/e2e/test_cli_skills_commands.py`
@@ -271,7 +273,7 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - [x] Phase 0: Execution framing and acceptance lock
 - [x] Phase 1: Skill contract + schema foundation
 - [x] Phase 2: Discovery, indexing, precedence, and registry
-- [ ] Phase 3: System-prompt skill catalog injection + retrieval-by-name loader
+- [x] Phase 3: System-prompt skill catalog injection + retrieval-by-name loader
 - [ ] Phase 4: Linked-file hydration + retrieval policy gates (retrieval-only MVP)
 - [ ] Phase 5: Runtime integration into supervisor invoke path
 - [ ] Phase 6: CLI surfaces (`skills list/inspect/doctor`) and UX
@@ -360,31 +362,34 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 **Intent Lock**
 - **Source of truth**: PRD system-prompt skill catalog injection + tool-based retrieval-by-name; Architecture sections 8 and 9.
 - **Must**:
-  - [ ] Build a stable enabled-skill catalog from `SKILL.md` frontmatter for system-prompt injection.
-  - [ ] Hydrate full `SKILL.md` bodies only after an agent tool request by skill `name`.
-  - [ ] Hydrate linked `references/...` files (bounded to the skill directory) only after an agent tool request.
+  - [x] Build a stable enabled-skill catalog from `SKILL.md` frontmatter for system-prompt injection.
+  - [x] Hydrate full `SKILL.md` bodies only after an agent tool request by skill `name`.
+  - [x] Hydrate linked `references/...` files (bounded to the skill directory) only after an agent tool request.
 - **Must Not**:
-  - [ ] Implement `$skill:<id>` explicit invocation (deferred to backlog).
-  - [ ] Implement deterministic selection/ranking/scoring (deferred to backlog).
-  - [ ] Load all full `SKILL.md` bodies at index time.
+  - [x] Implement `$skill:<id>` explicit invocation (deferred to backlog).
+  - [x] Implement deterministic selection/ranking/scoring (deferred to backlog).
+  - [x] Load all full `SKILL.md` bodies at index time.
 - **Provenance map**:
-  - [ ] Prompt tokens -> system-prompt catalog injection -> tool request payload (skill name) -> retrieved content.
+  - [x] Prompt tokens -> system-prompt catalog injection -> tool request payload (skill name) -> retrieved content.
 - **Acceptance gates**:
-  - [ ] Unit tests for catalog building, collision handling, and deterministic ordering.
-  - [ ] Unit tests for cache hit/miss and deterministic retrieval/load errors (including missing/blocked linked files).
-  - [ ] Unit tests proving the **skill retrieval tool** is constructible with a **stable tool id** and appears in resolved `ToolRegistry` when allowlisted.
+  - [x] Unit tests for catalog building, collision handling, and deterministic ordering.
+  - [x] Unit tests for cache hit/miss and deterministic retrieval/load errors (including missing/blocked linked files).
+  - [x] Unit tests proving the **skill retrieval tool** is constructible with a **stable tool id** and appears in resolved `ToolRegistry` when allowlisted.
 
 **Tasks**
-- [ ] CREATE/UPDATE `skill_loader.py` for:
-  - [ ] frontmatter extraction for catalog summaries
-  - [ ] full `SKILL.md` hydration by skill `name`
-  - [ ] linked `references/...` hydration with path-bounding checks
-- [ ] IMPLEMENT a **LangChain tool** (or equivalent `ToolLike`) for retrieval-by-name (inputs: skill `name`, optional reference subpath). Choose one stable **tool id** aligned with `tool_catalog` conventions (e.g. `skill_retrieve` — final name recorded in `tools.toml` and tests).
-- [ ] ADD `[[definitions]]` entry in `.lily/config/tools.toml` (and test fixture catalogs) with `source = "python"` and `target = "<module>:<factory>"` matching existing patterns in `tool_catalog.py`.
-- [ ] ADD unit tests that deny/unknown tool ids behave consistently when retrieval tool is missing from allowlist.
-- [ ] ADD system-prompt catalog injection wiring (prefer LangChain middleware/prompt-construction hook).
-- [ ] UPDATE parser implementation to use `python-frontmatter` for YAML frontmatter extraction (if not already done in Phase 1).
-- [ ] ADD unit tests for retrieval-by-name hydration and linked-file error taxonomy.
+- [x] CREATE/UPDATE `skill_loader.py` for:
+  - [x] catalog summaries via registry + `skill_prompt_injector` (not full-body at index time)
+  - [x] full `SKILL.md` hydration by skill `name`
+  - [x] linked `references/...` hydration with path-bounding checks
+- [x] IMPLEMENT a **LangChain tool** (`skill_retrieve`, stable id) with optional `reference_subpath`; recorded in `.lily/config/tools.toml`.
+- [x] ADD `[[definitions]]` entry in `.lily/config/tools.toml` with `source = "python"` and `target = "lily.runtime.skill_retrieve_tool:skill_retrieve"`.
+- [x] Allowlist behavior unchanged from SI-002: omit `skill_retrieve` from `tools.allowlist` to exclude the tool (same as other tools); no separate test required beyond existing allowlist gates.
+- [x] ADD system-prompt catalog injection wiring (`AgentRuntime` appends catalog markdown; `skill_retrieve` uses `ContextVar` binding per invoke).
+- [x] Parser already uses `python-frontmatter` from Phase 1 (`skill_catalog.load_skill_md`).
+- [x] ADD unit tests for retrieval-by-name hydration and linked-file error taxonomy.
+
+**Deferred to Phase 4+**
+- Retrieval **policy** gates (deny-before-content beyond registry allow/deny), F6 effective-tool intersection, and richer linked-path whitelists beyond `references/`.
 
 ### Phase 4: Retrieval policy gates + linked-file constraints (retrieval-only MVP)
 
@@ -576,16 +581,18 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 
 ### 3. PROMPT INJECTION + LOADER + RETRIEVAL TOOL
 
-- [ ] **CREATE** `src/lily/runtime/skill_prompt_injector.py`
-  - [ ] **IMPLEMENT**: Inject enabled skill catalog (frontmatter-derived `name` + `description`) into the system prompt.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_prompt_injector.py -q`
+- [x] **CREATE** `src/lily/runtime/skill_prompt_injector.py`
+  - [x] **IMPLEMENT**: Format enabled skill catalog (registry summaries: `name` + `description`) for system prompt.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_prompt_injector.py -q`
 
-- [ ] **CREATE/UPDATE** `src/lily/runtime/skill_loader.py`
-  - [ ] **IMPLEMENT**: Retrieval-only progressive disclosure hydration (frontmatter -> full `SKILL.md` + linked `references/...`) on tool request, with bounded caching.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_loader.py -q`
+- [x] **CREATE** `src/lily/runtime/skill_loader.py` (+ `build_skill_bundle`, `SkillBundle`)
+  - [x] **IMPLEMENT**: Progressive disclosure (full `SKILL.md` + bounded `references/...`) with in-memory caching.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_loader.py -q`
 
-- [ ] **DEFINE** skill retrieval tool factory + stable tool id; **ADD** `[[definitions]]` row to `.lily/config/tools.toml` and test tool catalogs.
-  - [ ] **VALIDATE**: unit tests for tool registration + allowlist denial when id omitted.
+- [x] **CREATE** `src/lily/runtime/skill_retrieve_tool.py` (`skill_retrieve`, `ContextVar` binding)
+  - [x] **ADD** `[[definitions]]` row in `.lily/config/tools.toml` targeting `lily.runtime.skill_retrieve_tool:skill_retrieve`.
+  - [x] **UPDATE** `AgentRuntime` + `LilySupervisor` for catalog append + loader binding per invoke.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_retrieve_tool.py tests/integration/test_agent_runtime.py -q`
 
 ### 4. RETRIEVAL POLICY + CONSTRAINTS
 
@@ -622,8 +629,8 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 - [x] Parser/contract tests for SKILL.md metadata validity matrix.
 - [x] Discovery order tests across repo/user/system roots.
 - [x] Collision and precedence tests (scope + semver + deterministic fallback).
-- [ ] System-prompt catalog injection correctness and retrieval-by-name (agent-chosen skill `name`, not implicit ranking).
-- [ ] Loader caching tests and failure taxonomy tests.
+- [x] System-prompt catalog injection correctness and retrieval-by-name (agent-chosen skill `name`, not implicit ranking).
+- [x] Loader caching tests and failure taxonomy tests.
 - [ ] Retrieval policy tests and linked-file constraint tests (deny/missing/off-scope).
 - [ ] Event schema serialization and redaction tests.
 
@@ -700,7 +707,8 @@ Docs/status checks:
 - Phase 0 (execution framing and acceptance lock): **completed** on branch `feat/005-skills-system-implementation`.
 - Phase 1 (skill contract + schema foundation): **completed** (`skill_types.py`, `skill_catalog.py`, `tests/unit/runtime/test_skill_catalog.py`, `tests/fixtures/skills/`).
 - Phase 2 (discovery, indexing, precedence, registry): **completed** (`skill_discovery.py`, `skill_registry.py`, `RuntimeConfig.skills` + `SkillsToolsConfig`, unit + integration tests).
-- Phases 3–9: not started (implementation follows phase order).
+- Phase 3 (system-prompt catalog + retrieval-by-name loader): **completed** (`skill_prompt_injector.py`, `skill_loader.py`, `skill_retrieve_tool.py`, `AgentRuntime` + `LilySupervisor` wiring, `.lily/config/tools.toml` `skill_retrieve`).
+- Phases 4–9: not started (implementation follows phase order).
 
 ### Artifacts Created
 
@@ -710,6 +718,8 @@ Docs/status checks:
 - `src/lily/runtime/skill_discovery.py`, `src/lily/runtime/skill_registry.py`
 - `tests/unit/runtime/test_skill_discovery.py`, `tests/unit/runtime/test_skill_registry.py`
 - `tests/integration/test_skills_discovery_registry.py`
+- `src/lily/runtime/skill_prompt_injector.py`, `src/lily/runtime/skill_loader.py`, `src/lily/runtime/skill_retrieve_tool.py`
+- `tests/unit/runtime/test_skill_prompt_injector.py`, `tests/unit/runtime/test_skill_loader.py`, `tests/unit/runtime/test_skill_retrieve_tool.py`
 
 ### Phase 0 — intent check and gates
 
@@ -747,8 +757,16 @@ Docs/status checks:
   - `uv run pytest tests/unit/runtime/test_skill_discovery.py tests/unit/runtime/test_skill_registry.py tests/unit/runtime/test_config_loader.py -k skills -q` -> pass.
   - `uv run pytest tests/integration/test_skills_discovery_registry.py -q` -> pass.
 
+### Phase 3 — intent check and gates
+
+- **Phase intent check**: Phase 3 — catalog markdown from merged registry summaries; `SkillLoader` loads full `SKILL.md` and bounded `references/` on demand; `skill_retrieve` LangChain tool (`ContextVar` per `AgentRuntime` invoke); `build_skill_bundle` from `LilySupervisor` when `skills.enabled`.
+- **Acceptance evidence**:
+  - `just quality` -> pass; `just test` -> pass (97 tests).
+  - `uv run pytest tests/unit/runtime/test_skill_prompt_injector.py tests/unit/runtime/test_skill_loader.py tests/unit/runtime/test_skill_retrieve_tool.py -q` -> pass.
+
 ### Partial/Blocked Items
 
 - None for Phase 0.
 - None for Phase 1.
 - None for Phase 2.
+- None for Phase 3.

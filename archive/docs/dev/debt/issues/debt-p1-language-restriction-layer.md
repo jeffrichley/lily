@@ -1,5 +1,5 @@
 ---
-owner: "@team"
+owner: "@jeffrichley"
 last_updated: "2026-03-02"
 status: "active"
 source_of_truth: false
@@ -34,5 +34,5 @@ source_of_truth: false
 
 ## Metadata
 - Priority: `P1`
-- Owner: `@team`
+- Owner: `@jeffrichley`
 - Target: `2026-03-08`

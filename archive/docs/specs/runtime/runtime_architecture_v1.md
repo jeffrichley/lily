@@ -1,5 +1,5 @@
 ---
-owner: "@team"
+owner: "@jeffrichley"
 last_updated: "2026-02-21"
 status: "active"
 source_of_truth: true

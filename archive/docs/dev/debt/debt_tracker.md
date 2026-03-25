@@ -1,5 +1,5 @@
 ---
-owner: "@team"
+owner: "@jeffrichley"
 last_updated: "2026-03-03"
 status: "active"
 source_of_truth: true
@@ -37,7 +37,7 @@ Priority scale:
 
 - [ ] [DEBT-015] Fix debt metadata parsing boundaries in docs traceability validator
   - Issue draft: `TBD`
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Target: `2026-03-10`
   - Current state:
     - `src/lily/docs_validator.py::_parse_debt_items` appends all non-checkbox lines to the current debt item until another checkbox appears.
@@ -49,7 +49,7 @@ Priority scale:
 
 - [ ] [DEBT-016] Enforce explicit roadmap-ID requirement in status traceability validator
   - Issue draft: `TBD`
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Target: `2026-03-10`
   - Current state:
     - status-sync policy requires explicit roadmap/debt references to use IDs (`SI-XXX`/`DEBT-XXX`)
@@ -63,7 +63,7 @@ Priority scale:
 
 - [ ] [DEBT-001] Align `tech-debt` command to canonical debt ledger path
   - Issue draft: `TBD`
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Target: `2026-03-17`
   - Current state:
     - `.ai/COMMANDS/tech-debt.md` instructs agents to update `.ai/TECHNICAL_DEBT.md`
@@ -77,7 +77,7 @@ Priority scale:
 - [ ] [DEBT-002] Eliminate third-party deprecation warning workaround (`trustcall`)
   - Issue draft: `docs/dev/debt/issues/debt-p1-trustcall-warning.md`
   - Execution plan: `.ai/PLANS/004-p1-trustcall-warning-removal.md`
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Target: `2026-03-15`
   - Current state:
     - pytest suppresses `trustcall._base` deprecation warning about `Send` import path
@@ -89,7 +89,7 @@ Priority scale:
 
 - [ ] [DEBT-003] Add configurable safe-runtime ruleset profiles
   - Issue draft: `TBD`
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Target: `2026-03-22`
   - Current state:
     - language restriction behavior is code-defined and not managed via a first-class ruleset/profile contract
@@ -102,7 +102,7 @@ Priority scale:
 
 - [ ] [DEBT-004] Unify duplicated memory repository behavior across file/store backends
   - Issue draft: `docs/dev/debt/issues/debt-p2-unify-memory-repository-core.md`
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Target: `2026-03-20`
   - Current state:
     - `src/lily/memory/file_repository.py` and `src/lily/memory/store_repository.py` each implement similar validation/policy/upsert logic and read/filter/sort/metrics paths.
@@ -116,7 +116,7 @@ Priority scale:
 
 - [ ] [DEBT-005] Add scheduled jobs for run-artifact cleanup and self-learning pipelines
   - Issue draft: `docs/dev/debt/issues/debt-p3-scheduled-jobs-cleanup-self-learning.md`
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Target: `TBD`
   - Current state: V0 jobs retain all artifacts by default; no periodic cleanup/self-learning orchestration jobs are defined.
   - Exit criteria:
@@ -126,7 +126,7 @@ Priority scale:
 
 - [ ] [DEBT-006] Consolidate runtime SQLite locations under `.lily/db/`
   - Issue draft: `docs/dev/debt/issues/debt-p3-consolidate-runtime-sqlite-location.md`
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Target: `TBD`
   - Current state: SQLite artifacts are split across directories (for example `.lily/checkpoints/checkpointer.sqlite` and planned `.lily/db/security.sqlite`).
   - Exit criteria:
@@ -137,7 +137,7 @@ Priority scale:
 - [ ] [DEBT-007] Add multi-process persistence safety strategy
   - Issue draft: `docs/dev/debt/issues/debt-p3-multiprocess-persistence-safety.md`
   - Roadmap: `SI-008`
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Target: `TBD`
   - Current state: per-session serialization exists, but multi-process locking strategy is not finalized.
   - Exit criteria:
@@ -149,7 +149,7 @@ Priority scale:
 
 - [x] [DEBT-008] Harden language-policy file-read/decode failure path to deterministic deny envelope
   - Issue draft: `TBD`
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Closed: `2026-03-03`
   - Current state:
     - language-policy scan now converts read and UTF-8 decode failures into deterministic `security_language_policy_denied` envelopes
@@ -166,7 +166,7 @@ Priority scale:
 
 - [x] [DEBT-009] Add pre-execution language restriction layer (RestrictedPython or equivalent AST policy)
   - Issue draft: `docs/dev/debt/issues/debt-p1-language-restriction-layer.md`
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Closed: `2026-03-03`
   - Current state: AST restriction layer is implemented and integrated before preflight in plugin authorization flow with deterministic deny envelopes and store-backed scan caching.
   - Why this matters:
@@ -184,7 +184,7 @@ Priority scale:
     - `docs/dev/debt/issues/debt-p1-language-restriction-layer.md` (layered security model documented: language restriction + container isolation)
 
 - [x] [DEBT-010] Integrate pytest-drill-sergeant for test quality enforcement
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Closed: `2026-02-20`
   - Current state: plugin now enforces marker classification and applies AAA/file-length policy in configured mode.
   - Reference: [pytest-drill-sergeant on PyPI](https://pypi.org/project/pytest-drill-sergeant/)
@@ -197,7 +197,7 @@ Priority scale:
 
 - [x] [DEBT-011] Split oversized test modules into focused suites
   - Issue draft: `docs/dev/debt/issues/debt-p3-split-oversized-test-modules.md`
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Closed: `2026-03-03`
   - Exit criteria:
     - command-surface tests are split by domain (for example skills/persona/memory/jobs)
@@ -229,7 +229,7 @@ Priority scale:
     - `just quality test` and `pytest` run warning-clean
 
 - [x] [DEBT-014] Consolidate planning docs to reduce stale duplication
-  - Owner: `@team`
+  - Owner: `@jeffrichley`
   - Closed: `2026-02-17`
   - Evidence:
     - `docs/archive/dev/punchlist.md` converted to archived summary + canonical links

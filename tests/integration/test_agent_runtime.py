@@ -12,8 +12,14 @@ from langchain_core.messages import AIMessage
 from langchain_core.tools import tool
 
 from lily.runtime.agent_runtime import AgentRuntime
-from lily.runtime.config_schema import ModelProfileConfig, ModelProvider, RuntimeConfig
+from lily.runtime.config_schema import (
+    ModelProfileConfig,
+    ModelProvider,
+    RuntimeConfig,
+    SkillsConfig,
+)
 from lily.runtime.model_factory import ModelBuilder, ModelFactory
+from lily.runtime.skill_loader import build_skill_bundle
 from lily.runtime.tool_registry import ToolRegistryError
 
 pytestmark = pytest.mark.integration
@@ -387,3 +393,63 @@ def test_agent_runtime_persists_history_for_same_conversation_id(
     assert first.final_output == "FIRST"
     assert second.final_output == "SECOND"
     assert second.message_count > first.message_count
+
+
+def test_agent_runtime_appends_skill_catalog_to_system_prompt(tmp_path: Path) -> None:
+    """Includes skill index markdown after the base system prompt when bundle is set."""
+    # Arrange - filesystem skill package and bundle for one skill
+    skills_root = tmp_path / "skills"
+    pkg = skills_root / "pkg"
+    pkg.mkdir(parents=True)
+    (pkg / "SKILL.md").write_text(
+        '---\nname: listed-skill\ndescription: "Listed."\n---\n# Body\n',
+        encoding="utf-8",
+    )
+    cfg = SkillsConfig(
+        enabled=True,
+        roots={"repository": [str(skills_root.relative_to(tmp_path))]},
+        scopes_precedence=["repository", "user", "system"],
+    )
+    bundle = build_skill_bundle(cfg, tmp_path)
+    assert bundle is not None
+
+    @tool
+    def ping_tool() -> str:
+        """Return pong."""
+        return "pong"
+
+    captured: dict[str, object] = {}
+    spy_agent = _SpyInvokableAgent()
+
+    def _spy_agent_builder(**kwargs: object) -> _SpyInvokableAgent:
+        captured.clear()
+        captured.update(kwargs)
+        return spy_agent
+
+    runtime = AgentRuntime(
+        config=_runtime_config(allowlist=["ping_tool"], routing_enabled=False),
+        tools=[ping_tool],
+        model_factory=_model_factory(
+            {
+                "default-model": ToolCapableFakeModel(
+                    responses=[AIMessage(content="SPY")]
+                ),
+                "long-model": ToolCapableFakeModel(
+                    responses=[AIMessage(content="ignored")]
+                ),
+            }
+        ),
+        agent_builder=_spy_agent_builder,
+        skill_bundle=bundle,
+    )
+
+    # Act - run once so the agent is built with the augmented system prompt
+    with closing(runtime):
+        result = runtime.run("hello")
+
+    # Assert - create_agent received base prompt plus catalog block
+    assert captured.get("system_prompt") is not None
+    assert "You are Lily." in str(captured["system_prompt"])
+    assert "Skill catalog" in str(captured["system_prompt"])
+    assert "listed-skill" in str(captured["system_prompt"])
+    assert result.final_output == "SPY"

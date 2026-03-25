@@ -623,7 +623,7 @@ Execute every command to ensure zero regressions and feature correctness.
     - `just quality && just test` -> fail at `pip-audit`
     - warning signature: `langgraph 1.0.8 CVE-2026-28277` (no fix version published by audit feed at execution time)
     - rationale: external dependency vulnerability with no available fix version in current advisory output; project code changes cannot remediate directly in this phase
-    - owner: `@team`
+    - owner: `@jeffrichley`
     - target date: `2026-03-12`
 - 2026-03-05: Resolved Phase 4 final-gate blocker and closed quality/test validation set.
   - Remediation:

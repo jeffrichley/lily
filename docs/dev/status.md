@@ -1,5 +1,5 @@
 ---
-owner: "@team"
+owner: "@jeffrichley"
 last_updated: "2026-03-25"
 status: "active"
 source_of_truth: true
@@ -9,10 +9,11 @@ source_of_truth: true
 
 ## Current Focus
 
-- Implement SI-007 Phase 3 system-prompt skill catalog injection + retrieval-by-name loader (`skill_loader`, retrieval tool, `tools.toml`) (`SI-007`, `.ai/PLANS/005-skills-system-implementation.md`).
+- Implement SI-007 Phase 4 retrieval policy gates + linked-file constraints (`skill_policies`, deny-before-content, F6 tool intersection) (`SI-007`, `.ai/PLANS/005-skills-system-implementation.md`).
 
 ## Recently Completed
 
+- Delivered SI-007 Phase 3 catalog injection + loader: `skill_prompt_injector`, `skill_loader` / `SkillBundle`, `skill_retrieve` tool + `ContextVar` binding in `AgentRuntime`, `LilySupervisor` + `build_skill_bundle`, `.lily/config/tools.toml` entry; tests `test_skill_prompt_injector`, `test_skill_loader`, `test_skill_retrieve_tool`, integration catalog append (`test_agent_runtime_appends_skill_catalog_to_system_prompt`) (`.ai/PLANS/005-skills-system-implementation.md`).
 - Delivered SI-007 Phase 2 discovery and registry: `skill_discovery`, `skill_registry`, `RuntimeConfig.skills` / `SkillsToolsConfig`, unit tests (`test_skill_discovery`, `test_skill_registry`, config skills cases in `test_config_loader`), integration `tests/integration/test_skills_discovery_registry.py` (`.ai/PLANS/005-skills-system-implementation.md`).
 - Delivered SI-007 Phase 1 skill contract: `SkillMetadata` / `SkillSummary`, `skill_catalog` parser (`python-frontmatter`), fixtures under `tests/fixtures/skills/`, unit tests `tests/unit/runtime/test_skill_catalog.py` (`.ai/PLANS/005-skills-system-implementation.md`).
 - Locked SI-007 execution framing: MVP traceability matrix, phase tracker, dependency graph, risk register (R-001–R-005), rollback-by-phase table, and non-goals in `.ai/PLANS/005-skills-system-implementation.md` (Phase 0).
@@ -32,7 +33,7 @@ source_of_truth: true
 - 2026-03-05: Completed phases 1-4 for conversation session attach/resume feature and validated full quality/test gates (`.ai/PLANS/002-conversation-session-attach-resume.md`).
 - 2026-03-05: Started SI-002 implementation and completed phases 1-2 with passing targeted unit gates; status-sync docs-check remains blocked by pre-existing frontmatter gap in `docs/ideas/tool_registries.md`.
 - 2026-03-05: Completed SI-002 phase 3 acceptance gates (integration + e2e); docs-check remains blocked by pre-existing frontmatter gap in `docs/ideas/tool_registries.md`.
-- 2026-03-05: Cleared docs-check blocker by adding frontmatter to `docs/ideas/tool_registries.md`; completed SI-002 phase 4 test/docs work, but final quality gate remains blocked by `pip-audit` advisory `langgraph 1.0.8 CVE-2026-28277` (owner `@team`, target `2026-03-12`).
+- 2026-03-05: Cleared docs-check blocker by adding frontmatter to `docs/ideas/tool_registries.md`; completed SI-002 phase 4 test/docs work, but final quality gate remains blocked by `pip-audit` advisory `langgraph 1.0.8 CVE-2026-28277` (owner `@jeffrichley`, target `2026-03-12`).
 - 2026-03-05: Resolved SI-002 final gate blocker by upgrading `langgraph` to `1.0.10` (and `langgraph-prebuilt` to `1.0.8` via lock refresh), then re-ran `just quality` and `just test` successfully.
 - 2026-03-05: Completed SI-002 Phase 5 by wiring runtime MCP providers (`mcp_servers`) and verifying MCP tool execution via CLI plus automated TUI parity tests; opened SI-002 Phase 6 for TOML config parity follow-up.
 - 2026-03-06: Completed SI-002 Phase 6 with TOML runtime/catalog parity, inferred `agent.toml -> tools.toml` default behavior, and passing full quality/test + coverage gates.
@@ -41,3 +42,4 @@ source_of_truth: true
 - 2026-03-25: Phase 0 close validation: `just quality && just test` green; bumped `requests` to 2.33.0 in `uv.lock`; `pip-audit` gate documents **DEBT-017** for CVE-2026-4539 (no `pygments` fix on PyPI yet).
 - 2026-03-25: Completed SI-007 Phase 1 (`skill_types`, `skill_catalog`, unit tests + fixtures); full `just quality` and `just test` green on `feat/005-skills-system-implementation`.
 - 2026-03-25: Completed SI-007 Phase 2 (`skill_discovery`, `skill_registry`, config `skills.*`); `just quality` and `just test` green (84 tests).
+- 2026-03-25: Completed SI-007 Phase 3 (catalog injection, `skill_loader`, `skill_retrieve`, runtime wiring); `just quality` and `just test` green (97 tests).

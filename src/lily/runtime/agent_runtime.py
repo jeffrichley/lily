@@ -22,6 +22,8 @@ from pydantic import BaseModel, ConfigDict
 from lily.runtime.config_schema import RuntimeConfig
 from lily.runtime.model_factory import ModelFactory
 from lily.runtime.model_router import DynamicModelRouter
+from lily.runtime.skill_loader import SkillBundle
+from lily.runtime.skill_retrieve_tool import bind_skill_loader, reset_skill_loader
 from lily.runtime.tool_registry import ToolLike, ToolRegistry
 
 
@@ -80,13 +82,14 @@ def _coerce_message_text(message: BaseMessage) -> str:
 class AgentRuntime:
     """Config-driven wrapper over LangChain's `create_agent` kernel."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         config: RuntimeConfig,
         tools: Sequence[ToolLike],
         model_factory: ModelFactory | None = None,
         checkpoint_db_path: Path | None = None,
         agent_builder: AgentBuilder = create_agent,
+        skill_bundle: SkillBundle | None = None,
     ) -> None:
         """Initialize runtime with validated config, tools, and adapters.
 
@@ -96,9 +99,12 @@ class AgentRuntime:
             model_factory: Optional model construction override.
             checkpoint_db_path: Optional SQLite path for thread checkpoints.
             agent_builder: Agent builder callable (defaults to create_agent).
+            skill_bundle: Optional discovery/loader bundle for catalog injection and
+                ``skill_retrieve`` context binding.
         """
         self._config = config
         self._tools = list(tools)
+        self._skill_bundle = skill_bundle
         self._model_factory = model_factory or ModelFactory()
         self._checkpoint_db_path = checkpoint_db_path or (
             Path(".lily") / "runtime-checkpoints.sqlite3"
@@ -227,10 +233,19 @@ class AgentRuntime:
             ToolCallLimitMiddleware(run_limit=self._config.policies.max_tool_calls),
         ]
 
+        system_prompt = self._config.agent.system_prompt
+        if (
+            self._skill_bundle is not None
+            and self._skill_bundle.catalog_markdown.strip()
+        ):
+            system_prompt = (
+                f"{system_prompt.rstrip()}\n\n{self._skill_bundle.catalog_markdown}"
+            )
+
         built = self._agent_builder(
             model=model_map[self._config.models.routing.default_profile],
             tools=allowlisted_tools,
-            system_prompt=self._config.agent.system_prompt,
+            system_prompt=system_prompt,
             middleware=middleware,
             checkpointer=self._build_checkpointer(),
             name=self._config.agent.name,
@@ -271,16 +286,25 @@ class AgentRuntime:
         thread_id = conversation_id or f"ephemeral-{uuid4()}"
         invoke_config["configurable"] = {"thread_id": thread_id}
 
-        if hasattr(agent, "ainvoke"):
-            async_agent = cast(_AsyncInvokableAgent, agent)
-            result = self._run_on_async_loop(
-                async_agent.ainvoke(payload, config=invoke_config)
-            )
-        elif hasattr(agent, "invoke"):
-            result = agent.invoke(payload, config=invoke_config)
-        else:
-            msg = "Built agent exposes neither invoke(...) nor ainvoke(...)."
-            raise AgentRuntimeError(msg)
+        loader_token = None
+        if self._skill_bundle is not None:
+            loader_token = bind_skill_loader(self._skill_bundle.loader)
+
+        try:
+            if hasattr(agent, "ainvoke"):
+                async_agent = cast(_AsyncInvokableAgent, agent)
+                result = self._run_on_async_loop(
+                    async_agent.ainvoke(payload, config=invoke_config)
+                )
+            elif hasattr(agent, "invoke"):
+                result = agent.invoke(payload, config=invoke_config)
+            else:
+                msg = "Built agent exposes neither invoke(...) nor ainvoke(...)."
+                raise AgentRuntimeError(msg)
+        finally:
+            if loader_token is not None:
+                reset_skill_loader(loader_token)
+
         if not isinstance(result, dict):
             msg = "Agent invocation returned non-dict output."
             raise AgentRuntimeError(msg)
