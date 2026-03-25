@@ -1,0 +1,9 @@
+[[definitions]]
+id = "skill_retrieve"
+source = "python"
+target = "lily.runtime.skill_retrieve_tool:skill_retrieve"
+
+[[definitions]]
+id = "echo_tool"
+source = "python"
+target = "lily.agents.lily_supervisor:echo_tool"

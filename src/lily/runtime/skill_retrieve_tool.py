@@ -6,6 +6,10 @@ from contextvars import ContextVar, Token
 
 from langchain_core.tools import tool
 
+from lily.runtime.skill_invoke_trace import (
+    SkillRetrievalTraceEntry,
+    record_skill_retrieval_trace,
+)
 from lily.runtime.skill_loader import (
     SkillLoader,
     SkillLoadError,
@@ -13,6 +17,8 @@ from lily.runtime.skill_loader import (
     SkillReferenceError,
     SkillRetrievalDeniedError,
 )
+
+SKILL_RETRIEVE_TOOL_ID = "skill_retrieve"
 
 _skill_loader_ctx: ContextVar[SkillLoader | None] = ContextVar(
     "skill_loader",
@@ -54,19 +60,50 @@ def skill_retrieve(name: str, reference_subpath: str | None = None) -> str:
     Returns:
         Raw file contents, or an error message when the loader is not bound.
     """
+    stripped_name = name.strip()
     loader = _skill_loader_ctx.get()
-    if loader is None:
-        return "Skill retrieval is not available: runtime did not bind a skill loader."
     ref = reference_subpath
     if ref is not None and ref.strip() == "":
         ref = None
+
+    def _trace_error(detail: str) -> None:
+        record_skill_retrieval_trace(
+            SkillRetrievalTraceEntry(
+                name=stripped_name,
+                reference_subpath=ref,
+                outcome="error",
+                detail=detail,
+            )
+        )
+
+    if loader is None:
+        msg = "Skill retrieval is not available: runtime did not bind a skill loader."
+        _trace_error(msg)
+        return msg
     try:
-        return loader.retrieve(name.strip(), ref)
+        text = loader.retrieve(stripped_name, ref)
     except SkillNotFoundError as exc:
-        return str(exc)
+        detail = str(exc)
+        _trace_error(detail)
+        return detail
     except SkillRetrievalDeniedError as exc:
-        return str(exc)
+        detail = str(exc)
+        _trace_error(detail)
+        return detail
     except SkillReferenceError as exc:
-        return str(exc)
+        detail = str(exc)
+        _trace_error(detail)
+        return detail
     except SkillLoadError as exc:
-        return str(exc)
+        detail = str(exc)
+        _trace_error(detail)
+        return detail
+    record_skill_retrieval_trace(
+        SkillRetrievalTraceEntry(
+            name=stripped_name,
+            reference_subpath=ref,
+            outcome="success",
+            detail=None,
+        )
+    )
+    return text

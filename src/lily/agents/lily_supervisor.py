@@ -5,12 +5,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
-from langchain_core.tools import tool
+from langchain_core.tools import BaseTool, tool
 
 from lily.runtime.agent_runtime import AgentRunResult, AgentRuntime
-from lily.runtime.config_loader import load_runtime_config
-from lily.runtime.config_schema import McpServerConfig
+from lily.runtime.config_loader import ConfigLoadError, load_runtime_config
+from lily.runtime.config_schema import McpServerConfig, RuntimeConfig
 from lily.runtime.skill_loader import SkillBundle, build_skill_bundle
+from lily.runtime.skill_retrieve_tool import SKILL_RETRIEVE_TOOL_ID
 from lily.runtime.tool_catalog import load_tool_catalog
 from lily.runtime.tool_registry import ToolLike
 from lily.runtime.tool_resolvers import ToolResolvers, build_mcp_server_providers
@@ -85,18 +86,21 @@ class LilySupervisor:
             else cls._default_tools_config_path(config_path)
         )
         config = load_runtime_config(config_path, override_config_path)
+        skills_cfg = config.skills
+        skills_enabled = skills_cfg is not None and skills_cfg.enabled
         resolved_tools = cls._load_tools_from_catalog(
             resolved_tools_config_path,
             mcp_servers=config.mcp_servers,
+            skills_enabled=skills_enabled,
         )
         skill_bundle: SkillBundle | None = None
-        if config.skills is not None and config.skills.enabled:
+        if skills_enabled and skills_cfg is not None:
             skill_bundle = build_skill_bundle(
-                config.skills,
+                skills_cfg,
                 Path(config_path).resolve().parent,
             )
         runtime = AgentRuntime(
-            config=config,
+            config=cls._effective_runtime_config(config, skills_enabled=skills_enabled),
             tools=resolved_tools,
             skill_bundle=skill_bundle,
         )
@@ -118,15 +122,74 @@ class LilySupervisor:
         return resolved.with_name("tools.yaml")
 
     @staticmethod
+    def _effective_runtime_config(
+        config: RuntimeConfig,
+        *,
+        skills_enabled: bool,
+    ) -> RuntimeConfig:
+        """Drop ``skill_retrieve`` from the allowlist when skills are disabled.
+
+        The catalog may still define the tool, but it is not registered; the allowlist
+        must not reference a missing tool name.
+
+        Args:
+            config: Loaded runtime configuration.
+            skills_enabled: Whether the skills subsystem is active.
+
+        Returns:
+            Config unchanged when skills are enabled, or with allowlist filtered.
+
+        Raises:
+            ConfigLoadError: When stripping ``skill_retrieve`` would leave an empty
+                allowlist.
+        """
+        if skills_enabled:
+            return config
+        allow = config.tools.allowlist
+        if SKILL_RETRIEVE_TOOL_ID not in allow:
+            return config
+        filtered = [tool_id for tool_id in allow if tool_id != SKILL_RETRIEVE_TOOL_ID]
+        if not filtered:
+            msg = (
+                "tools.allowlist cannot include only 'skill_retrieve' when skills are "
+                "disabled; add other tools or enable skills."
+            )
+            raise ConfigLoadError(msg)
+        return config.model_copy(
+            update={
+                "tools": config.tools.model_copy(update={"allowlist": filtered}),
+            }
+        )
+
+    @staticmethod
+    def _resolved_tool_name(tool: ToolLike) -> str:
+        """Stable tool id matching ``ToolRegistry`` naming rules.
+
+        Args:
+            tool: Resolved catalog tool object.
+
+        Returns:
+            Tool name string used for allowlist matching.
+        """
+        if isinstance(tool, BaseTool):
+            return tool.name
+        return tool.__name__
+
+    @classmethod
     def _load_tools_from_catalog(
+        cls,
         tools_config_path: str | Path,
         mcp_servers: Mapping[str, McpServerConfig],
+        *,
+        skills_enabled: bool,
     ) -> list[ToolLike]:
         """Load and resolve runtime tools from one catalog config file.
 
         Args:
             tools_config_path: Tool catalog config path (.yaml/.yml/.toml).
             mcp_servers: Runtime MCP server configuration mapping.
+            skills_enabled: When false, ``skill_retrieve`` is omitted even if defined
+                in the catalog so the tool registry matches the skills subsystem state.
 
         Returns:
             Resolved runtime tools in catalog order.
@@ -134,7 +197,14 @@ class LilySupervisor:
         tool_catalog = load_tool_catalog(tools_config_path)
         providers = build_mcp_server_providers(mcp_servers)
         resolvers = ToolResolvers(mcp_servers=providers)
-        return resolvers.resolve_catalog(tool_catalog)
+        resolved = resolvers.resolve_catalog(tool_catalog)
+        if skills_enabled:
+            return resolved
+        return [
+            tool
+            for tool in resolved
+            if cls._resolved_tool_name(tool) != SKILL_RETRIEVE_TOOL_ID
+        ]
 
     def run_prompt(
         self,

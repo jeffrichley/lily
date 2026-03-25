@@ -117,7 +117,7 @@ flowchart LR
 | 2 | Done | @jeffrichley | 1 | `skill_discovery`, `skill_registry`, config `skills.*` |
 | 3 | Done | @jeffrichley | 2 | `skill_prompt_injector`, `skill_loader`, `skill_retrieve`, runtime wiring |
 | 4 | Done | @jeffrichley | 3 | `skill_policies`, `SkillsRetrievalConfig`, deny-before-content, F6 `effective_skill_tools` |
-| 5 | Not started | @jeffrichley | 3–4 | Supervisor/runtime wiring, trace payload |
+| 5 | Done | @jeffrichley | 3–4 | Supervisor tool gating, `skill_trace`, integration tests |
 | 6 | Not started | @jeffrichley | 5 | `skills list|inspect|doctor` (Rich) |
 | 7 | Not started | @jeffrichley | 5–6 | `skill_events`, redaction tests |
 | 8 | Not started | @jeffrichley | 1–7 | Full gates, docs/status, PR evidence |
@@ -275,7 +275,7 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - [x] Phase 2: Discovery, indexing, precedence, and registry
 - [x] Phase 3: System-prompt skill catalog injection + retrieval-by-name loader
 - [x] Phase 4: Linked-file hydration + retrieval policy gates (retrieval-only MVP)
-- [ ] Phase 5: Runtime integration into supervisor invoke path
+- [x] Phase 5: Runtime integration into supervisor invoke path
 - [ ] Phase 6: CLI surfaces (`skills list/inspect/doctor`) and UX
 - [ ] Phase 7: Telemetry/events, diagnostics, and observability
 - [ ] Phase 8: Testing, docs/status sync, and release hardening
@@ -420,27 +420,27 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 **Intent Lock**
 - **Source of truth**: PRD integration bullets; Architecture layered flow section.
 - **Must**:
-  - [ ] Integrate skills flow into runtime without breaking current no-skill behavior.
-  - [ ] Preserve current tool allowlist and model routing policies.
-  - [ ] Return deterministic skill retrieval metadata in runtime result structures.
+  - [x] Integrate skills flow into runtime without breaking current no-skill behavior.
+  - [x] Preserve current tool allowlist and model routing policies.
+  - [x] Return deterministic skill retrieval metadata in runtime result structures.
 - **Must Not**:
-  - [ ] Introduce hidden behavior changes for existing prompts with no skill match.
-  - [ ] Break conversation continuity/session threading behavior.
+  - [x] Introduce hidden behavior changes for existing prompts with no skill match.
+  - [x] Break conversation continuity/session threading behavior.
 - **Provenance map**:
-  - [ ] Prompt ingress -> system-prompt catalog injection -> tool request -> retrieval -> policy -> final output + trace.
+  - [x] Prompt ingress -> system-prompt catalog injection -> tool request -> retrieval -> policy -> final output + trace.
 - **Acceptance gates**:
-  - [ ] Integration tests for successful retrieval, retrieval policy failures, and no-skill catalog behavior.
-  - [ ] Integration test proving **end-to-end** path: catalog in system prompt → model can call retrieval tool → hydrated content → trace payload (with mocks or deterministic agent stub as needed).
-  - [ ] Existing runtime integration suites remain green.
+  - [x] Integration tests for successful retrieval, retrieval policy failures, and no-skill catalog behavior.
+  - [x] Integration test proving **end-to-end** path: catalog in system prompt → model can call retrieval tool → hydrated content → trace payload (with mocks or deterministic agent stub as needed).
+  - [x] Existing runtime integration suites remain green.
 
 **Tasks**
-- [ ] UPDATE supervisor/runtime construction to initialize skill subsystem once.
-- [ ] WIRE **tool resolution** so the skill retrieval tool is included in the `AgentRuntime` tool set when `skills.enabled` and `tools.allowlist` permit it (follow `tool_resolvers.py` / `ToolCatalog` patterns; no duplicate registry logic).
-- [ ] ADD invoke-path hook for catalog injection + retrieval loading.
-- [ ] ADD structured `skill_trace` payload on runtime responses.
-- [ ] ADD config toggles to fully disable skill subsystem.
-- [ ] ADD integration tests for legacy behavior parity when disabled.
-- [ ] UPDATE sample/e2e configs (e.g. under `.lily/config/` or test fixtures) so **`tools.allowlist` includes the retrieval tool id** wherever skills are exercised.
+- [x] UPDATE supervisor/runtime construction to initialize skill subsystem once.
+- [x] WIRE **tool resolution** so the skill retrieval tool is included in the `AgentRuntime` tool set when `skills.enabled` and `tools.allowlist` permit it (follow `tool_resolvers.py` / `ToolCatalog` patterns; no duplicate registry logic).
+- [x] ADD invoke-path hook for catalog injection + retrieval loading.
+- [x] ADD structured `skill_trace` payload on runtime responses.
+- [x] ADD config toggles to fully disable skill subsystem.
+- [x] ADD integration tests for legacy behavior parity when disabled.
+- [x] UPDATE sample/e2e configs (e.g. under `.lily/config/` or test fixtures) so **`tools.allowlist` includes the retrieval tool id** wherever skills are exercised.
 
 ### Phase 6: CLI surfaces and UX
 
@@ -603,9 +603,9 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 
 ### 5. RUNTIME + CLI INTEGRATION
 
-- [ ] **UPDATE** `src/lily/agents/lily_supervisor.py`, `src/lily/runtime/agent_runtime.py`, `src/lily/runtime/tool_resolvers.py` (as needed)
-  - [ ] **IMPLEMENT**: Wire skill pipeline, retrieval tool into resolved registry, trace payload; sample configs include retrieval tool id on allowlist.
-  - [ ] **VALIDATE**: `uv run pytest tests/integration/test_skills_runtime_flow.py -q`
+- [x] **UPDATE** `src/lily/agents/lily_supervisor.py`, `src/lily/runtime/agent_runtime.py`, `src/lily/runtime/tool_resolvers.py` (as needed)
+  - [x] **IMPLEMENT**: Wire skill pipeline, retrieval tool into resolved registry, trace payload; sample configs include retrieval tool id on allowlist.
+  - [x] **VALIDATE**: `uv run pytest tests/integration/test_skills_runtime_flow.py -q`
 
 - [ ] **UPDATE/CREATE** CLI handlers + `src/lily/cli.py`
   - [ ] **IMPLEMENT**: `skills list|inspect|doctor` commands and rich output.
@@ -638,8 +638,8 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 ### Integration Tests
 
 - [x] Deterministic skill registry across repeated discover+merge (repo/user overlap); see `tests/integration/test_skills_discovery_registry.py`.
-- [ ] End-to-end runtime path from prompt -> system-prompt catalog injection -> skill retrieval tool request -> output.
-- [ ] Config-driven toggles (skills enabled/disabled) preserve existing behavior.
+- [x] End-to-end runtime path from prompt -> system-prompt catalog injection -> skill retrieval tool request -> output.
+- [x] Config-driven toggles (skills enabled/disabled) preserve existing behavior.
 - [ ] Policy constraints enforced under realistic runtime wiring.
 
 ### E2E Tests
@@ -710,7 +710,8 @@ Docs/status checks:
 - Phase 2 (discovery, indexing, precedence, registry): **completed** (`skill_discovery.py`, `skill_registry.py`, `RuntimeConfig.skills` + `SkillsToolsConfig`, unit + integration tests).
 - Phase 3 (system-prompt catalog + retrieval-by-name loader): **completed** (`skill_prompt_injector.py`, `skill_loader.py`, `skill_retrieve_tool.py`, `AgentRuntime` + `LilySupervisor` wiring, `.lily/config/tools.toml` `skill_retrieve`).
 - Phase 4 (retrieval policy + linked constraints + F6 helpers): **completed** (`skill_policies.py`, `SkillsRetrievalConfig`, `SkillRetrievalDeniedError`, `build_retrieval_blocked_keys`, `effective_skill_tools`, tests).
-- Phases 5–9: not started (implementation follows phase order).
+- Phase 5 (supervisor tool gating + `skill_trace` + integration tests): **completed** (`skill_invoke_trace.py`, `tests/fixtures/config/skills_retrieval/`, `tests/integration/test_skills_runtime_flow.py`).
+- Phases 6–9: not started (implementation follows phase order).
 
 ### Artifacts Created
 
@@ -723,6 +724,7 @@ Docs/status checks:
 - `src/lily/runtime/skill_prompt_injector.py`, `src/lily/runtime/skill_loader.py`, `src/lily/runtime/skill_retrieve_tool.py`
 - `tests/unit/runtime/test_skill_prompt_injector.py`, `tests/unit/runtime/test_skill_loader.py`, `tests/unit/runtime/test_skill_retrieve_tool.py`
 - `src/lily/runtime/skill_policies.py`, `tests/unit/runtime/test_skill_policies.py`
+- `src/lily/runtime/skill_invoke_trace.py`, `tests/integration/test_skills_runtime_flow.py`, `tests/fixtures/config/skills_retrieval/`
 
 ### Phase 0 — intent check and gates
 
@@ -767,9 +769,25 @@ Docs/status checks:
   - `just quality` -> pass; `just test` -> pass (97 tests).
   - `uv run pytest tests/unit/runtime/test_skill_prompt_injector.py tests/unit/runtime/test_skill_loader.py tests/unit/runtime/test_skill_retrieve_tool.py -q` -> pass.
 
+### Phase 4 — intent check and gates
+
+- **Phase intent check**: Phase 4 — retrieval policy gates, deny-before-content, F6 helpers; `SkillsRetrievalConfig`; linked-path bounding.
+- **Acceptance evidence**:
+  - `just quality` -> pass; `just test` -> pass (111 tests, pre–Phase 5 baseline).
+
+### Phase 5 — intent check and gates
+
+- **Phase intent check** (`.ai/COMMANDS/phase-intent-check.md`): Phase 5 “Runtime integration into supervisor invoke path” — Intent Lock satisfied; supervisor omits `skill_retrieve` from resolved tools when `skills.enabled` is false; allowlist coherency via `_effective_runtime_config`; `AgentRunResult.skill_trace` with `SkillInvokeTrace` / `SkillRetrievalTraceEntry`; `skill_retrieve` records trace via `record_skill_retrieval_trace`.
+- **Acceptance evidence**:
+  - `just quality && just test` -> pass (119 tests).
+  - `uv run pytest tests/integration/test_skills_runtime_flow.py -q` -> pass.
+  - Fixtures: `tests/fixtures/config/skills_retrieval/` (`agent.toml`, `tools.toml`, sample `SKILL.md`).
+
 ### Partial/Blocked Items
 
 - None for Phase 0.
 - None for Phase 1.
 - None for Phase 2.
 - None for Phase 3.
+- None for Phase 4.
+- None for Phase 5.
