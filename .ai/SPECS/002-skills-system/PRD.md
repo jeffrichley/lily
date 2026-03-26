@@ -12,11 +12,11 @@
 
 ## 1. Executive Summary
 
-Lily currently has a completed tool registry foundation (SI-002): config-defined Python/MCP tools, allowlist policy, deterministic runtime wiring, and YAML/TOML parity. What is missing is a first-class skills system that lets Lily package reusable expertise, select the right skill for a task, load only relevant detail, and execute reliably without context bloat.
+Lily currently has a completed tool registry foundation (SI-002): config-defined Python/MCP tools, allowlist policy, deterministic runtime wiring, and YAML/TOML parity. What is missing is a first-class skills system that lets Lily package reusable expertise, load only relevant detail via tool-based retrieval, and avoid context bloat.
 
 Across OpenAI Codex skills guidance, LangChain skills guidance, and Anthropic skills guidance, the ecosystem has converged on a practical model: `SKILL.md`-centered skill packages, progressive disclosure, explicit/implicit invocation, and clear separation of concerns between skills, tools, and subagents. This PRD defines Lily's MVP implementation of that model.
 
-MVP goal: deliver a production-usable skills layer that can discover skill packages, select skills deterministically, inject playbook context safely, execute procedural/agent-style skills through existing runtime boundaries, and expose auditable behavior for operators.
+MVP goal: deliver a production-usable skills layer that can discover skill packages, expose enabled skill metadata in the system prompt, and allow the agent to retrieve the full `SKILL.md` (and optionally linked reference files) on demand via tools—without requiring autonomous “skill execution modes”.
 
 ---
 
@@ -26,11 +26,11 @@ Build a standards-aligned, implementation-ready skills system that increases tas
 
 Core principles:
 
-1. Skills encode reusable competence; tools provide execution capability.
-2. Skills load progressively (summary first, full detail on selection) to control context growth.
+1. Skills encode reusable competence; tools provide controlled retrieval/injection capability.
+2. Skills load progressively (frontmatter in prompt; full `SKILL.md` hydrated only when requested) to control context growth.
 3. Skills must be explicit artifacts (`SKILL.md` package contract), not hidden prompts.
-4. Skill selection must be inspectable and policy-governed (deterministic tie-breaks, allowlists).
-5. Skills and subagents are complementary: skills for reusable expertise, subagents for independent execution contexts.
+4. Skill discovery/collision handling must be deterministic and policy-governed.
+5. Post-MVP: skills and subagents are complementary (MVP retrieval-only does not require subagent execution modes).
 
 ---
 
@@ -66,29 +66,26 @@ Core principles:
 #### Core functionality
 - ✅ Skill package contract with required `SKILL.md` and YAML frontmatter.
 - ✅ Local skill discovery from configured skill roots.
-- ✅ Skill indexing and deterministic selection pipeline.
-- ✅ Progressive disclosure loading model (summary index + full body on select).
-- ✅ Explicit invocation (`$skill`-style) and implicit invocation (description match).
-- ✅ Skill execution types:
-  - ✅ Playbook skills (instruction/context injection)
-  - ✅ Procedural skills (deterministic wrapper tools)
-  - ✅ Agent skills (delegation wrappers with independent runtime boundary)
+- ✅ Skill indexing and deterministic collision handling (for a stable skill catalog).
+- ✅ System-prompt skill catalog injection derived from `SKILL.md` frontmatter (the first level of progressive disclosure).
+- ✅ Tool-based skill retrieval by skill `name` that returns the full `SKILL.md` body (the second level of progressive disclosure).
+- ✅ Linked-file hydration via the same retrieval tool (e.g. fetching `references/...` content on demand) so the agent is not allowed to read the filesystem directly.
 
 #### Technical and policy
-- ✅ Config surfaces for skill roots, enabled scopes, and precedence order.
-- ✅ Deterministic collision policy and tie-break rules.
-- ✅ Skill-level policy controls (enabled/disabled, allowed agents, allowed tools).
-- ✅ Structured skill telemetry (selection reason, load path, result status).
+- ✅ Config surfaces for skill roots, enabled scopes, and collision/preference order.
+- ✅ Deterministic collision policy and tie-break rules for catalog stability.
+- ✅ Skill-level policy controls (enabled/disabled; and retrieval-tool allow/deny semantics).
+- ✅ Structured telemetry focused on discovery/loading/tool requests (not execution-mode adapters).
 
 #### Integration
 - ✅ Integrate with existing tool registry boundary (`tools.*`) and runtime allowlist (`agent.*`).
-- ✅ Integrate with existing runtime policies (`max_iterations`, tool/model call limits).
-- ✅ CLI visibility surface for skill discovery/list/selection traces.
+- ✅ Integrate with existing runtime policies (tool/model call limits) so retrieval remains bounded.
+- ✅ CLI visibility surface for skill catalog inventory and retrieval diagnostics.
 
 #### Validation
-- ✅ Unit tests for parsing, discovery, scoring, conflict handling.
-- ✅ Integration tests for runtime invocation and policy boundaries.
-- ✅ E2E smoke paths from CLI/TUI for explicit and implicit skill usage.
+- ✅ Unit tests for parsing, discovery, collision handling, and retrieval-by-name behavior.
+- ✅ Integration tests for runtime tool allowlist/policy boundaries.
+- ✅ E2E smoke paths from CLI/TUI for “catalog injection -> tool retrieval -> context use”.
 
 ### Out of Scope
 
@@ -96,6 +93,8 @@ Core principles:
 - ❌ Autonomous skill generation/evolution loops.
 - ❌ Automatic skill pruning/promotion RL system.
 - ❌ Embeddings/vector DB dependency as MVP requirement.
+- ❌ `$skill:<id>` explicit invocation and deterministic selection/ranking (deferred to a later slice).
+- ❌ Playbook/procedural/agent skill execution adapters (MVP is retrieval/injection-only).
 
 #### Technical and integration
 - ❌ Cross-repo remote skill installation marketplace as MVP requirement.
@@ -111,27 +110,19 @@ Core principles:
 ## 5. User Stories
 
 1. As a Lily operator, I want to add a new skill by dropping a folder with `SKILL.md`, so that I can add behavior without changing runtime code.
-Example: add `skills/playbooks/literature_review/SKILL.md` and have Lily discover it.
+Example: add `skills/literature-review/SKILL.md` and have Lily discover it.
 
-2. As a Lily operator, I want the runtime to load only skill summaries until needed, so that token usage stays bounded.
-Example: 200 skills installed, only the matched skill body is injected.
+2. As a Lily operator, I want the runtime to inject an enabled skill catalog into the system prompt (from `SKILL.md` frontmatter) and provide a tool that the agent can call to retrieve the full `SKILL.md` body by skill `name`.
+Example: 200 skills installed, only the requested skill body (and linked reference files) are hydrated.
 
-3. As a skill author, I want explicit invocation syntax, so that I can force a specific skill when needed.
-Example: `$skill:literature_review` in prompt.
+3. As a skill author, I want to place additional guidance/docs in the skill directory (for example `references/...`) and have the agent retrieve those linked files via the same skill retrieval tool.
 
-4. As a skill author, I want implicit invocation by description match, so that skills can be used naturally without remembering exact IDs.
-Example: "do a literature review" routes to the review skill.
+4. As a governance owner, I want deterministic collision and precedence rules, so that behavior is auditable.
+Example: same skill name in two scopes resolves by configured precedence and logs the winner.
 
-5. As a governance owner, I want deterministic collision and precedence rules, so that behavior is auditable.
-Example: same skill ID in two scopes resolves by configured precedence and logs the winner.
+5. As a runtime reviewer, I want tool-request/loading diagnostics in logs so I can debug why retrieval failed (disabled skill, missing file, policy rejection).
 
-6. As a runtime reviewer, I want selection rationale in logs, so that I can debug why a skill was chosen.
-Example: match score, tie-break path, disabled-policy filters.
-
-7. As an engineer, I want skills/subagents/tools clearly separated, so that system design remains maintainable.
-Example: procedural skill wraps deterministic pipeline tool; subagent runs isolated policy set.
-
-8. As a maintainer, I want compatibility with current tool registry and policy surfaces, so that SI-007 can ship incrementally without destabilizing SI-002.
+6. As a maintainer, I want compatibility with current tool registry and policy surfaces, so that SI-007 can ship incrementally without destabilizing SI-002.
 
 ---
 
@@ -141,38 +132,32 @@ Example: procedural skill wraps deterministic pipeline tool; subagent runs isola
 
 ```text
 User Prompt
-  -> Skill Selector
-  -> Skill Loader (progressive disclosure)
-  -> Runtime Binding
-     -> Playbook injection and/or
-     -> Procedural tool wrapper and/or
-     -> Agent-skill wrapper (delegated runtime)
-  -> Existing Tool Registry + Policy middleware
+  -> System-prompt skill catalog injection (frontmatter only)
+  -> Agent calls skills retrieval tool by skill `name`
+  -> Skill retrieval tool hydrates full `SKILL.md` (and optionally linked `references/...`) into context
+  -> Existing Tool Registry + policy middleware
 ```
 
 ### Core pattern decisions
 
-- Skill package contract: directory + `SKILL.md` + optional assets, aligned with OpenAI/LangChain/Anthropic patterns.
-- Progressive disclosure: metadata/summary index first; full content only on selection.
-- Routing hierarchy: explicit invocation > policy-eligible exact match > scored implicit match > no-skill fallback.
-- Boundary rule: skills do not replace tools/MCP; they orchestrate/reuse them.
-- Subagent rule: use subagent skill only when independent execution context is required.
+- Skill package contract: folder + required `SKILL.md` + optional `references/`, `scripts/`, `assets/`, aligned with OpenAI/LangChain/Anthropic patterns.
+- Progressive disclosure: frontmatter in the system prompt; full `SKILL.md` hydrated only after the agent requests it via the retrieval tool.
+- Boundary rule: skills do not execute side effects by themselves; they provide content/context that the agent can use.
+- Post-MVP: subagent execution modes are supported as an extension, not a baseline requirement.
 
 ### Repository target surfaces (MVP)
 
 ```text
 .lily/
   skills/
-    playbooks/<skill_id>/SKILL.md
-    procedures/<skill_id>.py
-    agents/<skill_id>.py
+    <skill_id>/SKILL.md
+    <skill_id>/references/...        # optional linked guidance
+    <skill_id>/assets/...            # optional linked assets/templates
 
 src/lily/runtime/
   skill_catalog.py
   skill_registry.py
-  skill_selector.py
   skill_loader.py
-  skill_policies.py
   skill_types.py
 ```
 
@@ -206,46 +191,44 @@ Acceptance:
 - duplicate IDs resolved by configured precedence with warning/event.
 
 ### F3. Selection and routing
-
-- Explicit routing via invocation keyword.
-- Implicit routing via deterministic scoring on description/tags/examples.
-- Hard policy filters before ranking.
+- No deterministic selection/ranking in MVP.
+- The agent performs selection implicitly by choosing a skill `name` from the injected system-prompt skill catalog.
+- A retrieval tool performs lookup by skill `name` and fails fast when:
+  - the skill is disabled/blocked by policy, or
+  - the requested linked file is missing/outside the skill directory, or
+  - the skill name does not exist in the catalog.
 
 Acceptance:
-- selection rationale emitted in logs/trace.
+- tool-request/loading diagnostics emitted in logs/trace.
 
 ### F4. Progressive disclosure loader
-
-- Load summary at startup/index build.
-- Load full `SKILL.md` (and optional assets) only when selected.
-- Cache loaded skills for the active run with bounded memory policy.
+- Load frontmatter-derived skill summaries at startup/index build for the system-prompt catalog.
+- Load full `SKILL.md` (and optionally linked `references/...`) only when requested via the retrieval tool.
+- Cache loaded skill bodies for the active run with bounded memory policy.
 
 Acceptance:
-- measurable token/context reduction in benchmark prompts.
+- measurable token/context reduction in benchmark prompts (only requested skill bodies are hydrated).
 
 ### F5. Execution bindings by skill type
-
-- Playbook skill: inject structured instructions into next reasoning step.
-- Procedural skill: call deterministic tool wrapper.
-- Agent skill: invoke delegated mini-agent runtime with restricted tool/policy set.
+- Retrieval-only: inject the retrieved `SKILL.md` content (and linked reference file contents) into the agent context.
+- Playbook/procedural/agent execution adapters remain deferred/backlog.
 
 Acceptance:
-- all three modes validated by unit + integration tests.
+- retrieval-only injection validated by unit + integration tests.
 
 ### F6. Governance and controls
-
-- Enable/disable by scope or skill ID.
-- Agent-level skill allowlist/denylist.
-- Optional manual-approval gates for high-risk skills.
+- Enable/disable by scope or skill `name` in the catalog.
+- Skill retrieval allowlist/denylist (controls whether the retrieval tool can return content).
+- Optional manual-approval gates for high-risk skills (post-MVP hardening).
 
 Tool-access resolution policy (normative):
-- Runtime boundary remains authoritative: skills cannot grant access to tools outside `agent.* tools.allowlist` and global runtime policies.
+- Runtime boundary remains authoritative: retrieval cannot grant access to tools outside `agent.* tools.allowlist` and global runtime policies.
 - If `allowed-tools` is omitted in skill frontmatter: apply no additional skill-level restriction (skill inherits runtime-available tools).
 - If `allowed-tools` is present: effective tools are `intersection(runtime_available_tools, skill_allowed_tools)`.
-- If `allowed-tools` resolves to an empty effective set: skill may still load for playbook-only behavior, but any tool-calling path must fail fast with deterministic policy error messaging.
+- If `allowed-tools` resolves to an empty effective set: tool-calling paths must fail fast with deterministic policy error messaging (content retrieval may still be allowed).
 
 Acceptance:
-- blocked skills cannot be invoked implicitly or explicitly.
+- blocked skills cannot be retrieved (and tool-calling paths are denied as applicable).
 
 ### F7. Observability
 
@@ -275,7 +258,7 @@ Acceptance:
 ### Proposed additions (MVP-friendly)
 
 - No mandatory external DB/search service required for MVP.
-- Deterministic lexical scoring baseline; optional embeddings in post-MVP.
+- Deterministic catalog building/collision handling; optional semantic selection/ranking in post-MVP.
 - Reuse existing config and policy schema strategy.
 
 ### Third-party integration posture
@@ -291,12 +274,12 @@ Acceptance:
 
 - Validate skill metadata and reject unknown required-contract violations.
 - Enforce skill allowlist/denylist and execution policy boundaries.
-- Restrict agent-skill delegation through explicit policy and max-call limits.
+- Restrict skill retrieval (full body + linked reference files) through explicit policy and max-call limits.
 - Log and surface unsafe/blocked invocation attempts.
 - Enforce frontmatter security restrictions aligned with the guide:
   - reject XML angle brackets (`<` and `>`) in frontmatter values;
   - reject reserved provider prefixes in skill `name` (`claude*`, `anthropic*`);
-  - parse YAML with safe loading only (no executable YAML tags).
+  - parse frontmatter via `python-frontmatter` (YAML safe loading only; no executable YAML tags).
 
 ### Security out of scope (post-MVP)
 
@@ -310,8 +293,6 @@ Agent config (`agent.yaml`/`agent.toml`):
 - `skills.roots`
 - `skills.scopes_precedence`
 - `skills.allowlist` / `skills.denylist`
-- `skills.implicit_selection.enabled`
-- `skills.selection.max_candidates`
 - `skills.tools.default_policy` (`inherit_runtime` | `deny_unless_allowed` | `use_default_packs`)
 - `skills.tools.default_packs` (list of named pack IDs)
 - `skills.tools.packs` (map of pack ID -> ordered tool ID list)
@@ -377,7 +358,7 @@ class SkillSummary(BaseModel):
     id: str
     name: str
     description: str
-    type: Literal["playbook", "procedural", "agent"]
+    type: Literal["standard", "playbook", "procedural", "agent"]
     tags: list[str]
     version: str
     source_path: str
@@ -443,29 +424,29 @@ Deliverables:
 Validation:
 - parser/unit tests for success/failure matrices.
 
-### Phase 2: Discovery, indexing, and selection
+### Phase 2: Discovery, indexing, and system-prompt catalog injection
 
-Goal: make skills discoverable and selectable deterministically.
+Goal: make skills discoverable as a stable catalog and inject enabled skill metadata into the system prompt (frontmatter-only).
 
 Deliverables:
 - ✅ Skill registry discovery/indexing implementation.
-- ✅ Selection/ranking with deterministic tie-breaks.
-- ✅ Explicit invocation precedence.
+- ✅ Deterministic collision handling and stable catalog ordering.
+- ✅ System-prompt skill catalog injection surface (frontmatter-derived `name` + `description`).
 
 Validation:
-- unit tests for precedence, collision, and ranking behavior.
+- unit tests for precedence and collision handling.
 
-### Phase 3: Runtime execution integration
+### Phase 3: Runtime integration for tool-based skill retrieval
 
-Goal: integrate skill loading and execution into existing runtime.
+Goal: integrate skill hydration into the existing runtime via a controlled retrieval tool (and bounded tool calls).
 
 Deliverables:
-- ✅ Progressive disclosure loader.
-- ✅ Playbook/procedural/agent skill execution adapters.
-- ✅ Policy gate enforcement and events.
+- ✅ Retrieval-by-name tool that hydates full `SKILL.md` on request.
+- ✅ Linked-file hydration support for `references/...` (bounded to the skill directory).
+- ✅ Policy gate enforcement and telemetry events focused on retrieval/loading/tool requests.
 
 Validation:
-- integration tests against runtime/tool registry boundaries.
+- integration tests against runtime/tool registry boundaries for retrieval tool and linked file constraints.
 
 ### Phase 4: UX and hardening
 
@@ -504,10 +485,10 @@ Estimated timeline (engineering weeks):
 ## 14. Risks and Mitigations
 
 1. Risk: Ambiguous skill matching causes unstable behavior.
-- Mitigation: deterministic routing order, explicit invocation precedence, full selection trace.
+- Mitigation: deterministic catalog ordering + strict tool lookup by skill `name` with actionable retrieval diagnostics.
 
 2. Risk: Skills bypass policy boundaries and call unsafe capabilities.
-- Mitigation: enforce runtime allowlist and policy middleware before execution.
+- Mitigation: enforce runtime allowlist and policy middleware before any tool-calling actions that follow retrieval.
 
 3. Risk: Context inflation from loading many skill bodies.
 - Mitigation: progressive disclosure and bounded in-run cache.
@@ -543,6 +524,6 @@ Estimated timeline (engineering weeks):
 ### C. Key assumptions
 
 - Assumption 1: SI-007 ships incrementally on top of existing SI-002 runtime/tool infrastructure.
-- Assumption 2: MVP starts with deterministic lexical selection before any vector dependency.
+- Assumption 2: MVP relies on agent-driven selection by skill `name` from the injected system-prompt catalog (no deterministic ranking yet).
 - Assumption 3: Skill package roots remain local filesystem paths for MVP.
 

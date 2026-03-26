@@ -24,7 +24,7 @@ def _write_traceability_docs(
         tmp_path / "docs" / "dev" / "roadmap.md",
         (
             "---\n"
-            'owner: "@team"\n'
+            'owner: "@jeffrichley"\n'
             'last_updated: "2026-03-03"\n'
             'status: "active"\n'
             "source_of_truth: true\n"
@@ -41,7 +41,7 @@ def _write_traceability_docs(
         tmp_path / "docs" / "dev" / "status.md",
         (
             "---\n"
-            'owner: "@team"\n'
+            'owner: "@jeffrichley"\n'
             'last_updated: "2026-03-03"\n'
             'status: "active"\n'
             "source_of_truth: true\n"
@@ -61,7 +61,7 @@ def _write_debt_tracker(tmp_path: Path, *, debt_lines: list[str]) -> None:
         tmp_path / "docs" / "dev" / "debt" / "debt_tracker.md",
         (
             "---\n"
-            'owner: "@team"\n'
+            'owner: "@jeffrichley"\n'
             'last_updated: "2026-03-03"\n'
             'status: "active"\n'
             "source_of_truth: true\n"
@@ -105,7 +105,7 @@ def test_validator_fails_stale_active_doc(tmp_path: Path) -> None:
         tmp_path / "docs" / "dev" / "status.md",
         (
             "---\n"
-            'owner: "@team"\n'
+            'owner: "@jeffrichley"\n'
             'last_updated: "2026-01-01"\n'
             'status: "active"\n'
             "source_of_truth: true\n"
@@ -130,7 +130,7 @@ def test_validator_passes_valid_docs(tmp_path: Path) -> None:
         tmp_path / "docs" / "dev" / "status.md",
         (
             "---\n"
-            'owner: "@team"\n'
+            'owner: "@jeffrichley"\n'
             'last_updated: "2026-02-17"\n'
             'status: "active"\n'
             "source_of_truth: true\n"
@@ -142,7 +142,7 @@ def test_validator_passes_valid_docs(tmp_path: Path) -> None:
         tmp_path / "docs" / "archive" / "old.md",
         (
             "---\n"
-            'owner: "@team"\n'
+            'owner: "@jeffrichley"\n'
             'last_updated: "2026-01-01"\n'
             'status: "archived"\n'
             "source_of_truth: false\n"

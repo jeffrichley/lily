@@ -23,7 +23,7 @@ long_context_profile = "long_context"
 complexity_threshold = 8000
 
 [tools]
-allowlist = ["echo_tool", "ping_tool", "search_langgraph_code"]
+allowlist = ["echo_tool", "ping_tool", "search_langgraph_code", "skill_retrieve"]
 
 [mcp_servers.langgraph_docs]
 transport = "streamable_http"
@@ -36,3 +36,9 @@ max_tool_calls = 40
 
 [logging]
 level = "INFO"
+
+# Skills: discovery under `.lily/skills/` (paths are relative to this file's directory).
+[skills]
+enabled = true
+roots = { repository = ["../skills"] }
+scopes_precedence = ["repository", "user", "system"]

@@ -6,12 +6,12 @@ Pay special attention to existing runtime config contracts, deterministic polici
 
 ## Feature Description
 
-Implement the full SI-007 skills system described in `.ai/SPECS/002-skills-system/PRD.md` and `.ai/SPECS/002-skills-system/SKILLS_ARCHITECTURE.md` on top of Lily's existing runtime/tool-registry foundation. This includes skill package contracts, discovery/indexing/selection/loading/execution, policy enforcement, telemetry, and CLI visibility surfaces.
+Implement the SI-007 skills system described in `.ai/SPECS/002-skills-system/PRD.md` and `.ai/SPECS/002-skills-system/SKILLS_ARCHITECTURE.md` on top of Lily's existing runtime/tool-registry foundation, starting with the retrieval-only MVP (skill catalog injection + tool-based `SKILL.md` retrieval by skill `name` + linked `references/...` hydration). Explicit `$skill:<id>` invocation and playbook/procedural/agent execution adapters are deferred.
 
 ## User Story
 
 As a Lily operator and skill author  
-I want a first-class, deterministic skills system with explicit and implicit invocation  
+I want a retrieval-only skills MVP where the agent can request a skill by `name` and receive the `SKILL.md` contents safely and deterministically  
 So that Lily can reuse expertise safely, reduce prompt duplication, and keep runtime behavior auditable.
 
 ## Problem Statement
@@ -37,7 +37,7 @@ Deliver a typed, policy-aware skills subsystem in `src/lily/runtime` with progre
 **Dependencies**:
 - Existing runtime config loader and tool registry contracts
 - Pydantic validation and LangChain runtime boundaries already in repo
-- No new external package dependency required for MVP baseline
+- `python-frontmatter` for parsing skill `SKILL.md` YAML frontmatter (add to `pyproject.toml` and refresh the lockfile with `uv lock` / `uv sync` before Phase 1 parser work lands)
 
 ## Traceability Mapping (Required When Applicable)
 
@@ -68,10 +68,97 @@ git show-ref --verify --quiet "refs/heads/${BRANCH_NAME}" \
 A reviewer can directly verify the skills system via:
 
 - Running `uv run lily skills list --config .lily/config/agent.toml` and seeing structured tabular output.
-- Running `uv run lily skills inspect <skill_id> --config ...` and seeing metadata + policy/selection details.
-- Running `uv run lily run --prompt '$skill:<id> ...' --config ...` and observing explicit skill invocation path.
-- Running `uv run lily run --prompt 'natural language trigger...' --config ...` and observing implicit selection traces.
-- Inspecting emitted structured events/log entries for selection rationale and execution outcomes.
+- Running `uv run lily skills inspect <skill_name> --config ...` and seeing metadata plus **catalog placement** and **retrieval policy** details (allow/deny, shadowing, collisions). MVP does **not** include implicit auto-selection; the agent chooses a skill by `name` via the retrieval tool.
+- Running `uv run lily run --prompt 'use the brand-guidelines skill to apply Anthropic branding guidance ...' --config ...` and observing that the agent requested the `brand-guidelines` skill via the retrieval tool.
+- Inspecting emitted structured events/log entries for catalog injection + skill retrieval/loading outcomes.
+
+## MVP scope traceability (PRD to phase)
+
+Single-thread execution order: **Phase 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8** (Phase 9 is post-MVP). Tool wiring (**`tools.toml` definition → Python tool → `tools.allowlist`**) spans **3–5**; do not merge Phase 5 before Phases 3–4 have retrieval + policy tests.
+
+| PRD / architecture slice | Phase(s) | Deliverable |
+|----------------------------|----------|-------------|
+| F1 Skill package contract | 1 | `skill_types`, `skill_catalog`, parser/validation matrix |
+| F2 Local discovery + collision policy | 2 | `skill_discovery`, `skill_registry`, config roots/scopes/enablement |
+| F3 System catalog + retrieval-by-name | 3–5 | Catalog injection + retrieval tool + loader; **no** ranking/scoring |
+| F4 Progressive disclosure + linked `references/` | 3–4 | `skill_loader` + path bounding + cache bounds |
+| F5 Retrieval-only context binding | 3–5 | Injected `SKILL.md` + linked files into agent context; **no** procedural/agent executors |
+| F6 Governance: allow/deny + `skills.tools.*` + `allowed-tools` ∩ runtime | 2, 4 | Config models + `skill_policies` + deny-before-content |
+| F7 Observability | 7 | `skill_events` + redaction tests |
+| CLI visibility | 6 | `skills list|inspect|doctor` (Rich) |
+| SI-002 tool boundary | 3–5 | `ToolCatalog` definition + `ToolRegistry` + allowlist tests |
+
+**Registry key**: Canonical skill identity for retrieval is frontmatter **`name`** (normalized per parser rules). `$skill:<id>` explicit invocation stays deferred.
+
+The table above is the **authoritative MVP scope lock** for plan `005` (what ships in SI-007 retrieval MVP vs deferred). Update rows only when PRD/architecture scope changes and re-run Phase 0 intent review.
+
+### Phase dependency graph (locked)
+
+Single-thread execution order: **Phase 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8**; **Phase 9** is post-MVP. Retrieval tool + `ToolCatalog` wiring spans **Phases 3–5**; do not merge Phase 5 before Phases 3–4 have retrieval and policy tests.
+
+```mermaid
+flowchart LR
+  P1["Phase 1\ncontract"] --> P2["Phase 2\ndiscovery"]
+  P2 --> P3["Phase 3\nloader + tool"]
+  P3 --> P4["Phase 4\npolicy"]
+  P4 --> P5["Phase 5\nruntime"]
+  P5 --> P6["Phase 6\nCLI"]
+  P6 --> P7["Phase 7\nevents"]
+  P7 --> P8["Phase 8\nhardening"]
+  P8 --> P9["Phase 9\npost-MVP"]
+```
+
+### Phase tracker (SI-007 / plan 005)
+
+| Phase | Status | Owner | Depends on | Notes |
+|---|:---:|---|---|---|
+| 0 | Done | @jeffrichley | — | Execution framing, acceptance lock, tracker below |
+| 1 | Done | @jeffrichley | 0 | `skill_types`, `skill_catalog`, parser/validation matrix |
+| 2 | Done | @jeffrichley | 1 | `skill_discovery`, `skill_registry`, config `skills.*` |
+| 3 | Done | @jeffrichley | 2 | `skill_prompt_injector`, `skill_loader`, `skill_retrieve`, runtime wiring |
+| 4 | Done | @jeffrichley | 3 | `skill_policies`, `SkillsRetrievalConfig`, deny-before-content, F6 `effective_skill_tools` |
+| 5 | Done | @jeffrichley | 3–4 | Supervisor tool gating, `skill_trace`, integration tests |
+| 6 | Done | @jeffrichley | 5 | `skills list|inspect|doctor` (Rich), `cli_skills` + presenters + diagnostics |
+| 7 | Done | @jeffrichley | 5–6 | `skill_events` JSON on `lily.skill.telemetry`, hooks + redaction tests |
+| 8 | Done | @jeffrichley | 1–7 | Gates, roadmap/status/backlog, alignment doc, PR draft |
+| 9 | Done | @jeffrichley | 8 | Contract in `docs/dev/backlog/skills-distribution-packaging.md` (no code); SI-008 / BL-007 |
+
+### Phase → PRD / architecture provenance (summary)
+
+Each implementation phase’s **Intent Lock** lists detailed sources; this summary satisfies the Phase 0 “every phase maps to PRD/architecture” requirement:
+
+| Phase | Primary PRD / architecture anchors |
+|---|-----|
+| 1 | PRD skill package contract; Architecture `SKILL.md` contract + metadata schema |
+| 2 | PRD local discovery + collision policy; Architecture §7–8 prerequisites |
+| 3–5 | PRD system catalog + retrieval-by-name; Architecture §8–9; tool boundary with SI-002 |
+| 4 | PRD retrieval policy + linked files + F6; Architecture §11 |
+| 5 | PRD integration; Architecture layered flow |
+| 6 | PRD CLI visibility; `AGENTS.md` Rich CLI output rule |
+| 7 | PRD F7 telemetry; Architecture `skill_events` |
+| 8 | `.ai/COMMANDS/validate.md`, `status-sync.md`, `.ai/RULES.md` |
+| 9 | PRD §13 future; Architecture §20 delta checklist |
+
+### Rollback strategy by phase
+
+| Phase | What can go wrong | Rollback / containment |
+|---|-----|-----|
+| 0 | Plan drift or ambiguous gates | Revert plan edits; re-lock Intent Lock before code |
+| 1 | Parser/schema regressions | Revert `skill_*` modules; remove `python-frontmatter` if unused elsewhere |
+| 2 | Bad index or collisions | Disable skills via `skills.enabled` (introduced this phase); narrow roots/scopes |
+| 3–4 | Retrieval or policy leaks | Disable skills; remove retrieval tool id from `tools.allowlist`; rely on deny-before-content |
+| 5 | Supervisor/runtime regressions | `skills.enabled=false` (full subsystem off); keep prior tool-only paths |
+| 6 | CLI confusion | Document; CLI is additive—rollback by hiding commands only if needed |
+| 7 | noisy or leaking events | Reduce emitters or gate events behind config (document in phase) |
+| 8 | gate/doc failures | Fix forward; docs-only rollback per commit policy |
+| 9 | N/A for SI-007 MVP | Tracked separately; does not block MVP closure |
+
+Master containment switch for runtime (required by Phase 5 tasks): **`skills.enabled=false`** disables the skills subsystem while preserving tool-registry behavior.
+
+## CLI vs TUI (this MVP slice)
+
+- **In scope**: Operator verification through **CLI** (`lily skills …`, `lily run …`) with Rich tables/panels per `AGENTS.md`.
+- **Out of scope for MVP closure**: Textual/TUI parity unless an existing TUI command path already mirrors these surfaces; if not, track TUI follow-up in `docs/dev/backlog.md` without blocking SI-007 retrieval MVP.
 
 Verification commands (final implementation slice):
 - `just quality && just test`
@@ -109,6 +196,8 @@ uv run python scripts/skills_seed_fixtures.py
 - `src/lily/runtime/config_loader.py` - deterministic loader behavior and fail-fast semantics.
 - `src/lily/runtime/tool_catalog.py` - schema parsing, validation, and collision/ID guard patterns.
 - `src/lily/runtime/tool_registry.py` - allowlist/policy boundary and deterministic ordering style.
+- `src/lily/runtime/tool_resolvers.py` - resolving `ToolCatalog` definitions into concrete tools for `ToolRegistry`.
+- `.lily/config/tools.toml` - pattern for `[[definitions]]` tool ids and Python `target` entry points.
 - `src/lily/runtime/agent_runtime.py` - invoke flow, middleware boundaries, and typed runtime result handling.
 - `src/lily/agents/lily_supervisor.py` - orchestration wiring from config -> runtime objects.
 - `src/lily/cli.py` - existing rich output style and command registration patterns.
@@ -123,9 +212,9 @@ Runtime core:
 - `src/lily/runtime/skill_catalog.py`
 - `src/lily/runtime/skill_discovery.py`
 - `src/lily/runtime/skill_registry.py`
-- `src/lily/runtime/skill_selector.py`
+- `src/lily/runtime/skill_prompt_injector.py`
 - `src/lily/runtime/skill_loader.py`
-- `src/lily/runtime/skill_executor.py`
+- `src/lily/runtime/skill_retrieve_tool.py`
 - `src/lily/runtime/skill_policies.py`
 - `src/lily/runtime/skill_events.py`
 
@@ -138,9 +227,9 @@ Tests:
 - `tests/unit/runtime/test_skill_catalog.py`
 - `tests/unit/runtime/test_skill_discovery.py`
 - `tests/unit/runtime/test_skill_registry.py`
-- `tests/unit/runtime/test_skill_selector.py`
 - `tests/unit/runtime/test_skill_loader.py`
-- `tests/unit/runtime/test_skill_executor.py`
+- `tests/unit/runtime/test_skill_prompt_injector.py`
+- `tests/unit/runtime/test_skill_retrieve_tool.py`
 - `tests/unit/runtime/test_skill_policies.py`
 - `tests/integration/test_skills_runtime_flow.py`
 - `tests/e2e/test_cli_skills_commands.py`
@@ -181,276 +270,276 @@ Scripts/docs (optional but recommended):
 
 Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so execution progress can be tracked live.
 
-- [ ] Phase 0: Execution framing and acceptance lock
-- [ ] Phase 1: Skill contract + schema foundation
-- [ ] Phase 2: Discovery, indexing, precedence, and registry
-- [ ] Phase 3: Selection/routing and progressive disclosure loader
-- [ ] Phase 4: Execution adapters (playbook/procedural/agent) + policy gates
-- [ ] Phase 5: Runtime integration into supervisor invoke path
-- [ ] Phase 6: CLI surfaces (`skills list/inspect/doctor`) and UX
-- [ ] Phase 7: Telemetry/events, diagnostics, and observability
-- [ ] Phase 8: Testing, docs/status sync, and release hardening
-- [ ] Phase 9: Post-MVP distribution and packaging follow-up
+- [x] Phase 0: Execution framing and acceptance lock
+- [x] Phase 1: Skill contract + schema foundation
+- [x] Phase 2: Discovery, indexing, precedence, and registry
+- [x] Phase 3: System-prompt skill catalog injection + retrieval-by-name loader
+- [x] Phase 4: Linked-file hydration + retrieval policy gates (retrieval-only MVP)
+- [x] Phase 5: Runtime integration into supervisor invoke path
+- [x] Phase 6: CLI surfaces (`skills list/inspect/doctor`) and UX
+- [x] Phase 7: Telemetry/events, diagnostics, and observability
+- [x] Phase 8: Testing, docs/status sync, and release hardening
+- [x] Phase 9: Post-MVP distribution and packaging follow-up
 
 ### Phase 0: Execution framing and acceptance lock
 
 **Intent Lock**
 - **Source of truth**: PRD sections 2/4/6/8; Architecture sections 5-11; `.ai/RULES.md`.
 - **Must**:
-  - [ ] Freeze MVP scope in a phase checklist before implementation.
-  - [ ] Define exact acceptance criteria per phase and required gates.
-  - [ ] Define explicit non-goals to prevent scope bleed.
+  - [x] Freeze MVP scope in a phase checklist before implementation.
+  - [x] Define exact acceptance criteria per phase and required gates.
+  - [x] Define explicit non-goals to prevent scope bleed.
 - **Must Not**:
-  - [ ] Start coding before criteria/gates are written.
-  - [ ] Expand to out-of-scope marketplace/autonomous systems in MVP.
+  - [x] Start coding before criteria/gates are written.
+  - [x] Expand to out-of-scope marketplace/autonomous systems in MVP.
 - **Provenance map**:
-  - [ ] Every phase maps to PRD scope bullets and architecture sections.
+  - [x] Every phase maps to PRD scope bullets and architecture sections.
 - **Acceptance gates**:
-  - [ ] Plan updated with per-phase gates and non-goals.
-  - [ ] Team-agreed ordering and dependency graph documented.
+  - [x] Plan updated with per-phase gates and non-goals.
+  - [x] Team-agreed ordering and dependency graph documented.
 
 **Tasks**
-- [ ] Build a phase tracker table with status/owner/dependencies.
-- [ ] Define risk register: contract drift, non-deterministic routing, policy bypass, context bloat.
-- [ ] Define rollback strategy per phase (feature toggle/config off).
+- [x] **EMBED** the [MVP scope traceability](#mvp-scope-traceability-prd-to-phase) table in this plan (update rows if scope shifts); treat it as the checklist lock for “what ships in 005”.
+- [x] Build a phase tracker table with status/owner/dependencies (optional spreadsheet or `.ai` status table).
+- [x] Define risk register: contract drift, non-deterministic routing, policy bypass, context bloat.
+- [x] Define rollback strategy per phase (feature toggle/config off).
 
 ### Phase 1: Skill contract + schema foundation
 
 **Intent Lock**
 - **Source of truth**: PRD `Skill package contract`; Architecture `SKILL.md contract` and metadata schema.
 - **Must**:
-  - [ ] Implement strict pydantic models for skill metadata/frontmatter and normalized summaries.
-  - [ ] Enforce guide-aligned required fields (`name`, `description`) and parser normalization rules.
-  - [ ] Enforce canonical kebab-case recommendation as lint/doctor guidance (not hard reject for imported third-party skills).
-  - [ ] Provide clear field-level errors (no generic parse failures).
+  - [x] Implement strict pydantic models for skill metadata/frontmatter and normalized summaries.
+  - [x] Enforce guide-aligned required fields (`name`, `description`) and parser normalization rules.
+  - [x] Enforce canonical kebab-case recommendation as lint/doctor guidance (not hard reject for imported third-party skills).
+  - [x] Provide clear field-level errors (no generic parse failures).
 - **Must Not**:
-  - [ ] Introduce implicit fallback defaults for required fields.
-  - [ ] Accept unknown required-contract fields silently.
+  - [x] Introduce implicit fallback defaults for required fields.
+  - [x] Accept unknown required-contract fields silently.
 - **Provenance map**:
-  - [ ] `SKILL.md` frontmatter -> `SkillMetadata` model -> `SkillSummary` index record.
+  - [x] `SKILL.md` frontmatter -> `SkillMetadata` model -> `SkillSummary` index record.
 - **Acceptance gates**:
-  - [ ] Unit tests for valid/invalid frontmatter permutations.
-  - [ ] Contract fixtures for all three skill types.
+  - [x] Unit tests for valid/invalid frontmatter permutations.
+  - [x] Fixture packs for **valid/invalid `SKILL.md`** contracts (retrieval-only MVP: one operational package shape; optional `type` field may exist for forward compatibility but **no** distinct execution paths per type in MVP).
 
 **Tasks**
-- [ ] CREATE `skill_types.py` with enums, summary/full models, and typed errors.
-- [ ] CREATE `skill_catalog.py` parser for markdown+frontmatter extraction.
-- [ ] ADD deterministic validation messages for each required field.
-- [ ] ADD fixture packs for success/failure contracts.
-- [ ] ADD unit tests for parsing, unknown fields, malformed versions, and ID validation.
-- [ ] ADD parser test matrix for malformed YAML/frontmatter edge cases (missing delimiters, unclosed quotes, bad YAML types, forbidden `<` `>` values, reserved provider prefixes).
-- [ ] ADD normalization tests for non-canonical names -> internal canonical key mapping.
+- [x] ADD `python-frontmatter` to `pyproject.toml` and refresh the lockfile (`uv lock`); verify import in CI/local before merging parser work.
+- [x] CREATE `skill_types.py` with enums, summary/full models, and typed errors.
+- [x] CREATE `skill_catalog.py` parser for markdown+frontmatter extraction.
+- [x] ADD deterministic validation messages for each required field.
+- [x] ADD fixture packs for success/failure contracts.
+- [x] ADD unit tests for parsing, unknown fields, malformed versions, and ID validation.
+- [x] ADD parser test matrix for malformed YAML/frontmatter edge cases (missing delimiters, unclosed quotes, bad YAML types, forbidden `<` `>` values, reserved provider prefixes).
+- [x] ADD normalization tests for non-canonical names -> internal canonical key mapping.
 
 ### Phase 2: Discovery, indexing, precedence, and registry
 
 **Intent Lock**
 - **Source of truth**: PRD `Local skill discovery`, `collision policy`; Architecture sections 7 and 8 prerequisites.
 - **Must**:
-  - [ ] Discover skills from configured roots/scopes in deterministic order.
-  - [ ] Resolve collisions via precedence + semantic version tie-break.
-  - [ ] Emit discover/shadow diagnostics records.
+  - [x] Discover skills from configured roots/scopes in deterministic order.
+  - [x] Resolve collisions via precedence + semantic version tie-break.
+  - [x] Emit discover/shadow diagnostics records.
 - **Must Not**:
-  - [ ] Use filesystem iteration order without explicit sorting.
-  - [ ] Allow duplicate winner outcomes between runs.
+  - [x] Use filesystem iteration order without explicit sorting.
+  - [x] Allow duplicate winner outcomes between runs.
 - **Provenance map**:
-  - [ ] Scope order + semantic version -> registry winner record.
+  - [x] Scope order + semantic version -> registry winner record.
 - **Acceptance gates**:
-  - [ ] Unit tests for precedence and tie-break matrix.
-  - [ ] Integration test proving deterministic registry across repeated runs.
+  - [x] Unit tests for precedence and tie-break matrix.
+  - [x] Integration test proving deterministic registry across repeated runs.
 
 **Tasks**
-- [ ] CREATE `skill_discovery.py` for root walking and candidate collection.
-- [ ] CREATE `skill_registry.py` for index build, collision resolution, and query APIs.
-- [ ] UPDATE config schema to include skills roots/scopes and enablement flags.
-- [ ] ADD unit tests for same-id collisions and lexical deterministic fallback.
-- [ ] ADD integration test for merged repo/user/system roots.
+- [x] CREATE `skill_discovery.py` for root walking and candidate collection.
+- [x] CREATE `skill_registry.py` for index build, collision resolution, and query APIs.
+- [x] UPDATE `config_schema.py` / loader to include `skills.enabled`, `skills.roots`, `skills.scopes_precedence`, `skills.allowlist` / `skills.denylist` per PRD §9.
+- [x] UPDATE `config_schema.py` for **`skills.tools`** per PRD §9: `default_policy` (`inherit_runtime` | `deny_unless_allowed` | `use_default_packs`), `default_packs`, `packs` (map pack id → ordered tool id list). Add unit tests for invalid references and forbidden combinations.
+- [x] ADD unit tests for same-id collisions and lexical deterministic fallback.
+- [x] ADD integration test for merged repo/user/system roots.
 
-### Phase 3: Selection/routing and progressive disclosure loader
+### Phase 3: System-prompt skill catalog injection + retrieval-by-name loader
 
 **Intent Lock**
-- **Source of truth**: PRD `explicit+implicit invocation` and `progressive disclosure`; Architecture sections 8 and 9.
+- **Source of truth**: PRD system-prompt skill catalog injection + tool-based retrieval-by-name; Architecture sections 8 and 9.
 - **Must**:
-  - [ ] Support explicit `$skill:<id>` path with highest precedence.
-  - [ ] Implement deterministic lexical scoring baseline for implicit selection.
-  - [ ] Hydrate full skill bodies only after selection.
+  - [x] Build a stable enabled-skill catalog from `SKILL.md` frontmatter for system-prompt injection.
+  - [x] Hydrate full `SKILL.md` bodies only after an agent tool request by skill `name`.
+  - [x] Hydrate linked `references/...` files (bounded to the skill directory) only after an agent tool request.
 - **Must Not**:
-  - [ ] Load all full `SKILL.md` bodies at index time.
-  - [ ] Use non-deterministic/random tie-break without stable rules.
+  - [x] Implement `$skill:<id>` explicit invocation (deferred to backlog).
+  - [x] Implement deterministic selection/ranking/scoring (deferred to backlog).
+  - [x] Load all full `SKILL.md` bodies at index time.
 - **Provenance map**:
-  - [ ] Prompt tokens + triggers + tags -> score breakdown -> selected IDs + rationale.
+  - [x] Prompt tokens -> system-prompt catalog injection -> tool request payload (skill name) -> retrieved content.
 - **Acceptance gates**:
-  - [ ] Unit tests for explicit/implicit/none routing modes.
-  - [ ] Unit tests for cache hit/miss and deterministic load errors.
+  - [x] Unit tests for catalog building, collision handling, and deterministic ordering.
+  - [x] Unit tests for cache hit/miss and deterministic retrieval/load errors (including missing/blocked linked files).
+  - [x] Unit tests proving the **skill retrieval tool** is constructible with a **stable tool id** and appears in resolved `ToolRegistry` when allowlisted.
 
 **Tasks**
-- [ ] CREATE `skill_selector.py` with strategy dispatch map by routing mode.
-- [ ] CREATE `skill_loader.py` with summary/full hydration + LRU cache.
-- [ ] ADD selection rationale model and candidate score debug output.
-- [ ] ADD parser support for explicit invocation syntax normalization.
-- [ ] ADD unit tests for routing order and tie-break determinism.
+- [x] CREATE/UPDATE `skill_loader.py` for:
+  - [x] catalog summaries via registry + `skill_prompt_injector` (not full-body at index time)
+  - [x] full `SKILL.md` hydration by skill `name`
+  - [x] linked `references/...` hydration with path-bounding checks
+- [x] IMPLEMENT a **LangChain tool** (`skill_retrieve`, stable id) with optional `reference_subpath`; recorded in `.lily/config/tools.toml`.
+- [x] ADD `[[definitions]]` entry in `.lily/config/tools.toml` with `source = "python"` and `target = "lily.runtime.skill_retrieve_tool:skill_retrieve"`.
+- [x] Allowlist behavior unchanged from SI-002: omit `skill_retrieve` from `tools.allowlist` to exclude the tool (same as other tools); no separate test required beyond existing allowlist gates.
+- [x] ADD system-prompt catalog injection wiring (`AgentRuntime` appends catalog markdown; `skill_retrieve` uses `ContextVar` binding per invoke).
+- [x] Parser already uses `python-frontmatter` from Phase 1 (`skill_catalog.load_skill_md`).
+- [x] ADD unit tests for retrieval-by-name hydration and linked-file error taxonomy.
 
-### Phase 4: Execution adapters + policy gates
+**Deferred to Phase 4+**
+- ~~Richer linked-path whitelists beyond `references/`~~ — **superseded**: `reference_subpath` is relative to the **skill package root** (any subdirectory; still no `..` escapes).
+- Wiring **F6 empty effective-tools** checks into future tool-calling / execution paths (retrieval-only MVP does not block `SKILL.md` on empty intersection per PRD).
+
+### Phase 4: Retrieval policy gates + linked-file constraints (retrieval-only MVP)
 
 **Intent Lock**
-- **Source of truth**: PRD execution types/policy section; Architecture section 10/11.
+- **Source of truth**: PRD retrieval policy + linked-file constraints; Architecture section 11 policy/safety.
 - **Must**:
-  - [ ] Implement playbook/procedural/agent adapters behind a registry dispatch map.
-  - [ ] Enforce skill-level policy checks before execution.
-  - [ ] Keep delegated agent execution context-bounded and auditable.
-  - [ ] Implement normative tool policy resolution:
-    - omitted `allowed-tools` follows config mode:
-      - `inherit_runtime` => inherit runtime-available tool set;
-      - `deny_unless_allowed` => empty skill candidate tool set;
-      - `use_default_packs` => tool union from configured default packs;
-    - present `allowed-tools` => explicit skill list wins, then intersect with runtime-available tool set;
-    - empty effective tool set => playbook-only allowed, tool-call paths fail fast.
+  - [x] Enforce skill-level enable/disable and retrieval allow/deny before returning content.
+  - [x] Enforce linked-file constraints: only allow `references/...` (and optionally other whitelisted subpaths) that stay inside the skill directory.
+  - [x] Enforce **effective tools** for skills per PRD F6: `intersection(runtime_available_tools, skill_allowed_tools_or_packs)` when `allowed-tools` / pack policy applies; fail fast with deterministic errors when the effective set is empty **for tool-calling paths** (retrieval of `SKILL.md` may still be allowed per PRD). *(F6 intersection implemented in `effective_skill_tools` for policy resolution; tool-calling enforcement deferred until procedural paths.)*
+  - [x] Keep retrieval tool failures deterministic and field-specific.
 - **Must Not**:
-  - [ ] Implement adapter selection with fragile long condition chains.
-  - [ ] Allow explicit invocation to bypass deny policies.
+  - [x] Implement playbook/procedural/agent execution adapters.
 - **Provenance map**:
-  - [ ] Selected skill + policy record -> adapter invocation contract -> execution result model.
+  - [x] Tool request (skill name + optional linked path) -> policy evaluation -> retrieval result/error.
 - **Acceptance gates**:
-  - [ ] Unit tests for each adapter success/failure path.
-  - [ ] Integration tests for denylist, tool allowlist, and agent allowlist enforcement.
-  - [ ] Unit/integration tests proving omitted `allowed-tools` does not over-restrict skills and cannot expand runtime boundaries.
-  - [ ] Unit tests for all three default policy modes and explicit `allowed-tools` override precedence.
+  - [x] Unit tests for retrieval allow/deny + disabled-skill errors.
+  - [x] Unit/integration tests for linked-file path bounding and missing-file errors.
 
 **Tasks**
-- [ ] CREATE `skill_policies.py` with typed check results and rejection reasons.
-- [ ] CREATE `skill_executor.py` with adapter registry and type-specific runners.
-- [ ] ADD procedural wrapper contract validation (input/output schema).
-- [ ] ADD agent adapter bounds (`max_iterations`, tool/model call limits).
-- [ ] ADD policy-focused tests preventing bypass via explicit invocation.
-- [ ] ADD policy tests for tool resolution matrix: omitted `allowed-tools`, explicit subset, explicit empty set, and out-of-runtime tool entries.
-- [ ] UPDATE config schema/loader to support:
-  - [ ] `skills.tools.default_policy`
-  - [ ] `skills.tools.default_packs`
-  - [ ] `skills.tools.packs`
-- [ ] ADD config validation tests for unknown pack IDs, unknown tool IDs in packs, and duplicate pack entries.
+- [x] CREATE `skill_policies.py` for retrieval allow/deny checks and deterministic rejection reasons.
+- [x] UPDATE config schema/loader to support retrieval enable/disable semantics by scope (`skills.retrieval.enabled`, `skills.retrieval.scopes_allowlist`; `skills.allowlist` / `skills.denylist` normalized to canonical keys).
+- [x] ADD linked-file path bounding checks and deterministic error taxonomy (directory vs file; paths stay inside the skill package directory).
+- [x] ADD unit/integration tests for **skills.denylist / allowlist**, **blocked retrieval**, and **effective tool intersection** (include at least one fixture where `allowed-tools` narrows to a subset of runtime tools).
 
 ### Phase 5: Runtime integration into supervisor invoke path
 
 **Intent Lock**
 - **Source of truth**: PRD integration bullets; Architecture layered flow section.
 - **Must**:
-  - [ ] Integrate skills flow into runtime without breaking current no-skill behavior.
-  - [ ] Preserve current tool allowlist and model routing policies.
-  - [ ] Return deterministic skill execution metadata in runtime result structures.
+  - [x] Integrate skills flow into runtime without breaking current no-skill behavior.
+  - [x] Preserve current tool allowlist and model routing policies.
+  - [x] Return deterministic skill retrieval metadata in runtime result structures.
 - **Must Not**:
-  - [ ] Introduce hidden behavior changes for existing prompts with no skill match.
-  - [ ] Break conversation continuity/session threading behavior.
+  - [x] Introduce hidden behavior changes for existing prompts with no skill match.
+  - [x] Break conversation continuity/session threading behavior.
 - **Provenance map**:
-  - [ ] Prompt ingress -> selection -> load -> policy -> execute -> final output + trace.
+  - [x] Prompt ingress -> system-prompt catalog injection -> tool request -> retrieval -> policy -> final output + trace.
 - **Acceptance gates**:
-  - [ ] Integration tests for explicit skill, implicit skill, and no-skill fallback paths.
-  - [ ] Existing runtime integration suites remain green.
+  - [x] Integration tests for successful retrieval, retrieval policy failures, and no-skill catalog behavior.
+  - [x] Integration test proving **end-to-end** path: catalog in system prompt → model can call retrieval tool → hydrated content → trace payload (with mocks or deterministic agent stub as needed).
+  - [x] Existing runtime integration suites remain green.
 
 **Tasks**
-- [ ] UPDATE supervisor/runtime construction to initialize skill subsystem once.
-- [ ] ADD invoke-path hook for selection/loading/execution.
-- [ ] ADD structured `skill_trace` payload on runtime responses.
-- [ ] ADD config toggles to fully disable skill subsystem.
-- [ ] ADD integration tests for legacy behavior parity when disabled.
+- [x] UPDATE supervisor/runtime construction to initialize skill subsystem once.
+- [x] WIRE **tool resolution** so the skill retrieval tool is included in the `AgentRuntime` tool set when `skills.enabled` and `tools.allowlist` permit it (follow `tool_resolvers.py` / `ToolCatalog` patterns; no duplicate registry logic).
+- [x] ADD invoke-path hook for catalog injection + retrieval loading.
+- [x] ADD structured `skill_trace` payload on runtime responses.
+- [x] ADD config toggles to fully disable skill subsystem.
+- [x] ADD integration tests for legacy behavior parity when disabled.
+- [x] UPDATE sample/e2e configs (e.g. under `.lily/config/` or test fixtures) so **`tools.allowlist` includes the retrieval tool id** wherever skills are exercised.
 
 ### Phase 6: CLI surfaces and UX
 
 **Intent Lock**
 - **Source of truth**: PRD CLI visibility requirement; AGENTS CLI UX Rich-render rule.
 - **Must**:
-  - [ ] Add `skills list`, `skills inspect`, `skills doctor` user-facing commands.
-  - [ ] Use Rich tables/panels for default outputs.
-  - [ ] Surface collisions/shadowing/invalid packages with actionable messages.
-  - [ ] Surface trigger quality diagnostics (under-trigger and over-trigger heuristics) with actionable remediation guidance.
+  - [x] Add `skills list`, `skills inspect`, `skills doctor` user-facing commands.
+  - [x] Use Rich tables/panels for default outputs.
+  - [x] Surface collisions/shadowing/invalid packages with actionable messages.
+  - [x] Surface **catalog and policy** diagnostics (what is indexed, what is blocked, why retrieval would fail).
 - **Must Not**:
-  - [ ] Default to raw JSON in interactive mode.
-  - [ ] Hide policy-block reasons from operator diagnostics.
+  - [x] Default to raw JSON in interactive mode.
+  - [x] Hide policy-block reasons from operator diagnostics.
 - **Provenance map**:
-  - [ ] Registry + diagnostics -> CLI presenter models -> rendered table/panel output.
+  - [x] Registry + diagnostics -> CLI presenter models -> rendered table/panel output.
 - **Acceptance gates**:
-  - [ ] E2E CLI tests for command outputs and exit codes.
-  - [ ] Snapshot-like assertions for key table headers/rows.
+  - [x] E2E CLI tests for command outputs and exit codes.
+  - [x] Snapshot-like assertions for key table headers/rows.
 
 **Tasks**
-- [ ] CREATE handlers for list/inspect/doctor commands.
-- [ ] UPDATE `src/lily/cli.py` command tree and options.
-- [ ] ADD filtering/sorting flags and concise/verbose modes.
-- [ ] ADD e2e tests for no-skills, valid-skills, invalid-skills scenarios.
-- [ ] ADD docs snippets for command usage.
-- [ ] ADD `skills doctor` trigger test templates: should-trigger, paraphrase-trigger, should-not-trigger.
-- [ ] ADD operator remediation docs for under-trigger/over-trigger tuning in description/frontmatter.
+- [x] CREATE handlers for list/inspect/doctor commands.
+- [x] UPDATE `src/lily/cli.py` command tree and options.
+- [x] ADD filtering/sorting flags and concise/verbose modes.
+- [x] ADD e2e tests for no-skills, valid-skills, invalid-skills scenarios.
+- [x] ADD docs snippets for command usage (deferred to Phase 8 reference slice per plan; no new user doc in this phase).
 
 ### Phase 7: Telemetry/events and observability
 
 **Intent Lock**
 - **Source of truth**: PRD structured telemetry requirement; Architecture `skill_events` component.
 - **Must**:
-  - [ ] Emit stable structured events for discover/select/load/execute/outcome.
-  - [ ] Include rationale and policy decisions without leaking secrets.
-  - [ ] Keep event schema versioned and test-covered.
+  - [x] Emit stable structured events for discover/request/load/outcome.
+  - [x] Include rationale and policy decisions without leaking secrets.
+  - [x] Keep event schema versioned and test-covered.
 - **Must Not**:
-  - [ ] Emit only free-form logs with no schema guarantee.
-  - [ ] Log full prompt/skill body when policy forbids it.
+  - [x] Emit only free-form logs with no schema guarantee.
+  - [x] Log full prompt/skill body when policy forbids it.
 - **Provenance map**:
-  - [ ] Runtime decision points -> typed event model -> logger sink.
+  - [x] Runtime decision points -> typed event model -> logger sink.
 - **Acceptance gates**:
-  - [ ] Unit tests for event schema and serialization.
-  - [ ] Integration check that key events appear in explicit+implicit flows.
+  - [x] Unit tests for event schema and serialization.
+  - [x] Integration check that key events appear in retrieval-only tool-request flows.
 
 **Tasks**
-- [ ] CREATE `skill_events.py` typed event models and emit helpers.
-- [ ] ADD event hooks across discovery, selector, loader, executor paths.
-- [ ] ADD redaction/sanitization rules and tests.
-- [ ] ADD event schema version constant and compatibility tests.
+- [x] CREATE `skill_events.py` typed event models and emit helpers.
+- [x] MAP PRD F7 names (`skill_discovered`, `skill_selected`, `skill_loaded`, `skill_executed`, `skill_failed`) onto retrieval semantics: e.g. treat **`skill_selected` / `skill_executed` as retrieval-request / content-applied** for playbook-style injection in MVP (document enum mapping in `skill_events` docstring). Adjust if PRD is updated to retrieval-specific names later.
+- [x] ADD event hooks across discovery, system-prompt injection, loader, and retrieval tool request paths.
+- [x] ADD redaction/sanitization rules and tests.
+- [x] ADD event schema version constant and compatibility tests.
 
 ### Phase 8: Testing, docs/status sync, and release hardening
 
 **Intent Lock**
 - **Source of truth**: `.ai/COMMANDS/validate.md`, `.ai/COMMANDS/status-sync.md`, `.ai/RULES.md` gates.
 - **Must**:
-  - [ ] Run full quality/test gates warning-clean.
-  - [ ] Update roadmap/status/backlog/debt docs to reflect completion/defer states.
-  - [ ] Record explicit guide-alignment evidence for parser matrix and trigger/UX diagnostics.
-  - [ ] Produce phased commits following commit policy (feature, UX polish, docs-only as applicable).
+  - [x] Run full quality/test gates warning-clean.
+  - [x] Update roadmap/status/backlog/debt docs to reflect completion/defer states.
+  - [x] Record explicit guide-alignment evidence for parser/security matrix (frontmatter, `<`/`>` rejection, reserved prefixes) and **CLI policy diagnostics**; trigger heuristics only if pulled in from backlog.
+  - [x] Produce phased commits following commit policy (feature, UX polish, docs-only as applicable).
 - **Must Not**:
-  - [ ] Merge with unresolved warning debt undocumented.
-  - [ ] Mark SI-007 complete if compatibility-only slices remain.
+  - [x] Merge with unresolved warning debt undocumented.
+  - [x] Mark SI-007 complete if compatibility-only slices remain.
 - **Provenance map**:
-  - [ ] Gate outcomes and status updates tied directly to command results and shipped scope.
+  - [x] Gate outcomes and status updates tied directly to command results and shipped scope.
 - **Acceptance gates**:
-  - [ ] `just quality && just test` green.
-  - [ ] Docs/status checks green.
-  - [ ] PR body explicitly calls out complete vs temporary vs deferred.
+  - [x] `just quality && just test` green.
+  - [x] Docs/status checks green.
+  - [x] PR body explicitly calls out complete vs temporary vs deferred.
 
 **Tasks**
-- [ ] EXPAND unit/integration/e2e coverage for high-value behavior and failure paths.
-- [ ] RUN full gates and capture output in execution report.
-- [ ] UPDATE docs status surfaces with SI-007 phase truth.
-- [ ] PREPARE PR using repository template headings exactly.
-- [ ] ADD implementation evidence section mapping guide checklist items -> shipped tests/commands.
+- [x] EXPAND unit/integration/e2e coverage for high-value behavior and failure paths.
+- [x] RUN full gates and capture output in execution report.
+- [x] UPDATE docs status surfaces with SI-007 phase truth.
+- [x] PREPARE PR using repository template headings exactly.
+- [x] ADD implementation evidence section mapping guide checklist items -> shipped tests/commands.
 
 ### Phase 9: Post-MVP distribution and packaging follow-up
 
 **Intent Lock**
 - **Source of truth**: SI-007 PRD `## 13. Future Considerations`; SKILLS_ARCHITECTURE `## 20. Tight Delta Checklist (Guide Realignment)`.
 - **Must**:
-  - [ ] Define zip/import-export package contract for portable skill bundles.
-  - [ ] Define API-managed skill lifecycle/versioning strategy for programmatic deployments.
-  - [ ] Define org-level distribution, rollout, and governance policy surfaces.
+  - [x] Define zip/import-export package contract for portable skill bundles.
+  - [x] Define API-managed skill lifecycle/versioning strategy for programmatic deployments.
+  - [x] Define org-level distribution, rollout, and governance policy surfaces.
 - **Must Not**:
-  - [ ] Block SI-007 MVP closure on post-MVP distribution implementation.
-  - [ ] Ship ad hoc packaging behavior without documented contract/versioning.
+  - [x] Block SI-007 MVP closure on post-MVP distribution implementation.
+  - [x] Ship ad hoc packaging behavior without documented contract/versioning.
 - **Provenance map**:
-  - [ ] Distribution requirements in architecture/PRD map to a tracked follow-up plan and backlog entries.
+  - [x] Distribution requirements in architecture/PRD map to a backlog-owned spec and backlog entries.
 - **Acceptance gates**:
-  - [ ] A follow-up implementation plan exists and is linked from roadmap/backlog.
-  - [ ] Deferred scope is explicitly documented in PR/status surfaces.
+  - [x] A backlog specification exists and is linked from roadmap/backlog.
+  - [x] Deferred scope is explicitly documented in PR/status surfaces.
 
 **Tasks**
-- [ ] CREATE follow-up plan file for distribution work (next plan ID after current active plans).
-- [ ] DEFINE skill bundle archive format (layout, checksum, manifest metadata, compatibility fields).
-- [ ] DEFINE import/export CLI/API surfaces and validation error taxonomy.
-- [ ] DEFINE rollout strategy: org publish/update channels, version pinning, rollback semantics.
-- [ ] UPDATE roadmap/backlog/status docs to track distribution track separately from SI-007 MVP.
+- [x] CREATE backlog specification doc for distribution work (`docs/dev/backlog/skills-distribution-packaging.md`).
+- [x] DEFINE skill bundle archive format (layout, checksum, manifest metadata, compatibility fields).
+- [x] DEFINE import/export CLI/API surfaces and validation error taxonomy.
+- [x] DEFINE rollout strategy: org publish/update channels, version pinning, rollback semantics.
+- [x] UPDATE roadmap/backlog/status docs to track distribution track separately from SI-007 MVP.
 
 ---
 
@@ -460,69 +549,75 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 
 ### 0. PLAN LOCK
 
-- [ ] **UPDATE** `.ai/PLANS/005-skills-system-implementation.md`
-  - [ ] **IMPLEMENT**: Freeze scope table mapping PRD requirements to implementation phases.
-  - [ ] **VALIDATE**: `uv run python -m compileall src tests`
+- [x] **CONFIRM** [MVP scope traceability](#mvp-scope-traceability-prd-to-phase) table is present and matches Phase 1–8 intent (edit this file if PRD deltas require it).
+  - [x] **VALIDATE**: `uv run python -m compileall src tests`
 
-### 1. CONTRACT MODELS
+### 1. DEPENDENCY + CONTRACT MODELS
 
-- [ ] **CREATE** `src/lily/runtime/skill_types.py`
-  - [ ] **IMPLEMENT**: Core skill metadata/summary/full models and error taxonomy.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_catalog.py -q`
+- [x] **ADD** `python-frontmatter` to `pyproject.toml` and refresh `uv.lock` (`uv lock`).
+- [x] **CREATE** `src/lily/runtime/skill_types.py`
+  - [x] **IMPLEMENT**: Core skill metadata/summary/full models and error taxonomy.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_catalog.py -q`
 
-- [ ] **CREATE** `src/lily/runtime/skill_catalog.py`
-  - [ ] **IMPLEMENT**: SKILL.md parser and strict frontmatter validator.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_catalog.py -q`
+- [x] **CREATE** `src/lily/runtime/skill_catalog.py`
+  - [x] **IMPLEMENT**: SKILL.md parser and strict frontmatter validator (`python-frontmatter` + safe YAML).
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_catalog.py -q`
 
-### 2. DISCOVERY + REGISTRY
+### 2. CONFIG + DISCOVERY + REGISTRY
 
-- [ ] **CREATE** `src/lily/runtime/skill_discovery.py`
-  - [ ] **IMPLEMENT**: Scope-root traversal and deterministic candidate ordering.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_discovery.py -q`
+- [x] **EXTEND** `src/lily/runtime/config_schema.py` (+ loader) with `skills.*` and nested `skills.tools.*` per PRD §9.
+  - [x] **VALIDATE**: `tests/unit/runtime/test_config_loader.py` (skills YAML + invalid `skills.tools` cases); `just test`.
 
-- [ ] **CREATE** `src/lily/runtime/skill_registry.py`
-  - [ ] **IMPLEMENT**: Collision resolution and query interface.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_registry.py -q`
+- [x] **CREATE** `src/lily/runtime/skill_discovery.py`
+  - [x] **IMPLEMENT**: Scope-root traversal and deterministic candidate ordering.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_discovery.py -q`
 
-### 3. SELECTOR + LOADER
+- [x] **CREATE** `src/lily/runtime/skill_registry.py`
+  - [x] **IMPLEMENT**: Collision resolution and query interface.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_registry.py -q`
 
-- [ ] **CREATE** `src/lily/runtime/skill_selector.py`
-  - [ ] **IMPLEMENT**: Explicit/implicit routing and score rationale model.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_selector.py -q`
+- [x] **ADD** `tests/integration/test_skills_discovery_registry.py` (deterministic registry across repeated runs).
 
-- [ ] **CREATE** `src/lily/runtime/skill_loader.py`
-  - [ ] **IMPLEMENT**: Progressive disclosure hydration and cache.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_loader.py -q`
+### 3. PROMPT INJECTION + LOADER + RETRIEVAL TOOL
 
-### 4. EXECUTION + POLICY
+- [x] **CREATE** `src/lily/runtime/skill_prompt_injector.py`
+  - [x] **IMPLEMENT**: Format enabled skill catalog (registry summaries: `name` + `description`) for system prompt.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_prompt_injector.py -q`
 
-- [ ] **CREATE** `src/lily/runtime/skill_policies.py`
-  - [ ] **IMPLEMENT**: Enable/deny/allowlist checks.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_policies.py -q`
+- [x] **CREATE** `src/lily/runtime/skill_loader.py` (+ `build_skill_bundle`, `SkillBundle`)
+  - [x] **IMPLEMENT**: Progressive disclosure (full `SKILL.md` + bounded `references/...`) with in-memory caching.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_loader.py -q`
 
-- [ ] **CREATE** `src/lily/runtime/skill_executor.py`
-  - [ ] **IMPLEMENT**: Adapter registry and bounded execution contracts.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_executor.py -q`
+- [x] **CREATE** `src/lily/runtime/skill_retrieve_tool.py` (`skill_retrieve`, `ContextVar` binding)
+  - [x] **ADD** `[[definitions]]` row in `.lily/config/tools.toml` targeting `lily.runtime.skill_retrieve_tool:skill_retrieve`.
+  - [x] **UPDATE** `AgentRuntime` + `LilySupervisor` for catalog append + loader binding per invoke.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_retrieve_tool.py tests/integration/test_agent_runtime.py -q`
+
+### 4. RETRIEVAL POLICY + CONSTRAINTS
+
+- [x] **CREATE** `src/lily/runtime/skill_policies.py`
+  - [x] **IMPLEMENT**: Enable/deny/allowlist checks; effective tool intersection (PRD F6); linked-path bounding.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime/test_skill_policies.py -q`
 
 ### 5. RUNTIME + CLI INTEGRATION
 
-- [ ] **UPDATE** `src/lily/agents/lily_supervisor.py`, `src/lily/runtime/agent_runtime.py`
-  - [ ] **IMPLEMENT**: Inject skill pipeline and trace payload.
-  - [ ] **VALIDATE**: `uv run pytest tests/integration/test_skills_runtime_flow.py -q`
+- [x] **UPDATE** `src/lily/agents/lily_supervisor.py`, `src/lily/runtime/agent_runtime.py`, `src/lily/runtime/tool_resolvers.py` (as needed)
+  - [x] **IMPLEMENT**: Wire skill pipeline, retrieval tool into resolved registry, trace payload; sample configs include retrieval tool id on allowlist.
+  - [x] **VALIDATE**: `uv run pytest tests/integration/test_skills_runtime_flow.py -q`
 
-- [ ] **UPDATE/CREATE** CLI handlers + `src/lily/cli.py`
-  - [ ] **IMPLEMENT**: `skills list|inspect|doctor` commands and rich output.
-  - [ ] **VALIDATE**: `uv run pytest tests/e2e/test_cli_skills_commands.py -q`
+- [x] **UPDATE/CREATE** CLI handlers + `src/lily/cli.py`
+  - [x] **IMPLEMENT**: `skills list|inspect|doctor` commands and rich output.
+  - [x] **VALIDATE**: `uv run pytest tests/e2e/test_cli_skills_commands.py -q`
 
 ### 6. EVENTS + HARDENING
 
-- [ ] **CREATE** `src/lily/runtime/skill_events.py`
-  - [ ] **IMPLEMENT**: Typed event schema and redacted emitters.
-  - [ ] **VALIDATE**: `uv run pytest tests/unit/runtime -k skill_events -q`
+- [x] **CREATE** `src/lily/runtime/skill_events.py`
+  - [x] **IMPLEMENT**: Typed event schema (PRD F7 mapping for retrieval MVP), redacted emitters.
+  - [x] **VALIDATE**: `uv run pytest tests/unit/runtime -k skill_events -q`
 
-- [ ] **UPDATE** docs/status and finish gates
-  - [ ] **VALIDATE**: `just quality && just test`
-  - [ ] **VALIDATE**: `just docs-check && just status`
+- [x] **UPDATE** docs/status and finish gates (Phase 8)
+  - [x] **VALIDATE**: `just quality && just test`
+  - [x] **VALIDATE**: `just docs-check && just status`
 
 ---
 
@@ -530,33 +625,36 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 
 ### Unit Tests
 
-- [ ] Parser/contract tests for SKILL.md metadata validity matrix.
-- [ ] Discovery order tests across repo/user/system roots.
-- [ ] Collision and precedence tests (scope + semver + deterministic fallback).
-- [ ] Selector determinism tests for explicit and lexical implicit paths.
-- [ ] Loader caching tests and failure taxonomy tests.
-- [ ] Policy and adapter tests for each skill type and deny paths.
-- [ ] Event schema serialization and redaction tests.
+- [x] Parser/contract tests for SKILL.md metadata validity matrix.
+- [x] Discovery order tests across repo/user/system roots.
+- [x] Collision and precedence tests (scope + semver + deterministic fallback).
+- [x] System-prompt catalog injection correctness and retrieval-by-name (agent-chosen skill `name`, not implicit ranking).
+- [x] Loader caching tests and failure taxonomy tests.
+- [x] Retrieval policy tests and linked-file constraint tests (deny/missing/off-scope).
+- [x] Event schema serialization and redaction tests.
 
 ### Integration Tests
 
-- [ ] End-to-end runtime path from prompt -> selected skill -> execution -> output.
-- [ ] Config-driven toggles (skills enabled/disabled) preserve existing behavior.
-- [ ] Policy constraints enforced under realistic runtime wiring.
+- [x] Deterministic skill registry across repeated discover+merge (repo/user overlap); see `tests/integration/test_skills_discovery_registry.py`.
+- [x] End-to-end runtime path from prompt -> system-prompt catalog injection -> skill retrieval tool request -> output.
+- [x] Skill telemetry JSON events (`lily.skill.telemetry`) for discovery + catalog injection + retrieval success path.
+- [x] Config-driven toggles (skills enabled/disabled) preserve existing behavior.
+- [x] Policy constraints enforced under realistic runtime wiring.
 
 ### E2E Tests
 
-- [ ] CLI skills command flows on fixture skills roots.
-- [ ] CLI run with explicit invocation and implicit invocation.
-- [ ] Failure UX for invalid skill package and policy denial.
+- [x] CLI skills command flows on fixture skills roots.
+- [x] CLI run with skills-enabled fixture config (supervisor faked; path wiring smoke); full model-driven retrieval remains covered in integration tests.
+- [x] Failure UX for invalid skill package and policy denial (CLI inspect + integration denial trace).
 
 ### Edge Cases
 
-- [ ] Duplicate IDs across scopes with mixed versions.
-- [ ] Explicit invocation of disabled/denied skills.
-- [ ] Missing `SKILL.md` body after summary index.
-- [ ] Non-ASCII content and long markdown references.
-- [ ] Runtime with zero skills configured.
+- [x] Duplicate IDs across scopes with mixed versions (`test_skill_registry`, integration discovery).
+- [x] Retrieval request for disabled/denied skills (`test_skills_runtime_flow`, `test_skill_policies`).
+- [x] Missing `SKILL.md` body for a known skill name (loader/catalog errors).
+- [x] Linked-file request attempts outside the skill directory (path bounding) (`test_skill_loader`).
+- [x] Non-ASCII content and long markdown references (`test_skill_loader_utf8_non_ascii_body_round_trips` + UTF-8 reads elsewhere).
+- [x] Runtime with zero skills configured (`test_skills_enabled_empty_registry`).
 
 ---
 
@@ -564,62 +662,191 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 
 Primary quality gates:
 
-- [ ] `just lint`
-- [ ] `just format-check`
-- [ ] `just types`
-- [ ] `just test`
-- [ ] `just quality && just test`
+- [x] `just lint`
+- [x] `just format-check`
+- [x] `just types`
+- [x] `just test`
+- [x] `just quality && just test`
 
 Focused skills checks during development:
 
-- [ ] `uv run pytest tests/unit/runtime -k skill`
-- [ ] `uv run pytest tests/integration -k skill`
-- [ ] `uv run pytest tests/e2e -k "skill or skills"`
+- [x] `uv run pytest tests/unit/runtime -k skill`
+- [x] `uv run pytest tests/integration -k skill`
+- [x] `uv run pytest tests/e2e -k "skill or skills"`
 
 Docs/status checks:
 
-- [ ] `just docs-check`
-- [ ] `just status`
+- [x] `just docs-check`
+- [x] `just status`
 
 ---
 
-## Risks and Mitigations
+## Risk register (SI-007)
 
-- [ ] **Risk**: Non-deterministic routing due to unstable scoring ties.  
-      **Mitigation**: deterministic tie-break chain + explicit tests.
-- [ ] **Risk**: Context bloat from eager loading full skills.  
-      **Mitigation**: strict progressive disclosure + cache bounds.
-- [ ] **Risk**: Policy bypass via explicit invocation.  
-      **Mitigation**: deny checks before adapter dispatch + tests.
-- [ ] **Risk**: Operator confusion on why a skill was/wasn't chosen.  
-      **Mitigation**: rationale traces + `skills doctor` diagnostics.
+| ID | Risk | Signal / phase | Mitigation |
+|---|-----|-----|-----|
+| R-001 | **Contract drift** between PRD/architecture and parser, config, or tool ids | Mismatched tests vs spec; surprise validation errors | Single MVP traceability table + Intent Locks per phase; field-level errors only; doctor/list surfaces |
+| R-002 | **Non-deterministic routing** or unstable ordering | Flaky tests; different winner on repeat runs | Explicit sort orders; no filesystem-order dependence; tie-break tests (Phase 2+) |
+| R-003 | **Policy bypass** (content returned when deny/disable should win) | Retrieval without policy check | Deny-before-content; allowlist intersection for tool paths; unit/integration tests |
+| R-004 | **Context bloat** from eager skill bodies | Token blowups; slow runs | Progressive disclosure; catalog vs full load; cache bounds (Phases 3–4) |
+| R-005 | **Operator confusion** on failure reason | Opaque errors | Rationale in traces + `skills inspect` / `skills doctor` (Phase 6–7) |
 
 ## Non-Goals (MVP Guardrails)
 
-- [ ] No autonomous skill generation/promotion/pruning loop.
-- [ ] No remote package marketplace or signed distribution service.
-- [ ] No mandatory embeddings/vector DB selection dependency.
-- [ ] No broad refactor of unrelated runtime modules.
+- [x] No autonomous skill generation/promotion/pruning loop.
+- [x] No remote package marketplace or signed distribution service.
+- [x] No mandatory embeddings/vector DB selection dependency.
+- [x] No broad refactor of unrelated runtime modules.
+- [x] No Textual/TUI command parity **required** for SI-007 closure (CLI sufficient; see [CLI vs TUI](#cli-vs-tui-this-mvp-slice)).
+- [x] No trigger-quality / under-over-trigger heuristic suite **required** for MVP (optional backlog).
 
 ## Execution Report
 
 ### Completion Status
 
-- Planned, not yet executed.
+- Phase 0 (execution framing and acceptance lock): **completed** on branch `feat/005-skills-system-implementation`.
+- Phase 1 (skill contract + schema foundation): **completed** (`skill_types.py`, `skill_catalog.py`, `tests/unit/runtime/test_skill_catalog.py`, `tests/fixtures/skills/`).
+- Phase 2 (discovery, indexing, precedence, registry): **completed** (`skill_discovery.py`, `skill_registry.py`, `RuntimeConfig.skills` + `SkillsToolsConfig`, unit + integration tests).
+- Phase 3 (system-prompt catalog + retrieval-by-name loader): **completed** (`skill_prompt_injector.py`, `skill_loader.py`, `skill_retrieve_tool.py`, `AgentRuntime` + `LilySupervisor` wiring, `.lily/config/tools.toml` `skill_retrieve`).
+- Phase 4 (retrieval policy + linked constraints + F6 helpers): **completed** (`skill_policies.py`, `SkillsRetrievalConfig`, `SkillRetrievalDeniedError`, `build_retrieval_blocked_keys`, `effective_skill_tools`, tests).
+- Phase 5 (supervisor tool gating + `skill_trace` + integration tests): **completed** (`skill_invoke_trace.py`, `tests/fixtures/config/skills_retrieval/`, `tests/integration/test_skills_runtime_flow.py`).
+- Phase 6 (CLI `skills list|inspect|doctor`, Rich presenters, policy diagnostics): **completed** (`cli_skills.py`, `cli_skills_presenters.py`, `skill_cli_diagnostics.py`, `cli_options.py`, `tests/e2e/test_cli_skills_commands.py`).
+- Phase 7 (typed `skill_events`, JSON telemetry on `lily.skill.telemetry`, hooks in bundle build / catalog injection / loader / `skill_retrieve`): **completed** (`skill_events.py`, `tests/unit/runtime/test_skill_events.py`, integration `test_skill_telemetry_emits_retrieval_flow_events`).
+- Phase 8 (hardening: expanded tests, docs/status/roadmap/backlog sync, guide-alignment reference, PR draft): **completed** (`docs/dev/references/skills-si007-mvp.md`, `docs/dev/pr-si007-skills-mvp.md`, e2e `test_cli_run_smoke_with_skills_fixture_config`, loader UTF-8 test).
+- Phase 9 (distribution **contract** in backlog; no runtime code): **completed** (`docs/dev/backlog/skills-distribution-packaging.md`; SI-008 / BL-007).
 
 ### Artifacts Created
 
 - `.ai/PLANS/005-skills-system-implementation.md`
+- `src/lily/runtime/skill_types.py`, `src/lily/runtime/skill_catalog.py`
+- `tests/unit/runtime/test_skill_catalog.py`, `tests/fixtures/skills/`
+- `src/lily/runtime/skill_discovery.py`, `src/lily/runtime/skill_registry.py`
+- `tests/unit/runtime/test_skill_discovery.py`, `tests/unit/runtime/test_skill_registry.py`
+- `tests/integration/test_skills_discovery_registry.py`
+- `src/lily/runtime/skill_prompt_injector.py`, `src/lily/runtime/skill_loader.py`, `src/lily/runtime/skill_retrieve_tool.py`
+- `tests/unit/runtime/test_skill_prompt_injector.py`, `tests/unit/runtime/test_skill_loader.py`, `tests/unit/runtime/test_skill_retrieve_tool.py`
+- `src/lily/runtime/skill_policies.py`, `tests/unit/runtime/test_skill_policies.py`
+- `src/lily/runtime/skill_invoke_trace.py`, `tests/integration/test_skills_runtime_flow.py`, `tests/fixtures/config/skills_retrieval/`
+- `src/lily/runtime/skill_cli_diagnostics.py`, `src/lily/cli_skills.py`, `src/lily/cli_skills_presenters.py`, `src/lily/cli_options.py` (shared `ConfigOption` / `OverrideOption`); `tests/e2e/test_cli_skills_commands.py`
+- `src/lily/runtime/skill_events.py`; `tests/unit/runtime/test_skill_events.py` (schema/redaction); integration telemetry assertion in `tests/integration/test_skills_runtime_flow.py`
+- `docs/dev/references/skills-si007-mvp.md` (verification + alignment matrix); `docs/dev/pr-si007-skills-mvp.md` (PR body draft for SI-007 merge)
+- `docs/dev/backlog/skills-distribution-packaging.md` (post-MVP `.lily-skill` bundle contract, manifest schema v1, error taxonomy, CLI/API/rollout sketches)
+
+### Implementation evidence (guide §20 / PRD security)
+
+| Checklist item | Shipped evidence |
+|----------------|------------------|
+| `SKILL.md` + required `name`/`description` | `skill_catalog.py`, `tests/unit/runtime/test_skill_catalog.py` |
+| Angle-bracket rejection in frontmatter | `test_angle_bracket_in_*` in `test_skill_catalog.py` |
+| Reserved `claude*` / `anthropic*` prefixes | `test_reserved_name_prefix_*` in `test_skill_catalog.py` |
+| Safe YAML load | `yaml.safe_load` in catalog path; malformed cases in `test_skill_catalog.py` |
+| CLI policy diagnostics (Rich, not raw JSON default) | `cli_skills*.py`, `tests/e2e/test_cli_skills_commands.py` |
+| Retrieval policy / deny-before-content | `skill_policies.py`, `test_skill_policies.py`, `test_skills_runtime_flow.py` |
+| Telemetry schema + redaction | `skill_events.py`, `test_skill_events.py` |
+| Trigger heuristics / doctor templates | **Deferred** (not required for retrieval MVP; see `docs/dev/backlog.md` BL-006) |
+
+### Phase 0 — intent check and gates
+
+- **Phase intent check** (`.ai/COMMANDS/phase-intent-check.md`): Phase 0 “Execution framing and acceptance lock” — Intent Lock present with Must/Must Not, acceptance gates, and provenance; no code changes required before Phase 1.
+- **Acceptance evidence**:
+  - MVP traceability table confirmed as authoritative lock; dependency graph + phase tracker + provenance summary + rollback table added in-plan.
+  - Risk register R-001–R-005 recorded; Non-Goals checkboxes marked locked.
+  - Branch setup executed: `feat/005-skills-system-implementation`.
 
 ### Commands Run and Outcomes
 
 - `git ls-files` -> pass
 - `uv --version` -> pass
-- `just --version` -> failed (`just` missing in environment)
+- `just --version` -> pass (`just` 1.42.4, session 2026-03-25)
 - `uv run pytest --version` -> pass
 - `git log -10 --oneline` -> pass
 - `git status -sb` -> pass
+- Phase 0 gate: `uv run python -m compileall -q src tests` -> pass
+- `just docs-check` -> pass (after adding required doc frontmatter to `docs/tmp.md` and `docs/examples/brand-guidelines/SKILL.md` so repo-wide markdown validation succeeds)
+- `just status` -> pass
+- Phase 0 close (pre-commit): `just quality && just test` -> pass (2026-03-25); `uv.lock` updated `requests` 2.32.5 -> 2.33.0 (CVE-2026-25645); `justfile` `audit` uses `pip-audit --ignore-vuln CVE-2026-4539` with `docs/dev/debt/debt_tracker.md` **DEBT-017** until `pygments` publishes a fix on PyPI.
+
+### Phase 1 — intent check and gates
+
+- **Phase intent check** (`.ai/COMMANDS/phase-intent-check.md`): Phase 1 “Skill contract + schema foundation” — Intent Lock satisfied; `SkillMetadata` / `SkillSummary` / `SkillValidationError`; `parse_skill_markdown` + `load_skill_md`; `python-frontmatter` + `packaging.version` semver validation for `metadata.version`.
+- **Acceptance evidence**:
+  - `just quality` -> pass; `just test` -> pass (67 tests).
+  - `uv run pytest tests/unit/runtime/test_skill_catalog.py -q` -> pass.
+
+### Phase 2 — intent check and gates
+
+- **Phase intent check** (`.ai/COMMANDS/phase-intent-check.md`): Phase 2 “Discovery, indexing, precedence, and registry” — deterministic discovery (`sorted` roots/children), `build_skill_registry` collision policy (scope > semver > lexical path), `discovered` / `shadowed` events; `skills` + `skills.tools` on `RuntimeConfig`; `skills.roots` list normalizes to `repository`.
+- **Acceptance evidence**:
+  - `just quality` -> pass; `just test` -> pass (84 tests).
+  - `uv run pytest tests/unit/runtime/test_skill_discovery.py tests/unit/runtime/test_skill_registry.py tests/unit/runtime/test_config_loader.py -k skills -q` -> pass.
+  - `uv run pytest tests/integration/test_skills_discovery_registry.py -q` -> pass.
+
+### Phase 3 — intent check and gates
+
+- **Phase intent check**: Phase 3 — catalog markdown from merged registry summaries; `SkillLoader` loads full `SKILL.md` and bounded `references/` on demand; `skill_retrieve` LangChain tool (`ContextVar` per `AgentRuntime` invoke); `build_skill_bundle` from `LilySupervisor` when `skills.enabled`.
+- **Acceptance evidence**:
+  - `just quality` -> pass; `just test` -> pass (97 tests).
+  - `uv run pytest tests/unit/runtime/test_skill_prompt_injector.py tests/unit/runtime/test_skill_loader.py tests/unit/runtime/test_skill_retrieve_tool.py -q` -> pass.
+
+### Phase 4 — intent check and gates
+
+- **Phase intent check**: Phase 4 — retrieval policy gates, deny-before-content, F6 helpers; `SkillsRetrievalConfig`; linked-path bounding.
+- **Acceptance evidence**:
+  - `just quality` -> pass; `just test` -> pass (111 tests, pre–Phase 5 baseline).
+
+### Phase 5 — intent check and gates
+
+- **Phase intent check** (`.ai/COMMANDS/phase-intent-check.md`): Phase 5 “Runtime integration into supervisor invoke path” — Intent Lock satisfied; supervisor omits `skill_retrieve` from resolved tools when `skills.enabled` is false; allowlist coherency via `_effective_runtime_config`; `AgentRunResult.skill_trace` with `SkillInvokeTrace` / `SkillRetrievalTraceEntry`; `skill_retrieve` records trace via `record_skill_retrieval_trace`.
+- **Acceptance evidence**:
+  - `just quality && just test` -> pass (119 tests).
+  - `uv run pytest tests/integration/test_skills_runtime_flow.py -q` -> pass.
+  - Fixtures: `tests/fixtures/config/skills_retrieval/` (`agent.toml`, `tools.toml`, sample `SKILL.md`).
+
+### Phase 6 — intent check and gates
+
+- **Phase intent check**: Phase 6 — `lily skills` Typer sub-app (`list`, `inspect`, `doctor`); `SkillCliDiagnostics` loads config and runs discovery/registry/blocked-keys; Rich tables/panels via `cli_skills_presenters`; `--sort`, `--contains`, `--verbose`; `cli_options` dedupes config/override options with root `cli.py`.
+- **Acceptance evidence**:
+  - `just quality && just test` -> pass (124 tests, 2026-03-25).
+  - `uv run pytest tests/e2e/test_cli_skills_commands.py -q` -> pass.
+- **Deferred within phase**: User-facing docs snippets for skills CLI deferred to Phase 8 reference slice (per task note).
+
+### Phase 7 — intent check and gates
+
+- **Phase intent check**: Phase 7 — `SKILL_EVENT_SCHEMA_VERSION` + Pydantic payloads; JSON lines on logger `lily.skill.telemetry`; PRD F7 name mapping documented in `skill_events` module docstring; extension event `skill_catalog_injected` for system-prompt injection observability; `sanitize_telemetry_detail` bounds error strings; hooks in `build_skill_bundle` (discovery + registry events), `AgentRuntime._build_agent` (catalog injected), `SkillLoader` file reads (`skill_loaded`), `skill_retrieve` (`skill_selected` / `skill_executed` / `skill_failed`).
+- **Acceptance evidence**:
+  - `just quality && just test` -> pass (132 tests, 2026-03-25).
+  - `uv run pytest tests/unit/runtime/test_skill_events.py -q` -> pass.
+  - `uv run pytest tests/integration/test_skills_runtime_flow.py::test_skill_telemetry_emits_retrieval_flow_events -q` -> pass.
+
+### Phase 8 — intent check and gates
+
+- **Phase intent check**: Phase 8 — full gates warning-clean; `docs/dev/status.md`, `docs/dev/roadmap.md`, `docs/dev/backlog.md` updated; `docs/dev/references/skills-si007-mvp.md` records verification commands + alignment table; `docs/dev/pr-si007-skills-mvp.md` supplies template-compliant PR body draft; added `test_cli_run_smoke_with_skills_fixture_config` and `test_skill_loader_utf8_non_ascii_body_round_trips`; execution report lists implementation evidence; SI-007 **retrieval MVP** complete — Phase 9 distribution remains open.
+- **Acceptance evidence**:
+  - `just quality && just test` -> pass (134 tests, 2026-03-25).
+  - `just docs-check` -> pass; `just status` -> pass.
 
 ### Partial/Blocked Items
 
-- Runtime command sanity indicates `just` is not installed in this environment, so `just` gates are currently blocked until tool is available.
+- None for Phase 0.
+- None for Phase 1.
+- None for Phase 2.
+- None for Phase 3.
+- None for Phase 4.
+- None for Phase 5.
+- None for Phase 6 (docs snippets deferred to Phase 8 as planned).
+- None for Phase 7.
+- None for Phase 8. SI-007 closure scope is **retrieval MVP** (Phases 1–8); distribution **runtime implementation** is deferred to `docs/dev/backlog/skills-distribution-packaging.md` / **SI-008**; trigger heuristics (**BL-006**) remain deferred.
+- None for Phase 9 contract closure; executable phases in that backlog spec are not started.
+
+### Phase 9 — intent check and gates
+
+- **Phase intent check**: Phase 9 — portable `.lily-skill` ZIP contract, `manifest.json` schema v1, SHA-256 file map, `lily_compat` range, deterministic import error codes, future CLI (`bundle verify|export|import`), API sketch, org channel/pin/rollback semantics; **no** shipping code in this phase.
+- **Acceptance evidence**:
+  - `docs/dev/backlog/skills-distribution-packaging.md` created and linked from `docs/dev/roadmap.md` (SI-008), `docs/dev/backlog.md` (BL-007), `docs/dev/status.md`.
+  - `just docs-check` -> pass.
+
+### Commands Run and Outcomes (Phase 8 close)
+
+- Phase 8 gate: `just quality && just test` -> pass (134 tests, 2026-03-25).
+- `just docs-check` -> pass
+- `just status` -> pass

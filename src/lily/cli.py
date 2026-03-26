@@ -11,6 +11,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from lily.agents.lily_supervisor import LilySupervisor
+from lily.cli_options import ConfigOption, OverrideOption
+from lily.cli_skills import skills_app
 from lily.runtime.agent_runtime import AgentRuntimeError
 from lily.runtime.config_loader import ConfigLoadError
 from lily.runtime.conversation_sessions import (
@@ -25,34 +27,11 @@ from lily.runtime.tool_resolvers import ToolResolverError
 from lily.ui.app import LilyTuiApp
 
 app = typer.Typer(no_args_is_help=True)
+app.add_typer(skills_app, name="skills")
 _console = Console()
 PromptOption = Annotated[
     str,
     typer.Option(..., "--prompt", help="Prompt text to send to Lily."),
-]
-ConfigOption = Annotated[
-    Path,
-    typer.Option(
-        "--config",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        readable=True,
-        resolve_path=False,
-        help="Path to base runtime config (.yaml/.yml/.toml).",
-    ),
-]
-OverrideOption = Annotated[
-    Path | None,
-    typer.Option(
-        "--override",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        readable=True,
-        resolve_path=False,
-        help="Optional path to runtime override config (.yaml/.yml/.toml).",
-    ),
 ]
 ConversationIdOption = Annotated[
     str | None,
@@ -66,6 +45,16 @@ LastConversationOption = Annotated[
     typer.Option(
         "--last-conversation",
         help="Attach to the most recently used conversation id.",
+    ),
+]
+ShowSkillTelemetryOption = Annotated[
+    bool,
+    typer.Option(
+        "--show-skill-telemetry",
+        help=(
+            "Print skill telemetry JSON to stderr; default is file-only "
+            "(see [logging].skill_telemetry_log / .lily/logs/skill-telemetry.jsonl)."
+        ),
     ),
 ]
 
@@ -134,12 +123,13 @@ def app_callback() -> None:
 
 
 @app.command("run")
-def run_command(
+def run_command(  # noqa: PLR0913
     prompt: PromptOption,
     config: ConfigOption = Path(".lily/config/agent.toml"),
     override: OverrideOption = None,
     conversation_id: ConversationIdOption = None,
     last_conversation: LastConversationOption = False,
+    show_skill_telemetry: ShowSkillTelemetryOption = False,
 ) -> None:
     """Run a single prompt using config-driven Lily supervisor runtime.
 
@@ -149,6 +139,7 @@ def run_command(
         override: Optional override runtime config path.
         conversation_id: Optional explicit conversation id attach target.
         last_conversation: Whether to attach to most-recent conversation.
+        show_skill_telemetry: Mirror skill F7 JSON telemetry to stderr.
 
     Raises:
         Exit: Raised with non-zero code when runtime/config fails.
@@ -158,7 +149,11 @@ def run_command(
             conversation_id=conversation_id,
             last_conversation=last_conversation,
         )
-        supervisor = LilySupervisor.from_config_paths(config, override)
+        supervisor = LilySupervisor.from_config_paths(
+            config,
+            override,
+            skill_telemetry_echo=show_skill_telemetry,
+        )
         result = supervisor.run_prompt(
             prompt,
             conversation_id=resolved_conversation_id,
@@ -189,6 +184,7 @@ def tui_command(
     override: OverrideOption = None,
     conversation_id: ConversationIdOption = None,
     last_conversation: LastConversationOption = False,
+    show_skill_telemetry: ShowSkillTelemetryOption = False,
 ) -> None:
     """Launch Textual TUI using config-driven Lily supervisor runtime.
 
@@ -197,6 +193,7 @@ def tui_command(
         override: Optional override runtime config path.
         conversation_id: Optional explicit conversation id attach target.
         last_conversation: Whether to attach to most-recent conversation.
+        show_skill_telemetry: Mirror skill F7 JSON telemetry to stderr.
 
     Raises:
         Exit: Raised with non-zero code when runtime/config fails.
@@ -210,6 +207,7 @@ def tui_command(
             config_path=config,
             override_config_path=override,
             conversation_id=resolved_conversation_id,
+            skill_telemetry_echo=show_skill_telemetry,
         )
         app.run()
     except (

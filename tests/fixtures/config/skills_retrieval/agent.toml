@@ -1,0 +1,39 @@
+schema_version = 1
+
+[agent]
+name = "lily-skills-fixture"
+system_prompt = "You are a test agent."
+
+[models.profiles.default]
+provider = "openai"
+model = "gpt-5-nano"
+temperature = 0.1
+timeout_seconds = 30
+
+[models.profiles.long_context]
+provider = "openai"
+model = "gpt-5-nano"
+temperature = 0.1
+timeout_seconds = 60
+
+[models.routing]
+enabled = false
+default_profile = "default"
+long_context_profile = "long_context"
+complexity_threshold = 8000
+
+[tools]
+allowlist = ["skill_retrieve", "echo_tool"]
+
+[policies]
+max_iterations = 20
+max_model_calls = 40
+max_tool_calls = 40
+
+[logging]
+level = "INFO"
+
+[skills]
+enabled = true
+roots = { repository = ["./skills"] }
+scopes_precedence = ["repository", "user", "system"]

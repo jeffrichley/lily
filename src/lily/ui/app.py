@@ -30,23 +30,29 @@ class _SupervisorProtocol(Protocol):
         """
 
 
-type SupervisorFactory = Callable[[Path, Path | None], _SupervisorProtocol]
+type SupervisorFactory = Callable[[Path, Path | None, bool], _SupervisorProtocol]
 
 
 def _default_supervisor_factory(
     config_path: Path,
     override_config_path: Path | None,
+    skill_telemetry_echo: bool = False,
 ) -> _SupervisorProtocol:
     """Build default supervisor from config paths.
 
     Args:
         config_path: Base runtime config path.
         override_config_path: Optional runtime override config path.
+        skill_telemetry_echo: Mirror skill telemetry JSON to stderr when true.
 
     Returns:
         Configured Lily supervisor instance.
     """
-    return LilySupervisor.from_config_paths(config_path, override_config_path)
+    return LilySupervisor.from_config_paths(
+        config_path,
+        override_config_path,
+        skill_telemetry_echo=skill_telemetry_echo,
+    )
 
 
 class LilyTuiApp(App[None]):
@@ -67,6 +73,7 @@ class LilyTuiApp(App[None]):
         override_config_path: Path | None = None,
         conversation_id: str | None = None,
         supervisor_factory: SupervisorFactory = _default_supervisor_factory,
+        skill_telemetry_echo: bool = False,
     ) -> None:
         """Initialize TUI app with config-driven supervisor factory.
 
@@ -75,12 +82,14 @@ class LilyTuiApp(App[None]):
             override_config_path: Optional runtime override config path.
             conversation_id: Active conversation id for this TUI process.
             supervisor_factory: Factory building supervisor runtime object.
+            skill_telemetry_echo: Passed through when constructing the supervisor.
         """
         super().__init__()
         self._config_path = config_path
         self._override_config_path = override_config_path
         self._conversation_id = conversation_id
         self._supervisor_factory = supervisor_factory
+        self._skill_telemetry_echo = skill_telemetry_echo
         self._supervisor: _SupervisorProtocol | None = None
 
     def on_mount(self) -> None:
@@ -97,6 +106,7 @@ class LilyTuiApp(App[None]):
             self._supervisor = self._supervisor_factory(
                 self._config_path,
                 self._override_config_path,
+                self._skill_telemetry_echo,
             )
         return self._supervisor
 

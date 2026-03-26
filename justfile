@@ -53,8 +53,10 @@ docstr-coverage:
     uv run docstr-coverage src --skip-private --skip-magic --skip-init -v 2
 
 # Security: dependency vulnerabilities (pip-audit)
+# CVE-2026-4539 (pygments): no release >2.19.2 on PyPI yet; low-severity local ReDoS.
+# Tracked: docs/dev/debt/debt_tracker.md (DEBT-017). Remove --ignore-vuln when upstream ships a fix.
 audit:
-    uv run pip-audit
+    uv run pip-audit --ignore-vuln CVE-2026-4539
 
 # Security: static analysis (bandit); config in pyproject.toml
 bandit:
@@ -77,6 +79,10 @@ pre-commit-install:
 pre-commit:
     uv run pre-commit run --all-files
 
+# Secret scan (pre-commit gitleaks hook); also runs in CI via `just quality-check`
+secrets-check:
+    uv run pre-commit run gitleaks --all-files
+
 # Conventional commits: interactive commit (Commitizen)
 commit:
     uv run cz commit
@@ -89,7 +95,7 @@ commit-check:
 quality: format lint types complexity vulture darglint audit bandit radon find-dupes docstr-coverage docs-check
 
 # Check-only quality lane (CI-safe; no write)
-quality-check: format-check lint-check types complexity vulture darglint audit bandit radon find-dupes docstr-coverage docs-check
+quality-check: format-check lint-check types complexity vulture darglint audit bandit radon find-dupes docstr-coverage docs-check secrets-check
 
 # Lighter target for day-to-day reboot development
 quality-dev: format lint types darglint

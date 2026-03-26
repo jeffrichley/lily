@@ -455,3 +455,183 @@ level = "INFO"
     # Assert - parsed server mapping is available for runtime wiring.
     assert "langgraph_docs" in config.mcp_servers
     assert config.mcp_servers["langgraph_docs"].transport == "streamable_http"
+
+
+def _minimal_runtime_yaml_with_skills(skills_block: str) -> str:
+    """Return a valid runtime YAML document with an optional ``skills`` section."""
+    return f"""
+schema_version: 1
+agent:
+  name: lily
+  system_prompt: "You are Lily."
+models:
+  profiles:
+    default:
+      provider: openai
+      model: gpt-4o-mini
+      temperature: 0.1
+      timeout_seconds: 30
+    long_context:
+      provider: openai
+      model: gpt-4o
+      temperature: 0.1
+      timeout_seconds: 45
+  routing:
+    enabled: true
+    default_profile: default
+    long_context_profile: long_context
+    complexity_threshold: 8
+tools:
+  allowlist:
+    - filesystem_read
+policies:
+  max_iterations: 12
+  max_model_calls: 20
+  max_tool_calls: 20
+logging:
+  level: INFO
+{skills_block}
+"""
+
+
+def test_load_runtime_config_skills_omitted_is_none(tmp_path: Path) -> None:
+    """When no ``skills`` key is present, ``RuntimeConfig.skills`` is None."""
+    # Arrange - valid base YAML without a skills section
+    config_file = tmp_path / "agent.yaml"
+    _write(config_file, _minimal_runtime_yaml_with_skills(""))
+
+    # Act - load and validate runtime config
+    config = load_runtime_config(config_file)
+
+    # Assert - optional skills block stays unset
+    assert config.skills is None
+
+
+def test_load_runtime_config_parses_skills_block_yaml(tmp_path: Path) -> None:
+    """Parses ``skills`` roots list, precedence, and nested ``skills.tools``."""
+    # Arrange - YAML with list-form roots and tool packs
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        _minimal_runtime_yaml_with_skills(
+            """
+skills:
+  enabled: true
+  roots: [".skills"]
+  scopes_precedence: [repository, user, system]
+  tools:
+    default_policy: inherit_runtime
+    packs:
+      core:
+        - filesystem_read
+""",
+        ),
+    )
+
+    # Act - load config including skills subtree
+    config = load_runtime_config(config_file)
+
+    # Assert - skills model is normalized and tool pack ids resolve
+    assert config.skills is not None
+    assert config.skills.enabled is True
+    assert config.skills.roots == {"repository": [".skills"]}
+    assert config.skills.scopes_precedence == ["repository", "user", "system"]
+    assert "core" in config.skills.tools.packs
+    assert config.skills.tools.packs["core"] == ["filesystem_read"]
+
+
+def test_load_runtime_config_rejects_skills_tools_unknown_default_pack(
+    tmp_path: Path,
+) -> None:
+    """Rejects ``default_packs`` entries that are not keys in ``skills.tools.packs``."""
+    # Arrange - default_packs references a missing pack id
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        _minimal_runtime_yaml_with_skills(
+            """
+skills:
+  enabled: true
+  roots: [".skills"]
+  tools:
+    default_packs: [core]
+    packs: {}
+""",
+        ),
+    )
+
+    # Act - attempt to validate skills.tools cross-references
+    with pytest.raises(ConfigLoadError) as err:
+        load_runtime_config(config_file)
+
+    # Assert - error cites the unknown pack reference
+    assert "default_packs" in str(err.value)
+    assert "core" in str(err.value)
+
+
+def test_load_runtime_config_rejects_skills_tools_use_default_packs_empty(
+    tmp_path: Path,
+) -> None:
+    """Rejects ``use_default_packs`` when ``default_packs`` is empty."""
+    # Arrange - policy requires packs but none are listed
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        _minimal_runtime_yaml_with_skills(
+            """
+skills:
+  enabled: true
+  roots: [".skills"]
+  tools:
+    default_policy: use_default_packs
+    default_packs: []
+    packs:
+      core:
+        - filesystem_read
+""",
+        ),
+    )
+
+    # Act - attempt to validate policy vs default_packs
+    with pytest.raises(ConfigLoadError) as err:
+        load_runtime_config(config_file)
+
+    # Assert - error explains the forbidden combination
+    assert "use_default_packs" in str(err.value).lower() or "default_packs" in str(
+        err.value,
+    )
+
+
+def test_load_runtime_config_rejects_skills_tools_invalid_tool_id(
+    tmp_path: Path,
+) -> None:
+    """Rejects malformed tool ids inside ``skills.tools.packs``."""
+    # Arrange - tool id uses invalid characters
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        _minimal_runtime_yaml_with_skills(
+            """
+skills:
+  enabled: true
+  roots: [".skills"]
+  tools:
+    packs:
+      core:
+        - NOT_A_VALID_ID
+""",
+        ),
+    )
+
+    # Act - attempt to validate tool id pattern
+    with pytest.raises(ConfigLoadError) as err:
+        load_runtime_config(config_file)
+
+    # Assert - error references the offending tool id
+    assert (
+        "NOT_A_VALID_ID" in str(err.value)
+        or "invalid tool id"
+        in str(
+            err.value,
+        ).lower()
+    )

@@ -24,6 +24,7 @@ dependencies = [
     "langchain-mcp-adapters>=0.2.1",
     "aiosqlite>=0.22.1",
     "python-dotenv>=1.2.2",
+    "python-frontmatter>=1.1.0",
 ]
 
 [project.scripts]

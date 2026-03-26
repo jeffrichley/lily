@@ -17,11 +17,20 @@ from langchain.agents.middleware import (
 )
 from langchain_core.messages import AIMessage, BaseMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from lily.runtime.config_schema import RuntimeConfig
 from lily.runtime.model_factory import ModelFactory
 from lily.runtime.model_router import DynamicModelRouter
+from lily.runtime.skill_events import emit_skill_catalog_injected
+from lily.runtime.skill_invoke_trace import (
+    SkillInvokeTrace,
+    SkillRetrievalTraceEntry,
+    bind_skill_trace,
+    reset_skill_trace,
+)
+from lily.runtime.skill_loader import SkillBundle
+from lily.runtime.skill_retrieve_tool import bind_skill_loader, reset_skill_loader
 from lily.runtime.tool_registry import ToolLike, ToolRegistry
 
 
@@ -37,6 +46,7 @@ class AgentRunResult(BaseModel):
     final_output: str
     message_count: int
     conversation_id: str | None = None
+    skill_trace: SkillInvokeTrace = Field(default_factory=SkillInvokeTrace)
 
 
 AgentBuilder = Callable[..., object]
@@ -80,13 +90,14 @@ def _coerce_message_text(message: BaseMessage) -> str:
 class AgentRuntime:
     """Config-driven wrapper over LangChain's `create_agent` kernel."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         config: RuntimeConfig,
         tools: Sequence[ToolLike],
         model_factory: ModelFactory | None = None,
         checkpoint_db_path: Path | None = None,
         agent_builder: AgentBuilder = create_agent,
+        skill_bundle: SkillBundle | None = None,
     ) -> None:
         """Initialize runtime with validated config, tools, and adapters.
 
@@ -96,9 +107,12 @@ class AgentRuntime:
             model_factory: Optional model construction override.
             checkpoint_db_path: Optional SQLite path for thread checkpoints.
             agent_builder: Agent builder callable (defaults to create_agent).
+            skill_bundle: Optional discovery/loader bundle for catalog injection and
+                ``skill_retrieve`` context binding.
         """
         self._config = config
         self._tools = list(tools)
+        self._skill_bundle = skill_bundle
         self._model_factory = model_factory or ModelFactory()
         self._checkpoint_db_path = checkpoint_db_path or (
             Path(".lily") / "runtime-checkpoints.sqlite3"
@@ -227,10 +241,22 @@ class AgentRuntime:
             ToolCallLimitMiddleware(run_limit=self._config.policies.max_tool_calls),
         ]
 
+        system_prompt = self._config.agent.system_prompt
+        if (
+            self._skill_bundle is not None
+            and self._skill_bundle.catalog_markdown.strip()
+        ):
+            catalog = self._skill_bundle.catalog_markdown
+            emit_skill_catalog_injected(
+                skills_count=len(self._skill_bundle.registry.canonical_keys()),
+                catalog_char_count=len(catalog),
+            )
+            system_prompt = f"{system_prompt.rstrip()}\n\n{catalog}"
+
         built = self._agent_builder(
             model=model_map[self._config.models.routing.default_profile],
             tools=allowlisted_tools,
-            system_prompt=self._config.agent.system_prompt,
+            system_prompt=system_prompt,
             middleware=middleware,
             checkpointer=self._build_checkpointer(),
             name=self._config.agent.name,
@@ -248,7 +274,7 @@ class AgentRuntime:
         self,
         user_prompt: str,
         conversation_id: str | None = None,
-    ) -> dict[str, object]:
+    ) -> tuple[dict[str, object], list[SkillRetrievalTraceEntry]]:
         """Invoke the underlying agent with configured recursion limit.
 
         Args:
@@ -256,7 +282,8 @@ class AgentRuntime:
             conversation_id: Optional conversation/thread id for resume continuity.
 
         Returns:
-            Raw mapping output from compiled LangChain agent.
+            Raw mapping output from compiled LangChain agent and skill retrieval trace
+            entries recorded during this invoke.
 
         Raises:
             AgentRuntimeError: If invocation output is not a dict payload.
@@ -271,20 +298,31 @@ class AgentRuntime:
         thread_id = conversation_id or f"ephemeral-{uuid4()}"
         invoke_config["configurable"] = {"thread_id": thread_id}
 
-        if hasattr(agent, "ainvoke"):
-            async_agent = cast(_AsyncInvokableAgent, agent)
-            result = self._run_on_async_loop(
-                async_agent.ainvoke(payload, config=invoke_config)
-            )
-        elif hasattr(agent, "invoke"):
-            result = agent.invoke(payload, config=invoke_config)
-        else:
-            msg = "Built agent exposes neither invoke(...) nor ainvoke(...)."
-            raise AgentRuntimeError(msg)
+        loader_token = None
+        if self._skill_bundle is not None:
+            loader_token = bind_skill_loader(self._skill_bundle.loader)
+
+        trace_token, trace_entries = bind_skill_trace()
+        try:
+            if hasattr(agent, "ainvoke"):
+                async_agent = cast(_AsyncInvokableAgent, agent)
+                result = self._run_on_async_loop(
+                    async_agent.ainvoke(payload, config=invoke_config)
+                )
+            elif hasattr(agent, "invoke"):
+                result = agent.invoke(payload, config=invoke_config)
+            else:
+                msg = "Built agent exposes neither invoke(...) nor ainvoke(...)."
+                raise AgentRuntimeError(msg)
+        finally:
+            if loader_token is not None:
+                reset_skill_loader(loader_token)
+            reset_skill_trace(trace_token)
+
         if not isinstance(result, dict):
             msg = "Agent invocation returned non-dict output."
             raise AgentRuntimeError(msg)
-        return result
+        return result, trace_entries
 
     def run(
         self,
@@ -303,7 +341,9 @@ class AgentRuntime:
         Raises:
             AgentRuntimeError: If agent output is missing expected messages.
         """
-        output = self._invoke(user_prompt, conversation_id=conversation_id)
+        output, trace_entries = self._invoke(
+            user_prompt, conversation_id=conversation_id
+        )
         raw_messages = output.get("messages")
         if not isinstance(raw_messages, list) or not raw_messages:
             msg = "Agent output missing non-empty 'messages' list."
@@ -317,8 +357,20 @@ class AgentRuntime:
             raise AgentRuntimeError(msg)
 
         final_output = _coerce_message_text(ai_messages[-1])
+        skills_enabled = self._skill_bundle is not None
+        catalog_injected = bool(
+            skills_enabled
+            and self._skill_bundle is not None
+            and self._skill_bundle.catalog_markdown.strip()
+        )
+        skill_trace = SkillInvokeTrace(
+            skills_enabled=skills_enabled,
+            catalog_injected=catalog_injected,
+            retrievals=tuple(trace_entries),
+        )
         return AgentRunResult(
             final_output=final_output,
             message_count=len(raw_messages),
             conversation_id=conversation_id,
+            skill_trace=skill_trace,
         )
