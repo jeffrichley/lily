@@ -10,6 +10,11 @@ from langchain_core.tools import BaseTool, tool
 from lily.runtime.agent_runtime import AgentRunResult, AgentRuntime
 from lily.runtime.config_loader import ConfigLoadError, load_runtime_config
 from lily.runtime.config_schema import McpServerConfig, RuntimeConfig
+from lily.runtime.logging_setup import (
+    clear_skill_telemetry_handlers,
+    configure_skill_telemetry_handlers,
+    resolve_skill_telemetry_log_path,
+)
 from lily.runtime.skill_loader import SkillBundle, build_skill_bundle
 from lily.runtime.skill_retrieve_tool import SKILL_RETRIEVE_TOOL_ID
 from lily.runtime.tool_catalog import load_tool_catalog
@@ -67,6 +72,8 @@ class LilySupervisor:
         config_path: str | Path,
         override_config_path: str | Path | None = None,
         tools_config_path: str | Path | None = None,
+        *,
+        skill_telemetry_echo: bool = False,
     ) -> LilySupervisor:
         """Build supervisor from config files.
 
@@ -76,6 +83,8 @@ class LilySupervisor:
             tools_config_path: Optional explicit tool catalog config path.
                 When omitted, `.toml` runtime configs infer `tools.toml`
                 in the same directory; otherwise `tools.yaml`.
+            skill_telemetry_echo: When skills are enabled, mirror F7 JSON telemetry
+                to stderr in addition to the configured log file.
 
         Returns:
             Supervisor with runtime and catalog-resolved tools configured.
@@ -88,6 +97,17 @@ class LilySupervisor:
         config = load_runtime_config(config_path, override_config_path)
         skills_cfg = config.skills
         skills_enabled = skills_cfg is not None and skills_cfg.enabled
+        if skills_enabled and skills_cfg is not None:
+            telemetry_path = resolve_skill_telemetry_log_path(
+                config_path,
+                relative_override=config.logging.skill_telemetry_log,
+            )
+            configure_skill_telemetry_handlers(
+                telemetry_path,
+                echo_to_stderr=skill_telemetry_echo,
+            )
+        else:
+            clear_skill_telemetry_handlers()
         resolved_tools = cls._load_tools_from_catalog(
             resolved_tools_config_path,
             mcp_servers=config.mcp_servers,

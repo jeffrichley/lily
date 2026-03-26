@@ -451,8 +451,6 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
   - [x] Use Rich tables/panels for default outputs.
   - [x] Surface collisions/shadowing/invalid packages with actionable messages.
   - [x] Surface **catalog and policy** diagnostics (what is indexed, what is blocked, why retrieval would fail).
-- **Should (post-MVP / backlog)**:
-  - [ ] Trigger-quality heuristics (under/over-trigger templates for skill descriptions) — **not** required for SI-007 retrieval MVP; link follow-up in backlog if descoped.
 - **Must Not**:
   - [x] Default to raw JSON in interactive mode.
   - [x] Hide policy-block reasons from operator diagnostics.

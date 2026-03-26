@@ -24,6 +24,7 @@ tools:
     - echo_tool
     - ping_tool
     - search_langgraph_code
+    - skill_retrieve
 mcp_servers:
   langgraph_docs:
     transport: streamable_http
@@ -34,3 +35,12 @@ policies:
   max_tool_calls: 40
 logging:
   level: INFO
+skills:
+  enabled: true
+  roots:
+    repository:
+      - ../skills
+  scopes_precedence:
+    - repository
+    - user
+    - system

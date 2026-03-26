@@ -28,9 +28,11 @@ class _FakeSupervisor:
         cls,
         config_path: str | Path,
         override_config_path: str | Path | None = None,
+        *,
+        skill_telemetry_echo: bool = False,
     ) -> _FakeSupervisor:
         """Build fake supervisor from config paths for command smoke tests."""
-        _ = (config_path, override_config_path)
+        _ = (config_path, override_config_path, skill_telemetry_echo)
         return cls()
 
     def run_prompt(

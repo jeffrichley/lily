@@ -45,17 +45,19 @@ class _FakeSupervisor:
 def _fake_supervisor_factory(
     config_path: Path,
     override_config_path: Path | None,
+    skill_telemetry_echo: bool = False,
 ) -> _FakeSupervisor:
     """Build fake supervisor while validating config arguments are plumbed.
 
     Args:
         config_path: Base config path from app startup.
         override_config_path: Optional override path.
+        skill_telemetry_echo: Echo flag from TUI (unused by fake).
 
     Returns:
         Fake supervisor instance.
     """
-    _ = (config_path, override_config_path)
+    _ = (config_path, override_config_path, skill_telemetry_echo)
     return _FakeSupervisor()
 
 
@@ -106,9 +108,15 @@ class _FakeTuiApp:
         override_config_path: Path | None = None,
         conversation_id: str | None = None,
         supervisor_factory: object | None = None,
+        skill_telemetry_echo: bool = False,
     ) -> None:
         """Capture constructor arguments for assertions."""
-        _ = (config_path, override_config_path, supervisor_factory)
+        _ = (
+            config_path,
+            override_config_path,
+            supervisor_factory,
+            skill_telemetry_echo,
+        )
         self._conversation_id = conversation_id
         self.created_conversation_ids.append(conversation_id)
 

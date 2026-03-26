@@ -142,6 +142,15 @@ class LoggingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     level: str = Field(pattern="^(DEBUG|INFO|WARNING|ERROR)$")
+    skill_telemetry_log: str | None = Field(
+        default=None,
+        description=(
+            "Optional path for skill F7 JSON telemetry (JSONL). "
+            "Relative paths resolve against the runtime config file directory. "
+            "When omitted, defaults to ../logs/skill-telemetry.jsonl "
+            "from that directory."
+        ),
+    )
 
 
 def _validate_skills_tools_packs_entries(packs: dict[str, list[str]]) -> None:

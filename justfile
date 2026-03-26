@@ -79,6 +79,10 @@ pre-commit-install:
 pre-commit:
     uv run pre-commit run --all-files
 
+# Secret scan (pre-commit gitleaks hook); also runs in CI via `just quality-check`
+secrets-check:
+    uv run pre-commit run gitleaks --all-files
+
 # Conventional commits: interactive commit (Commitizen)
 commit:
     uv run cz commit
@@ -91,7 +95,7 @@ commit-check:
 quality: format lint types complexity vulture darglint audit bandit radon find-dupes docstr-coverage docs-check
 
 # Check-only quality lane (CI-safe; no write)
-quality-check: format-check lint-check types complexity vulture darglint audit bandit radon find-dupes docstr-coverage docs-check
+quality-check: format-check lint-check types complexity vulture darglint audit bandit radon find-dupes docstr-coverage docs-check secrets-check
 
 # Lighter target for day-to-day reboot development
 quality-dev: format lint types darglint
