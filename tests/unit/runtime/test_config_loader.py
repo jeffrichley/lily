@@ -457,6 +457,164 @@ level = "INFO"
     assert config.mcp_servers["langgraph_docs"].transport == "streamable_http"
 
 
+def test_load_runtime_config_parses_sse_mcp_server(tmp_path: Path) -> None:
+    """Parses SSE MCP server config for endpoint-event transports."""
+    # Arrange - write valid runtime YAML with one SSE MCP server.
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        """
+schema_version: 1
+agent:
+  name: lily
+  system_prompt: "You are Lily."
+models:
+  profiles:
+    default:
+      provider: openai
+      model: gpt-4o-mini
+      temperature: 0.1
+      timeout_seconds: 30
+    long_context:
+      provider: openai
+      model: gpt-4o
+      temperature: 0.1
+      timeout_seconds: 45
+  routing:
+    enabled: true
+    default_profile: default
+    long_context_profile: long_context
+    complexity_threshold: 8
+tools:
+  allowlist:
+    - search_langgraph_code
+mcp_servers:
+  langgraph_docs:
+    transport: sse
+    url: https://gitmcp.io/langchain-ai/langgraph
+policies:
+  max_iterations: 12
+  max_model_calls: 20
+  max_tool_calls: 20
+logging:
+  level: INFO
+""",
+    )
+
+    # Act - load config with SSE MCP server mapping.
+    config = load_runtime_config(config_file)
+
+    # Assert - SSE server mapping is parsed with expected fields.
+    assert "langgraph_docs" in config.mcp_servers
+    assert config.mcp_servers["langgraph_docs"].transport == "sse"
+
+
+def test_load_runtime_config_parses_websocket_mcp_server(tmp_path: Path) -> None:
+    """Parses WebSocket MCP server config."""
+    # Arrange - write valid runtime YAML with one websocket MCP server.
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        """
+schema_version: 1
+agent:
+  name: lily
+  system_prompt: "You are Lily."
+models:
+  profiles:
+    default:
+      provider: openai
+      model: gpt-4o-mini
+      temperature: 0.1
+      timeout_seconds: 30
+    long_context:
+      provider: openai
+      model: gpt-4o
+      temperature: 0.1
+      timeout_seconds: 45
+  routing:
+    enabled: true
+    default_profile: default
+    long_context_profile: long_context
+    complexity_threshold: 8
+tools:
+  allowlist:
+    - search_langgraph_code
+mcp_servers:
+  websocket_docs:
+    transport: websocket
+    url: wss://example.com/mcp
+policies:
+  max_iterations: 12
+  max_model_calls: 20
+  max_tool_calls: 20
+logging:
+  level: INFO
+""",
+    )
+
+    # Act - load config with websocket MCP server mapping.
+    config = load_runtime_config(config_file)
+
+    # Assert - websocket server mapping is parsed with expected fields.
+    assert "websocket_docs" in config.mcp_servers
+    assert config.mcp_servers["websocket_docs"].transport == "websocket"
+
+
+def test_load_runtime_config_parses_stdio_mcp_server(tmp_path: Path) -> None:
+    """Parses stdio MCP server config for local process transports."""
+    # Arrange - write valid runtime YAML with one stdio MCP server.
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        """
+schema_version: 1
+agent:
+  name: lily
+  system_prompt: "You are Lily."
+models:
+  profiles:
+    default:
+      provider: openai
+      model: gpt-4o-mini
+      temperature: 0.1
+      timeout_seconds: 30
+    long_context:
+      provider: openai
+      model: gpt-4o
+      temperature: 0.1
+      timeout_seconds: 45
+  routing:
+    enabled: true
+    default_profile: default
+    long_context_profile: long_context
+    complexity_threshold: 8
+tools:
+  allowlist:
+    - search_langgraph_code
+mcp_servers:
+  local_stdio:
+    transport: stdio
+    command: uvx
+    args:
+      - mcp-server-example
+policies:
+  max_iterations: 12
+  max_model_calls: 20
+  max_tool_calls: 20
+logging:
+  level: INFO
+""",
+    )
+
+    # Act - load config with stdio MCP server mapping.
+    config = load_runtime_config(config_file)
+
+    # Assert - stdio server mapping is parsed with expected fields.
+    assert "local_stdio" in config.mcp_servers
+    assert config.mcp_servers["local_stdio"].transport == "stdio"
+
+
 def _minimal_runtime_yaml_with_skills(
     skills_block: str,
     *,

@@ -212,11 +212,11 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 ---
 
 ### Phase 4: Test hardening, debt closure + docs/status sync
-- [ ] Add/extend tests for both features.
-- [ ] Run full quality/test gates (`just quality && just test`).
-- [ ] Update runtime config docs to include the new fields (if user-visible docs surface exists).
-- [ ] Close **DEBT-019** (fix/resolve why `Unknown SSE event: endpoint` is produced for MCP `streamable_http` tools; do not “mask” output without understanding it).
-- [ ] Close **DEBT-020** (ensure commit-time secret scanning is enforced so API keys cannot be committed).
+- [x] Add/extend tests for both features.
+- [x] Run full quality/test gates (`just quality && just test`).
+- [x] Update runtime config docs to include the new fields (if user-visible docs surface exists).
+- [x] Close **DEBT-019** (fix/resolve why `Unknown SSE event: endpoint` is produced for MCP `streamable_http` tools; do not “mask” output without understanding it).
+- [x] Close **DEBT-020** (ensure commit-time secret scanning is enforced so API keys cannot be committed).
 
 #### Intent Lock
 **Source of truth:**
@@ -294,15 +294,16 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 ### 7. Close DEBT-020 (commit-time secret scanning gate)
 - **IMPLEMENT**:
   - Ensure local commit workflow fails fast if secrets are detected:
-    - Update `justfile` so `commit` depends on `secrets-check` (so `just commit` enforces gitleaks even without pre-commit hooks being installed).
-    - Update `.ai/COMMANDS/commit.md` to include `just secrets-check` as a required pre-commit step before invoking Commitizen.
-    - Do not change CI behavior: CI already runs `just quality-check` (which includes `secrets-check`).
+    - Enforce `gitleaks` via git hooks (`pre-commit` hook path), not via `justfile` coupling.
+    - Update `.ai/COMMANDS/commit.md` to require hook installation (`just pre-commit-install`) and explicit verification (`uv run pre-commit run gitleaks --all-files`) before commit flow.
+    - Ensure server-side git checks fail pushes/PRs on secret findings (independent of local hook installation).
 - **VALIDATE**:
   - manual presubmit validation:
-    - run `just secrets-check` locally and confirm it behaves like the pre-commit/gitleaks gate
-    - run the commit workflow (`just commit` and/or `.ai/COMMANDS/commit.md` steps) on a branch with no secrets staged and confirm it proceeds
+    - run `just pre-commit-install` then confirm `git commit` triggers `gitleaks` hook checks
+    - run `uv run pre-commit run gitleaks --all-files` and confirm deterministic pass/fail behavior
+    - run commit workflow on a branch with no secrets staged and confirm it proceeds
   - CI validation:
-    - run `just quality-check` locally to confirm the gate remains green
+    - confirm push/PR secret-scan workflow exists and fails on findings
 
 ---
 
@@ -358,15 +359,15 @@ IMPORTANT: Execute every task in order, top to bottom. Each task is atomic and i
 - [x] When enabled, summarization compacts message history and persists across repeated turns with same conversation id.
 - [x] Skill catalog injection uses middleware only.
 - [x] Skill catalog telemetry `skill_catalog_injected` is emitted for the middleware path.
-- [ ] DEBT-019 is resolved by fixing SSE parsing/handling so `Unknown SSE event: endpoint` is no longer emitted without explanation.
-- [ ] DEBT-020 is resolved by enforcing a commit-time secret scanning gate (local + CI), so API keys cannot be committed.
-- [ ] All updated/new tests pass with zero new warnings.
+- [x] DEBT-019 is resolved by fixing SSE parsing/handling so `Unknown SSE event: endpoint` is no longer emitted without explanation.
+- [x] DEBT-020 is resolved by enforcing a commit-time secret scanning gate (local + CI), so API keys cannot be committed.
+- [x] All updated/new tests pass with zero new warnings.
 
 ---
 
 ## COMPLETION CHECKLIST
-- [ ] All phases completed (in execution, not in this planning step).
-- [ ] `just quality && just test` passes.
+- [x] All phases completed (in execution, not in this planning step).
+- [x] `just quality && just test` passes.
 
 ---
 

@@ -8,8 +8,11 @@ import pytest
 from langchain_core.tools import BaseTool, tool
 
 from lily.runtime.config_schema import (
+    McpServerSseConfig,
+    McpServerStdioConfig,
     McpServerStreamableHttpConfig,
     McpServerTestConfig,
+    McpServerWebsocketConfig,
 )
 from lily.runtime.tool_catalog import McpToolDefinition, PythonToolDefinition
 from lily.runtime.tool_resolvers import (
@@ -191,6 +194,129 @@ def test_resolve_mcp_streamable_http_provider_success(
     resolvers = ToolResolvers(mcp_servers=build_mcp_server_providers(mcp_servers))
 
     # Act - resolve MCP tool from streamable-http server provider.
+    resolved = resolvers.resolve(definition)
+
+    # Assert - resolved tool maps to expected catalog id.
+    assert isinstance(resolved, BaseTool)
+    assert resolved.name == "search_langgraph_code"
+
+
+def test_resolve_mcp_sse_provider_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolves MCP tool via SSE provider mapping."""
+
+    # Arrange - build SSE server config and fake adapter tool response.
+    @tool
+    def search_langgraph_code(query: str) -> str:
+        """Return deterministic fake search result."""
+        return f"result:{query}"
+
+    def _fake_run_async(coro: object) -> list[BaseTool]:
+        close = getattr(coro, "close", None)
+        if callable(close):
+            close()
+        return [search_langgraph_code]
+
+    monkeypatch.setattr("lily.runtime.tool_resolvers._run_async", _fake_run_async)
+    mcp_servers = {
+        "langgraph_docs": McpServerSseConfig.model_validate(
+            {
+                "transport": "sse",
+                "url": "https://gitmcp.io/langchain-ai/langgraph",
+            }
+        )
+    }
+    definition = McpToolDefinition(
+        id="search_langgraph_code",
+        source="mcp",
+        server="langgraph_docs",
+        remote_tool="search_langgraph_code",
+    )
+    resolvers = ToolResolvers(mcp_servers=build_mcp_server_providers(mcp_servers))
+
+    # Act - resolve MCP tool from SSE server provider.
+    resolved = resolvers.resolve(definition)
+
+    # Assert - resolved tool maps to expected catalog id.
+    assert isinstance(resolved, BaseTool)
+    assert resolved.name == "search_langgraph_code"
+
+
+def test_resolve_mcp_websocket_provider_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Resolves MCP tool via websocket provider mapping."""
+
+    # Arrange - build websocket server config and fake adapter tool response.
+    @tool
+    def search_langgraph_code(query: str) -> str:
+        """Return deterministic fake search result."""
+        return f"result:{query}"
+
+    def _fake_run_async(coro: object) -> list[BaseTool]:
+        close = getattr(coro, "close", None)
+        if callable(close):
+            close()
+        return [search_langgraph_code]
+
+    monkeypatch.setattr("lily.runtime.tool_resolvers._run_async", _fake_run_async)
+    mcp_servers = {
+        "langgraph_docs": McpServerWebsocketConfig.model_validate(
+            {
+                "transport": "websocket",
+                "url": "wss://example.com/mcp",
+            }
+        )
+    }
+    definition = McpToolDefinition(
+        id="search_langgraph_code",
+        source="mcp",
+        server="langgraph_docs",
+        remote_tool="search_langgraph_code",
+    )
+    resolvers = ToolResolvers(mcp_servers=build_mcp_server_providers(mcp_servers))
+
+    # Act - resolve MCP tool from websocket server provider.
+    resolved = resolvers.resolve(definition)
+
+    # Assert - resolved tool maps to expected catalog id.
+    assert isinstance(resolved, BaseTool)
+    assert resolved.name == "search_langgraph_code"
+
+
+def test_resolve_mcp_stdio_provider_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolves MCP tool via stdio provider mapping."""
+
+    # Arrange - build stdio server config and fake adapter tool response.
+    @tool
+    def search_langgraph_code(query: str) -> str:
+        """Return deterministic fake search result."""
+        return f"result:{query}"
+
+    def _fake_run_async(coro: object) -> list[BaseTool]:
+        close = getattr(coro, "close", None)
+        if callable(close):
+            close()
+        return [search_langgraph_code]
+
+    monkeypatch.setattr("lily.runtime.tool_resolvers._run_async", _fake_run_async)
+    mcp_servers = {
+        "langgraph_docs": McpServerStdioConfig.model_validate(
+            {
+                "transport": "stdio",
+                "command": "uvx",
+                "args": ["mcp-server-example"],
+            }
+        )
+    }
+    definition = McpToolDefinition(
+        id="search_langgraph_code",
+        source="mcp",
+        server="langgraph_docs",
+        remote_tool="search_langgraph_code",
+    )
+    resolvers = ToolResolvers(mcp_servers=build_mcp_server_providers(mcp_servers))
+
+    # Act - resolve MCP tool from stdio server provider.
     resolved = resolvers.resolve(definition)
 
     # Assert - resolved tool maps to expected catalog id.

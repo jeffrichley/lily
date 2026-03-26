@@ -11,13 +11,21 @@ from typing import Any, Protocol, cast
 
 from langchain_core.tools import BaseTool
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain_mcp_adapters.sessions import StreamableHttpConnection
+from langchain_mcp_adapters.sessions import (
+    SSEConnection,
+    StdioConnection,
+    StreamableHttpConnection,
+    WebsocketConnection,
+)
 from pydantic import PrivateAttr
 
 from lily.runtime.config_schema import (
     McpServerConfig,
+    McpServerSseConfig,
+    McpServerStdioConfig,
     McpServerStreamableHttpConfig,
     McpServerTestConfig,
+    McpServerWebsocketConfig,
 )
 from lily.runtime.tool_catalog import (
     McpToolDefinition,
@@ -509,6 +517,190 @@ class _AdapterMcpServerProvider:
         return resolved
 
 
+type _McpProviderBuilder = Callable[[str, McpServerConfig], McpServerToolProvider]
+
+
+def _build_test_server_provider(
+    server_name: str,
+    server_config: McpServerConfig,
+) -> McpServerToolProvider:
+    """Build provider strategy for ``transport: test``.
+
+    Args:
+        server_name: Configured MCP server name.
+        server_config: Generic MCP server config value.
+
+    Returns:
+        Deterministic local test provider instance.
+
+    Raises:
+        McpServerConfigError: If ``server_config`` is not a test transport config.
+    """
+    if not isinstance(server_config, McpServerTestConfig):
+        msg = (
+            f"Invalid MCP config type for server '{server_name}' with transport 'test'."
+        )
+        raise McpServerConfigError(msg)
+    return _TestMcpServerProvider(server_config.tool_targets)
+
+
+def _build_streamable_http_server_provider(
+    server_name: str,
+    server_config: McpServerConfig,
+) -> McpServerToolProvider:
+    """Build provider strategy for ``transport: streamable_http``.
+
+    Args:
+        server_name: Configured MCP server name.
+        server_config: Generic MCP server config value.
+
+    Returns:
+        Adapter-backed provider bound to a streamable HTTP connection.
+
+    Raises:
+        McpServerConfigError: If ``server_config`` is not streamable HTTP config.
+    """
+    if not isinstance(server_config, McpServerStreamableHttpConfig):
+        msg = (
+            f"Invalid MCP config type for server '{server_name}' with "
+            "transport 'streamable_http'."
+        )
+        raise McpServerConfigError(msg)
+
+    streamable_connection: StreamableHttpConnection = {
+        "transport": "streamable_http",
+        "url": server_config.url,
+    }
+    if server_config.headers:
+        streamable_connection["headers"] = server_config.headers
+    if server_config.timeout_seconds is not None:
+        timeout = timedelta(seconds=server_config.timeout_seconds)
+        streamable_connection["timeout"] = timeout
+        streamable_connection["sse_read_timeout"] = timeout
+
+    client = MultiServerMCPClient({server_name: streamable_connection})
+    return _AdapterMcpServerProvider(server_name, client)
+
+
+def _build_sse_server_provider(
+    server_name: str,
+    server_config: McpServerConfig,
+) -> McpServerToolProvider:
+    """Build provider strategy for ``transport: sse``.
+
+    Args:
+        server_name: Configured MCP server name.
+        server_config: Generic MCP server config value.
+
+    Returns:
+        Adapter-backed provider bound to an SSE connection.
+
+    Raises:
+        McpServerConfigError: If ``server_config`` is not SSE config.
+    """
+    if not isinstance(server_config, McpServerSseConfig):
+        msg = (
+            f"Invalid MCP config type for server '{server_name}' with transport 'sse'."
+        )
+        raise McpServerConfigError(msg)
+
+    sse_connection: SSEConnection = {
+        "transport": "sse",
+        "url": server_config.url,
+    }
+    if server_config.headers:
+        sse_connection["headers"] = server_config.headers
+    if server_config.timeout_seconds is not None:
+        sse_connection["timeout"] = server_config.timeout_seconds
+        sse_connection["sse_read_timeout"] = server_config.timeout_seconds
+
+    client = MultiServerMCPClient({server_name: sse_connection})
+    return _AdapterMcpServerProvider(server_name, client)
+
+
+def _build_websocket_server_provider(
+    server_name: str,
+    server_config: McpServerConfig,
+) -> McpServerToolProvider:
+    """Build provider strategy for ``transport: websocket``.
+
+    Args:
+        server_name: Configured MCP server name.
+        server_config: Generic MCP server config value.
+
+    Returns:
+        Adapter-backed provider bound to a websocket connection.
+
+    Raises:
+        McpServerConfigError: If ``server_config`` is not websocket config.
+    """
+    if not isinstance(server_config, McpServerWebsocketConfig):
+        msg = (
+            f"Invalid MCP config type for server '{server_name}' with "
+            "transport 'websocket'."
+        )
+        raise McpServerConfigError(msg)
+
+    websocket_connection: WebsocketConnection = {
+        "transport": "websocket",
+        "url": server_config.url,
+    }
+    client = MultiServerMCPClient({server_name: websocket_connection})
+    return _AdapterMcpServerProvider(server_name, client)
+
+
+def _build_stdio_server_provider(
+    server_name: str,
+    server_config: McpServerConfig,
+) -> McpServerToolProvider:
+    """Build provider strategy for ``transport: stdio``.
+
+    Args:
+        server_name: Configured MCP server name.
+        server_config: Generic MCP server config value.
+
+    Returns:
+        Adapter-backed provider bound to a stdio connection.
+
+    Raises:
+        McpServerConfigError: If ``server_config`` is not stdio config.
+    """
+    if not isinstance(server_config, McpServerStdioConfig):
+        msg = (
+            f"Invalid MCP config type for server '{server_name}' with "
+            "transport 'stdio'."
+        )
+        raise McpServerConfigError(msg)
+
+    stdio_connection: StdioConnection = {
+        "transport": "stdio",
+        "command": server_config.command,
+        "args": server_config.args,
+    }
+    if server_config.env is not None:
+        stdio_connection["env"] = server_config.env
+    if server_config.cwd is not None:
+        stdio_connection["cwd"] = server_config.cwd
+    if server_config.encoding is not None:
+        stdio_connection["encoding"] = server_config.encoding
+    if server_config.encoding_error_handler is not None:
+        stdio_connection["encoding_error_handler"] = (
+            server_config.encoding_error_handler
+        )
+
+    client = MultiServerMCPClient({server_name: stdio_connection})
+    return _AdapterMcpServerProvider(server_name, client)
+
+
+_MCP_PROVIDER_BUILDERS: dict[str, _McpProviderBuilder] = {
+    "test": _build_test_server_provider,
+    "streamable_http": _build_streamable_http_server_provider,
+    "sse": _build_sse_server_provider,
+    "websocket": _build_websocket_server_provider,
+    "stdio": _build_stdio_server_provider,
+}
+
+
 def build_mcp_server_providers(
     mcp_servers: Mapping[str, McpServerConfig],
 ) -> dict[str, McpServerToolProvider]:
@@ -525,30 +717,12 @@ def build_mcp_server_providers(
     """
     providers: dict[str, McpServerToolProvider] = {}
     for server_name, server_config in mcp_servers.items():
-        if isinstance(server_config, McpServerTestConfig):
-            providers[server_name] = _TestMcpServerProvider(server_config.tool_targets)
-            continue
-
-        if isinstance(server_config, McpServerStreamableHttpConfig):
-            connection: StreamableHttpConnection = {
-                "transport": "streamable_http",
-                "url": server_config.url,
-            }
-            if server_config.headers:
-                connection["headers"] = server_config.headers
-            if server_config.timeout_seconds is not None:
-                timeout = timedelta(seconds=server_config.timeout_seconds)
-                connection["timeout"] = timeout
-                connection["sse_read_timeout"] = timeout
-
-            client = MultiServerMCPClient({server_name: connection})
-            providers[server_name] = _AdapterMcpServerProvider(server_name, client)
-            continue
-
-        msg = (
-            f"Unsupported MCP transport for server '{server_name}': "
-            f"'{server_config.transport}'."
-        )
-        raise McpServerConfigError(msg)
-
+        builder = _MCP_PROVIDER_BUILDERS.get(server_config.transport)
+        if builder is None:
+            msg = (
+                f"Unsupported MCP transport for server '{server_name}': "
+                f"'{server_config.transport}'."
+            )
+            raise McpServerConfigError(msg)
+        providers[server_name] = builder(server_name, server_config)
     return providers

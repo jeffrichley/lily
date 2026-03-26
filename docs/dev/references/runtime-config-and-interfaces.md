@@ -72,6 +72,19 @@ Top-level keys in `agent.*`:
     - `url`: MCP streamable HTTP endpoint
     - `headers` (optional): request headers mapping
     - `timeout_seconds` (optional): request and stream timeout
+  - `transport: sse`
+    - `url`: MCP SSE endpoint
+    - `headers` (optional): request headers mapping
+    - `timeout_seconds` (optional): request and SSE read timeout
+  - `transport: stdio`
+    - `command`: executable used to start local MCP server
+    - `args`: command arguments list
+    - `env` (optional): environment variables mapping
+    - `cwd` (optional): process working directory
+    - `encoding` (optional): stdio encoding
+    - `encoding_error_handler` (optional): `strict|ignore|replace`
+  - `transport: websocket`
+    - `url`: MCP websocket endpoint
   - `transport: test` (fixture-only deterministic local path)
     - `tool_targets`: mapping of remote MCP tool name -> Python import target (`module.path:attribute`)
 

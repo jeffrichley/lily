@@ -126,6 +126,34 @@ class McpServerStreamableHttpConfig(McpServerConfig):
     timeout_seconds: float | None = Field(default=None, gt=0.0)
 
 
+class McpServerSseConfig(McpServerConfig):
+    """SSE MCP transport configuration for legacy endpoint-style servers."""
+
+    transport: Literal["sse"]
+    url: str = Field(min_length=1)
+    headers: dict[str, str] = Field(default_factory=dict)
+    timeout_seconds: float | None = Field(default=None, gt=0.0)
+
+
+class McpServerWebsocketConfig(McpServerConfig):
+    """WebSocket MCP transport configuration."""
+
+    transport: Literal["websocket"]
+    url: str = Field(min_length=1)
+
+
+class McpServerStdioConfig(McpServerConfig):
+    """Local stdio MCP transport configuration."""
+
+    transport: Literal["stdio"]
+    command: str = Field(min_length=1)
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] | None = None
+    cwd: str | None = None
+    encoding: str | None = None
+    encoding_error_handler: Literal["strict", "ignore", "replace"] | None = None
+
+
 class ConversationCompressionTriggerConfig(BaseModel):
     """Threshold policy for conversation compression summarization."""
 
@@ -441,7 +469,11 @@ class RuntimeConfig(BaseModel):
     mcp_servers: dict[
         str,
         Annotated[
-            McpServerTestConfig | McpServerStreamableHttpConfig,
+            McpServerTestConfig
+            | McpServerStreamableHttpConfig
+            | McpServerSseConfig
+            | McpServerWebsocketConfig
+            | McpServerStdioConfig,
             Field(discriminator="transport"),
         ],
     ] = Field(default_factory=dict)

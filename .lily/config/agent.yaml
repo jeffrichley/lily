@@ -27,7 +27,7 @@ tools:
     - skill_retrieve
 mcp_servers:
   langgraph_docs:
-    transport: streamable_http
+    transport: sse
     url: https://gitmcp.io/langchain-ai/langgraph
 policies:
   max_iterations: 20
