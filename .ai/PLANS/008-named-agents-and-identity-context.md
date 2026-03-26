@@ -266,8 +266,8 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - Manual spot-check examples in docs are executable and accurate.
 
 **Tasks:**
-- [ ] UPDATE runtime reference docs with new named-agent and context injection sections.
-- [ ] ADD examples for `run`/`tui` with `--agent`.
+- [x] UPDATE runtime reference docs with new named-agent and context injection sections.
+- [x] ADD examples for `run`/`tui` with `--agent`.
 
 ---
 
@@ -369,23 +369,23 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 
 ## ACCEPTANCE CRITERIA
 
-- [ ] Named agents are resolved from `.lily/agents/<agent-name>/`.
-- [ ] `default` agent is used when `--agent` is absent.
-- [ ] Hyphenated agent names (e.g. `pepper-potts`) are supported.
-- [ ] Sessions are scoped per agent.
-- [ ] Required special markdown files are enforced.
-- [ ] Runtime injects special markdown files via middleware in deterministic order.
-- [ ] Runtime docs include explicit section for special markdown context injection.
-- [ ] `just quality && just test` passes warning-clean.
+- [x] Named agents are resolved from `.lily/agents/<agent-name>/`.
+- [x] `default` agent is used when `--agent` is absent.
+- [x] Hyphenated agent names (e.g. `pepper-potts`) are supported.
+- [x] Sessions are scoped per agent.
+- [x] Required special markdown files are enforced.
+- [x] Runtime injects special markdown files via middleware in deterministic order.
+- [x] Runtime docs include explicit section for special markdown context injection.
+- [x] `just quality && just test` passes warning-clean.
 
 ---
 
 ## COMPLETION CHECKLIST
 
-- [ ] All phase tasks completed in dependency order.
-- [ ] Unit + integration/e2e validation executed.
-- [ ] Docs updated and verified.
-- [ ] Acceptance criteria satisfied.
+- [x] All phase tasks completed in dependency order.
+- [x] Unit + integration/e2e validation executed.
+- [x] Docs updated and verified.
+- [x] Acceptance criteria satisfied.
 
 ---
 
@@ -465,3 +465,38 @@ Use markdown checkboxes (`- [ ]`) for implementation phases and task bullets so 
 - Phase intent lock compliance:
   - Must: middleware-based identity injection with deterministic ordering and documentation contract compatibility -> implemented.
   - Must Not: static startup-only mutation path for personality layer -> avoided; injection occurs via middleware.
+
+### 2026-03-26 - Phase 4: Documentation and migration updates
+
+- Status: Completed
+- Completed tasks:
+  - Updated `docs/dev/references/runtime-config-and-interfaces.md` with:
+    - named-agent workspace contract under `.lily/agents/<agent-name>/`
+    - required special markdown files and required directories
+    - dedicated special-markdown context injection contract
+    - middleware-only identity injection semantics and failure behavior
+    - CLI examples for default `--agent` mode and explicit named agents
+    - migration guide from `.lily/config/*` to `.lily/agents/default/*`
+- Validation evidence:
+  - `just docs-check` -> pass
+  - `just status` -> pass
+- Phase intent lock compliance:
+  - Must: dedicated docs section for special markdown files + injection contract + migration path -> implemented.
+  - Must Not: undocumented injection behavior or optional language for required identity files -> satisfied.
+
+### 2026-03-26 - Post-Phase Validation and Skills Compatibility Follow-up
+
+- Status: Completed
+- Completed tasks:
+  - Validated full quality/test gate after integrated phase work:
+    - `just quality && just test` -> pass
+  - Verified runtime behavior for skill loading/use in named-agent mode via CLI prompts and telemetry.
+  - Fixed named-agent skills compatibility by ensuring `<agent_workspace_dir>/skills` is always included as a repository skill root when skills are enabled.
+  - Added integration coverage in `tests/integration/test_lily_supervisor.py` to verify local agent skills discovery under named-agent mode.
+- Validation evidence:
+  - `uv run pytest tests/integration/test_lily_supervisor.py -q` -> pass
+  - `just types` -> pass
+  - runtime telemetry confirms:
+    - skill discovery of `.lily/agents/default/skills/math-skill/SKILL.md`
+    - catalog injection events present
+    - progressive disclosure reference load observed for `references/subtraction.md` on subtraction prompt

@@ -101,6 +101,13 @@ class LilySupervisor:
             else cls._default_tools_config_path(config_path)
         )
         config = load_runtime_config(config_path, override_config_path)
+        workspace_path = (
+            Path(agent_workspace_dir) if agent_workspace_dir is not None else None
+        )
+        config = cls._effective_skills_config(
+            config,
+            agent_workspace_dir=workspace_path,
+        )
         configure_lily_package_logging(config.logging.level)
         skills_cfg = config.skills
         skills_enabled = skills_cfg is not None and skills_cfg.enabled
@@ -127,10 +134,8 @@ class LilySupervisor:
                 Path(config_path).resolve().parent,
             )
         identity_context_markdown = ""
-        if agent_workspace_dir is not None:
-            identity_context_markdown = load_agent_identity_context(
-                Path(agent_workspace_dir)
-            )
+        if workspace_path is not None:
+            identity_context_markdown = load_agent_identity_context(workspace_path)
         runtime = AgentRuntime(
             config=cls._effective_runtime_config(config, skills_enabled=skills_enabled),
             tools=resolved_tools,
@@ -138,6 +143,36 @@ class LilySupervisor:
             agent_identity_context_markdown=identity_context_markdown,
         )
         return cls(runtime=runtime)
+
+    @staticmethod
+    def _effective_skills_config(
+        config: RuntimeConfig,
+        *,
+        agent_workspace_dir: Path | None,
+    ) -> RuntimeConfig:
+        """Inject agent-local skills root when running with named-agent workspace.
+
+        Args:
+            config: Loaded runtime configuration.
+            agent_workspace_dir: Optional named-agent workspace directory.
+
+        Returns:
+            Runtime config with merged skills roots when applicable.
+        """
+        skills_cfg = config.skills
+        if skills_cfg is None or agent_workspace_dir is None:
+            return config
+        local_root = str((Path(agent_workspace_dir) / "skills").resolve())
+        roots = dict(skills_cfg.roots)
+        repository_roots = list(roots.get("repository", []))
+        if local_root not in repository_roots:
+            repository_roots.insert(0, local_root)
+        roots["repository"] = repository_roots
+        return config.model_copy(
+            update={
+                "skills": skills_cfg.model_copy(update={"roots": roots}),
+            }
+        )
 
     @staticmethod
     def _default_tools_config_path(config_path: str | Path) -> Path:

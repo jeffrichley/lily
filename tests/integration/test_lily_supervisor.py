@@ -227,3 +227,99 @@ target = "lily.agents.lily_supervisor:ping_tool"
     registry = ToolRegistry.from_tools(runtime._tools)
     assert registry.names() == ["echo_tool", "ping_tool"]
     assert runtime._config.tools.allowlist == ["ping_tool"]
+
+
+def test_supervisor_from_config_paths_adds_agent_local_skills_root(
+    tmp_path: Path,
+) -> None:
+    """Adds `<agent_workspace_dir>/skills` as repository root when skills enabled."""
+    # Arrange - create agent workspace with one local skill package.
+    workspace_dir = tmp_path / ".lily" / "agents" / "default"
+    workspace_dir.mkdir(parents=True)
+    skills_dir = workspace_dir / "skills" / "math-skill"
+    skills_dir.mkdir(parents=True)
+    _write(
+        skills_dir / "SKILL.md",
+        '---\nname: math-skill\ndescription: "adds numbers"\n---\n# Math skill\n',
+    )
+
+    agent_config = workspace_dir / "agent.toml"
+    tools_config = workspace_dir / "tools.toml"
+    _write(
+        agent_config,
+        """
+schema_version = 1
+
+[agent]
+name = "lily"
+system_prompt = "You are Lily."
+
+[models.profiles.default]
+provider = "openai"
+model = "gpt-4o-mini"
+temperature = 0.1
+timeout_seconds = 30
+
+[models.profiles.long_context]
+provider = "openai"
+model = "gpt-4o"
+temperature = 0.1
+timeout_seconds = 45
+
+[models.routing]
+enabled = true
+default_profile = "default"
+long_context_profile = "long_context"
+complexity_threshold = 8
+
+[tools]
+allowlist = ["ping_tool", "skill_retrieve"]
+
+[policies]
+max_iterations = 12
+max_model_calls = 20
+max_tool_calls = 20
+
+[logging]
+level = "INFO"
+
+[skills]
+enabled = true
+roots = { repository = ["../skills"] }
+scopes_precedence = ["repository", "user", "system"]
+""",
+    )
+    _write(
+        tools_config,
+        """
+[[definitions]]
+id = "ping_tool"
+source = "python"
+target = "lily.agents.lily_supervisor:ping_tool"
+
+[[definitions]]
+id = "skill_retrieve"
+source = "python"
+target = "lily.runtime.skill_retrieve_tool:skill_retrieve"
+""",
+    )
+
+    # Required identity files for named-agent workspace path.
+    _write(workspace_dir / "AGENTS.md", "# AGENTS\n")
+    _write(workspace_dir / "IDENTITY.md", "# IDENTITY\n")
+    _write(workspace_dir / "SOUL.md", "# SOUL\n")
+    _write(workspace_dir / "USER.md", "# USER\n")
+    _write(workspace_dir / "TOOLS.md", "# TOOLS\n")
+    (workspace_dir / "memory").mkdir(parents=True, exist_ok=True)
+
+    # Act - build supervisor with named-agent workspace context.
+    supervisor = LilySupervisor.from_config_paths(
+        agent_config,
+        tools_config_path=tools_config,
+        agent_workspace_dir=workspace_dir,
+    )
+    runtime = supervisor._runtime
+
+    # Assert - runtime skill bundle contains the local agent skill.
+    assert runtime._skill_bundle is not None
+    assert "math-skill" in runtime._skill_bundle.registry.canonical_keys()
