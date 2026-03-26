@@ -51,6 +51,9 @@ Required output:
   - failure summaries
 - Run a quick flake check:
   - rerun tests 3x (or targeted suspicious ones) to detect flaky failures.
+- Ensure accidental live-network/model calls are impossible by default:
+  - default run should execute without `@pytest.mark.allows_network`;
+  - only explicitly marked tests may use real network/provider paths.
 
 Required output:
 - Commands executed + outputs summary.

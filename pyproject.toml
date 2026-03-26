@@ -77,6 +77,7 @@ markers = [
     "integration: Integration tests that test multiple components together",
     "e2e: End-to-end tests that exercise full user journeys",
     "slow: Tests that take a long time to run",
+    "allows_network: Explicit opt-in for tests that are allowed to call live network/model providers",
 ]
 filterwarnings = [
     "error::ResourceWarning",

@@ -14,6 +14,7 @@ source_of_truth: true
 
 ## Recently Completed
 
+- Added test-time live-call guardrails: default deny for outbound sockets + `init_chat_model`, opt-in marker `allows_network`, and sentinel coverage (`tests/conftest.py`, `tests/unit/runtime/test_test_guardrails.py`, `pyproject.toml`).
 - Closed plan `007` Phase 4 hardening/debt close: full gates (`just quality && just test`), transport docs/status sync, DEBT-019 + DEBT-020 closure evidence updated (`.ai/PLANS/007-conversation-compression-and-skill-injection.md`, `docs/dev/debt/debt_tracker.md`).
 - Delivered MCP transport expansion + dispatch refactor: added `sse`/`stdio`/`websocket` runtime support and switched default `langgraph_docs` transport to `sse` to resolve `Unknown SSE event: endpoint` mismatch (`src/lily/runtime/config_schema.py`, `src/lily/runtime/tool_resolvers.py`, `.lily/config/agent.toml`, `.lily/config/agent.yaml`).
 - Added secret-scan defense-in-depth: local commit hook setup/verification guidance + server-side push/PR `gitleaks` workflow (`.ai/COMMANDS/commit.md`, `.github/workflows/secret-scan.yml`).
@@ -38,6 +39,7 @@ source_of_truth: true
 
 ## Diary Log
 
+- 2026-03-26: Implemented default test guardrails to prevent accidental paid LLM/network calls in routine test runs; added `allows_network` opt-in marker and guardrail sentinel tests.
 - 2026-03-26: Completed plan 007 Phase 4 closure with full `just quality && just test` green, transport support expansion (`streamable_http` + `sse` + `stdio` + `websocket`), and secret-scan hardening via git hooks + push/PR workflow gate.
 - 2026-03-04: Completed phases 1-4 for kernel/runtime/CLI/TUI and validated warning-clean gates.
 - 2026-03-04: Marked deferred internal items for registry, sub-agent runtime, and evolution logging (SI-002, SI-003, SI-004).

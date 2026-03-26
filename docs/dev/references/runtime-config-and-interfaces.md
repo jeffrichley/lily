@@ -202,10 +202,18 @@ Exit keys in TUI:
 - Unit: `tests/unit/runtime/test_config_loader.py`
 - Unit: `tests/unit/runtime/test_tool_catalog.py`
 - Unit: `tests/unit/runtime/test_tool_resolvers.py`
+- Unit: `tests/unit/runtime/test_test_guardrails.py`
 - Integration: `tests/integration/test_agent_runtime.py`
 - Integration: `tests/integration/test_lily_supervisor.py`
 - E2E CLI: `tests/e2e/test_cli_agent_run.py`
 - E2E TUI: `tests/e2e/test_tui_app.py`
+
+### Test-Time Live-Call Guardrails
+
+- Default test behavior blocks outbound sockets and `init_chat_model` calls via `tests/conftest.py` autouse fixtures.
+- Live-provider environment variables (`OPENAI_API_KEY`, etc.) are scrubbed during non-network tests to prevent accidental paid-provider use.
+- Tests that intentionally call live services must opt in with `@pytest.mark.allows_network`.
+- Strict local/CI mode can enforce fail-fast on detected live-provider env vars by setting `LILY_TEST_STRICT_PROVIDER_ENV=1`.
 
 ## Deferred Boundaries
 
