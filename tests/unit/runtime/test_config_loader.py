@@ -457,8 +457,22 @@ level = "INFO"
     assert config.mcp_servers["langgraph_docs"].transport == "streamable_http"
 
 
-def _minimal_runtime_yaml_with_skills(skills_block: str) -> str:
+def _minimal_runtime_yaml_with_skills(
+    skills_block: str,
+    *,
+    policies_block: str | None = None,
+) -> str:
     """Return a valid runtime YAML document with an optional ``skills`` section."""
+    effective_policies = (
+        policies_block
+        or """
+policies:
+  max_iterations: 12
+  max_model_calls: 20
+  max_tool_calls: 20
+"""
+    )
+
     return f"""
 schema_version: 1
 agent:
@@ -484,10 +498,7 @@ models:
 tools:
   allowlist:
     - filesystem_read
-policies:
-  max_iterations: 12
-  max_model_calls: 20
-  max_tool_calls: 20
+{effective_policies}
 logging:
   level: INFO
 {skills_block}
@@ -538,6 +549,48 @@ skills:
     assert config.skills.scopes_precedence == ["repository", "user", "system"]
     assert "core" in config.skills.tools.packs
     assert config.skills.tools.packs["core"] == ["filesystem_read"]
+
+
+def test_load_runtime_config_parses_conversation_compression_config(
+    tmp_path: Path,
+) -> None:
+    """Parses ``policies.conversation_compression`` when enabled."""
+    # Arrange - write runtime YAML with compression policy enabled.
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        _minimal_runtime_yaml_with_skills(
+            """
+skills:
+  enabled: true
+  roots: [".skills"]
+""",
+            policies_block="""
+policies:
+  max_iterations: 12
+  max_model_calls: 20
+  max_tool_calls: 20
+  conversation_compression:
+    enabled: true
+    trigger:
+      kind: messages
+      threshold: 3
+    keep:
+      kind: messages
+      value: 1
+""",
+        ),
+    )
+
+    # Act - load and validate runtime config.
+    config = load_runtime_config(config_file)
+
+    # Assert - compression policy fields are parsed and typed.
+    assert config.policies.conversation_compression.enabled is True
+    assert config.policies.conversation_compression.trigger.kind == "messages"
+    assert config.policies.conversation_compression.trigger.threshold == 3
+    assert config.policies.conversation_compression.keep.kind == "messages"
+    assert config.policies.conversation_compression.keep.value == 1
 
 
 def test_load_runtime_config_rejects_skills_tools_unknown_default_pack(
