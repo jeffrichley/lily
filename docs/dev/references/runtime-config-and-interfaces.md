@@ -1,6 +1,6 @@
 ---
 owner: "@jeffrichley"
-last_updated: "2026-03-05"
+last_updated: "2026-03-26"
 status: "active"
 source_of_truth: true
 ---
@@ -81,7 +81,10 @@ Top-level keys in `agent.*`:
 - `max_tool_calls`: enforced via LangChain `ToolCallLimitMiddleware`
 
 ### `logging`
-- `level`: `DEBUG|INFO|WARNING|ERROR`
+- `level`: `DEBUG|INFO|WARNING|ERROR` — applied at process startup (when the supervisor loads config) to the stdlib logger **`lily`** and therefore all descendant loggers **`lily.*`** that do not set their own level. A single **Rich** `RichHandler` on stderr is attached to **`lily`** (idempotent) so package logs render with Rich styling. Third-party libraries (e.g. LangChain) are **not** controlled by this field.
+- `skill_telemetry_log` (optional): relative path (from the runtime config file’s directory) or absolute path for skill F7 JSONL telemetry. When omitted, defaults to `../logs/skill-telemetry.jsonl` from that directory (e.g. `.lily/logs/skill-telemetry.jsonl` when config lives under `.lily/config/`).
+
+**Skill telemetry:** logger `lily.skill.telemetry` uses dedicated handlers (append-only **plain** JSONL file by default; optional stderr mirror via `--show-skill-telemetry` on `lily run` / `lily tui` using **Rich**). That logger does **not** propagate to the parent `lily` logger (avoids duplicate Rich lines). It is explicitly held at **INFO** for emission so F7 JSON lines still record when `level` is `WARNING` or `ERROR`.
 
 ## Tool Catalog Contract (`tools.*`)
 
@@ -107,7 +110,7 @@ Validation constraints:
 ## Runtime Behavior
 
 Runtime path:
-1. `agent.*` load + pydantic validation
+1. `agent.*` load + pydantic validation; `[logging].level` → `lily` package logger (`configure_lily_package_logging`)
 2. `tools.*` load + catalog validation
 3. catalog definition resolution to tool objects (Python/MCP resolver layer)
 4. model profile construction (`ModelFactory`)

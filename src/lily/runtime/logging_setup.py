@@ -1,13 +1,50 @@
-"""Skill telemetry logging: JSON lines default to a file; optional stderr mirror."""
+"""Runtime logging: Lily package log levels, Rich console, and skill telemetry."""
 
 from __future__ import annotations
 
 import logging
-import sys
 from pathlib import Path
 
+from rich.console import Console
+from rich.logging import RichHandler
+
+_LILY_ROOT_LOGGER = "lily"
 _SKILL_LOG = logging.getLogger("lily.skill.telemetry")
 _HANDLER_MARKER = "lily_skill_telemetry_handler"
+_LILY_RICH_HANDLER_MARKER = "lily_rich_stderr_handler"
+
+
+def configure_lily_package_logging(level: str) -> None:
+    """Apply ``[logging].level`` to stdlib loggers under the ``lily`` namespace.
+
+    Sets ``logging.getLogger("lily")`` so all descendant loggers such as
+    ``lily.runtime.*`` inherit the threshold unless they set their own level.
+
+    Attaches a single **Rich** ``RichHandler`` to stderr for ``lily.*`` records
+    (idempotent per process). Does **not** change third-party loggers (e.g.
+    ``langchain``). Skill F7 telemetry on ``lily.skill.telemetry`` sets its own
+    level to ``INFO`` when skill handlers are installed, so JSON lines still emit
+    even if this level is ``WARNING`` or ``ERROR``.
+
+    Args:
+        level: One of ``DEBUG``, ``INFO``, ``WARNING``, ``ERROR`` (from config).
+    """
+    numeric = getattr(logging, level.upper(), logging.INFO)
+    lily = logging.getLogger(_LILY_ROOT_LOGGER)
+    lily.setLevel(numeric)
+    if any(getattr(h, _LILY_RICH_HANDLER_MARKER, False) for h in lily.handlers):
+        return
+    rich_handler = RichHandler(
+        level=logging.NOTSET,
+        console=Console(stderr=True),
+        show_time=True,
+        show_path=False,
+        markup=False,
+        rich_tracebacks=False,
+        omit_repeated_times=True,
+    )
+    setattr(rich_handler, _LILY_RICH_HANDLER_MARKER, True)
+    lily.addHandler(rich_handler)
 
 
 def clear_skill_telemetry_handlers() -> None:
@@ -16,6 +53,8 @@ def clear_skill_telemetry_handlers() -> None:
         if getattr(handler, _HANDLER_MARKER, False):
             _SKILL_LOG.removeHandler(handler)
             handler.close()
+    if not _SKILL_LOG.handlers:
+        _SKILL_LOG.propagate = True
 
 
 def resolve_skill_telemetry_log_path(
@@ -51,13 +90,19 @@ def configure_skill_telemetry_handlers(
     *,
     echo_to_stderr: bool,
 ) -> None:
-    """Attach a file handler and optionally mirror telemetry to stderr.
+    """Attach a plain file handler and optionally mirror telemetry to stderr with Rich.
 
     Idempotent for repeated calls in-process: replaces prior Lily-managed handlers.
 
+    The JSONL file remains **plain text** (one JSON object per line). The optional
+    stderr mirror uses :class:`rich.logging.RichHandler` so operators get styled
+    output when using ``--show-skill-telemetry``. Telemetry does not propagate to
+    the parent ``lily`` logger, avoiding duplicate lines next to
+    :func:`configure_lily_package_logging`.
+
     Args:
         log_path: Append-only JSONL destination (parent dirs are created).
-        echo_to_stderr: When true, also log the same records to ``sys.stderr``.
+        echo_to_stderr: When true, also log the same records to ``sys.stderr`` via Rich.
     """
     clear_skill_telemetry_handlers()
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -67,11 +112,16 @@ def configure_skill_telemetry_handlers(
     setattr(file_handler, _HANDLER_MARKER, True)
     _SKILL_LOG.addHandler(file_handler)
     _SKILL_LOG.setLevel(logging.INFO)
+    _SKILL_LOG.propagate = False
     if echo_to_stderr:
-        stream_handler = logging.StreamHandler(sys.stderr)
-        stream_handler.setLevel(logging.INFO)
-        stream_handler.setFormatter(
-            logging.Formatter("%(levelname)s %(name)s: %(message)s"),
+        rich_echo = RichHandler(
+            level=logging.INFO,
+            console=Console(stderr=True),
+            show_time=True,
+            show_path=False,
+            markup=False,
+            rich_tracebacks=False,
+            omit_repeated_times=True,
         )
-        setattr(stream_handler, _HANDLER_MARKER, True)
-        _SKILL_LOG.addHandler(stream_handler)
+        setattr(rich_echo, _HANDLER_MARKER, True)
+        _SKILL_LOG.addHandler(rich_echo)

@@ -12,6 +12,7 @@ from lily.runtime.config_loader import ConfigLoadError, load_runtime_config
 from lily.runtime.config_schema import McpServerConfig, RuntimeConfig
 from lily.runtime.logging_setup import (
     clear_skill_telemetry_handlers,
+    configure_lily_package_logging,
     configure_skill_telemetry_handlers,
     resolve_skill_telemetry_log_path,
 )
@@ -95,6 +96,7 @@ class LilySupervisor:
             else cls._default_tools_config_path(config_path)
         )
         config = load_runtime_config(config_path, override_config_path)
+        configure_lily_package_logging(config.logging.level)
         skills_cfg = config.skills
         skills_enabled = skills_cfg is not None and skills_cfg.enabled
         if skills_enabled and skills_cfg is not None:

@@ -141,7 +141,13 @@ class LoggingConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    level: str = Field(pattern="^(DEBUG|INFO|WARNING|ERROR)$")
+    level: str = Field(
+        pattern="^(DEBUG|INFO|WARNING|ERROR)$",
+        description=(
+            "Stdlib threshold for logger ``lily`` (all ``lily.*`` descendants "
+            "unless overridden). Does not set third-party log levels."
+        ),
+    )
     skill_telemetry_log: str | None = Field(
         default=None,
         description=(
