@@ -21,6 +21,7 @@ from lily.runtime.config_schema import (
     RuntimeConfig,
     SkillsConfig,
 )
+from lily.runtime.logging_setup import clear_skill_telemetry_handlers
 from lily.runtime.model_factory import ModelBuilder, ModelFactory
 from lily.runtime.skill_loader import build_skill_bundle
 from lily.runtime.skill_retrieve_tool import SKILL_RETRIEVE_TOOL_ID, skill_retrieve
@@ -289,6 +290,7 @@ def test_skill_telemetry_emits_retrieval_flow_events(
 ) -> None:
     """Key F7 telemetry events appear during catalog + retrieval success path."""
     # Arrange - one skill package, telemetry logger at INFO, tool-call fake model
+    clear_skill_telemetry_handlers()
     caplog.set_level(logging.INFO, "lily.skill.telemetry")
     skills_root = tmp_path / "skills"
     pkg = skills_root / "pkg"
