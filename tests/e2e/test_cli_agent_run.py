@@ -19,6 +19,19 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SKILLS_FIXTURE_AGENT = _REPO_ROOT / "tests/fixtures/config/skills_retrieval/agent.toml"
 
 
+def _create_named_agent_workspace(root: Path, name: str) -> Path:
+    """Create minimal valid named-agent workspace for CLI tests."""
+    agent_dir = root / ".lily" / "agents" / name
+    agent_dir.mkdir(parents=True)
+    (agent_dir / "agent.toml").write_text("schema_version = 1\n", encoding="utf-8")
+    (agent_dir / "tools.toml").write_text("[[definitions]]\n", encoding="utf-8")
+    for filename in ("AGENTS.md", "IDENTITY.md", "SOUL.md", "USER.md", "TOOLS.md"):
+        (agent_dir / filename).write_text(f"# {filename}\n", encoding="utf-8")
+    (agent_dir / "skills").mkdir()
+    (agent_dir / "memory").mkdir()
+    return agent_dir
+
+
 class _FakeSupervisor:
     """Test double supervisor used to avoid external model calls in e2e tests."""
 
@@ -31,9 +44,15 @@ class _FakeSupervisor:
         override_config_path: str | Path | None = None,
         *,
         skill_telemetry_echo: bool = False,
+        agent_workspace_dir: str | Path | None = None,
     ) -> _FakeSupervisor:
         """Build fake supervisor from config paths for command smoke tests."""
-        _ = (config_path, override_config_path, skill_telemetry_echo)
+        _ = (
+            config_path,
+            override_config_path,
+            skill_telemetry_echo,
+            agent_workspace_dir,
+        )
         return cls()
 
     def run_prompt(
@@ -230,3 +249,181 @@ def test_cli_run_command_rejects_ambiguous_attach_flags(
     assert result.exit_code == 1
     assert "Choose only one attach mode" in result.stdout
     assert _FakeSupervisor.captured_conversation_ids == []
+
+
+def test_cli_run_command_defaults_to_named_default_agent(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Uses `.lily/agents/default` when no --config/--agent is provided."""
+    # Arrange - create default agent workspace and patch fake supervisor.
+    monkeypatch.setattr("lily.cli.LilySupervisor", _FakeSupervisor)
+    _FakeSupervisor.captured_conversation_ids = []
+    _create_named_agent_workspace(tmp_path, "default")
+    runner = CliRunner()
+
+    # Act - invoke command with no explicit config/agent selection.
+    with monkeypatch.context() as context:
+        context.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                "--prompt",
+                "default agent mode",
+            ],
+        )
+
+    # Assert - run succeeds and fake supervisor receives one conversation id.
+    assert result.exit_code == 0
+    assert "fake: default agent mode" in result.stdout
+    assert len(_FakeSupervisor.captured_conversation_ids) == 1
+
+
+def test_cli_run_command_accepts_named_agent(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Resolves selected named-agent workspace via --agent flag."""
+    # Arrange - create two named-agent workspaces and patch fake supervisor.
+    monkeypatch.setattr("lily.cli.LilySupervisor", _FakeSupervisor)
+    _FakeSupervisor.captured_conversation_ids = []
+    _create_named_agent_workspace(tmp_path, "default")
+    _create_named_agent_workspace(tmp_path, "pepper-potts")
+    runner = CliRunner()
+
+    # Act - invoke run command with explicit named-agent selector.
+    with monkeypatch.context() as context:
+        context.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                "--agent",
+                "pepper-potts",
+                "--prompt",
+                "named agent mode",
+            ],
+        )
+
+    # Assert - run succeeds and emits expected visible output.
+    assert result.exit_code == 0
+    assert "fake: named agent mode" in result.stdout
+    assert len(_FakeSupervisor.captured_conversation_ids) == 1
+
+
+def test_cli_run_command_rejects_unknown_named_agent(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Fails deterministically when --agent directory is missing."""
+    # Arrange - patch fake supervisor and create only default workspace.
+    monkeypatch.setattr("lily.cli.LilySupervisor", _FakeSupervisor)
+    _create_named_agent_workspace(tmp_path, "default")
+    runner = CliRunner()
+
+    # Act - invoke with non-existent named agent.
+    with monkeypatch.context() as context:
+        context.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                "--agent",
+                "missing-agent",
+                "--prompt",
+                "should fail",
+            ],
+        )
+
+    # Assert - command fails with deterministic error payload.
+    assert result.exit_code == 1
+    assert "Unknown agent 'missing-agent'" in result.stdout
+
+
+def test_cli_run_command_rejects_ambiguous_agent_and_config_modes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Rejects simultaneous --agent and --config runtime modes."""
+    # Arrange - patch fake supervisor and create valid local config + workspace.
+    monkeypatch.setattr("lily.cli.LilySupervisor", _FakeSupervisor)
+    config_file = tmp_path / "agent.yaml"
+    config_file.write_text("schema_version: 1\n", encoding="utf-8")
+    _create_named_agent_workspace(tmp_path, "default")
+    runner = CliRunner()
+
+    # Act - invoke with both explicit runtime mode selectors.
+    with monkeypatch.context() as context:
+        context.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                "--agent",
+                "default",
+                "--config",
+                str(config_file),
+                "--prompt",
+                "ambiguous mode",
+            ],
+        )
+
+    # Assert - command fails with deterministic mode conflict error.
+    assert result.exit_code == 1
+    assert "Choose only one runtime mode" in result.stdout
+
+
+def test_cli_run_attach_last_is_isolated_per_agent(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Ensures attach-last resolves within selected agent session scope only."""
+    # Arrange - create two named workspaces and patch fake supervisor.
+    monkeypatch.setattr("lily.cli.LilySupervisor", _FakeSupervisor)
+    _FakeSupervisor.captured_conversation_ids = []
+    _create_named_agent_workspace(tmp_path, "default")
+    _create_named_agent_workspace(tmp_path, "pepper-potts")
+    runner = CliRunner()
+
+    # Act - seed one conversation per agent, then attach-last on each.
+    with monkeypatch.context() as context:
+        context.chdir(tmp_path)
+        seed_default = runner.invoke(
+            app,
+            ["run", "--agent", "default", "--prompt", "seed default"],
+        )
+        default_seed_id = _FakeSupervisor.captured_conversation_ids[-1]
+        seed_pepper = runner.invoke(
+            app,
+            ["run", "--agent", "pepper-potts", "--prompt", "seed pepper"],
+        )
+        pepper_seed_id = _FakeSupervisor.captured_conversation_ids[-1]
+        attach_default_last = runner.invoke(
+            app,
+            ["run", "--agent", "default", "--last-conversation", "--prompt", "d last"],
+        )
+        default_last_id = _FakeSupervisor.captured_conversation_ids[-1]
+        attach_pepper_last = runner.invoke(
+            app,
+            [
+                "run",
+                "--agent",
+                "pepper-potts",
+                "--last-conversation",
+                "--prompt",
+                "p last",
+            ],
+        )
+        pepper_last_id = _FakeSupervisor.captured_conversation_ids[-1]
+
+    # Assert - each agent resolves its own last conversation id.
+    assert seed_default.exit_code == 0
+    assert seed_pepper.exit_code == 0
+    assert attach_default_last.exit_code == 0
+    assert attach_pepper_last.exit_code == 0
+    assert default_seed_id is not None
+    assert pepper_seed_id is not None
+    assert default_last_id == default_seed_id
+    assert pepper_last_id == pepper_seed_id
+    assert default_seed_id != pepper_seed_id

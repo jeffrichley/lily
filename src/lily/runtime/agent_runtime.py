@@ -1,4 +1,5 @@
 """LangChain-backed agent runtime wrapper for Lily kernel execution."""
+# ruff: noqa: PLR0913
 
 from __future__ import annotations
 
@@ -19,6 +20,9 @@ from langchain_core.messages import AIMessage, BaseMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel, ConfigDict, Field
 
+from lily.runtime.agent_identity_injection_middleware import (
+    SystemPromptAgentIdentityMiddleware,
+)
 from lily.runtime.config_schema import RuntimeConfig
 from lily.runtime.conversation_compression import (
     build_conversation_compression_middleware,
@@ -96,7 +100,7 @@ def _coerce_message_text(message: BaseMessage) -> str:
 class AgentRuntime:
     """Config-driven wrapper over LangChain's `create_agent` kernel."""
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         config: RuntimeConfig,
         tools: Sequence[ToolLike],
@@ -104,6 +108,7 @@ class AgentRuntime:
         checkpoint_db_path: Path | None = None,
         agent_builder: AgentBuilder = create_agent,
         skill_bundle: SkillBundle | None = None,
+        agent_identity_context_markdown: str = "",
     ) -> None:
         """Initialize runtime with validated config, tools, and adapters.
 
@@ -115,10 +120,13 @@ class AgentRuntime:
             agent_builder: Agent builder callable (defaults to create_agent).
             skill_bundle: Optional discovery/loader bundle for catalog injection and
                 ``skill_retrieve`` context binding.
+            agent_identity_context_markdown: Optional pre-formatted identity context
+                markdown block injected via middleware before model invocation.
         """
         self._config = config
         self._tools = list(tools)
         self._skill_bundle = skill_bundle
+        self._agent_identity_context_markdown = agent_identity_context_markdown
         self._model_factory = model_factory or ModelFactory()
         self._checkpoint_db_path = checkpoint_db_path or (
             Path(".lily") / "runtime-checkpoints.sqlite3"
@@ -244,6 +252,13 @@ class AgentRuntime:
 
         system_prompt = self._config.agent.system_prompt
         middleware = [router.build_middleware()]
+
+        if self._agent_identity_context_markdown.strip():
+            middleware.append(
+                SystemPromptAgentIdentityMiddleware(
+                    identity_markdown=self._agent_identity_context_markdown,
+                )
+            )
 
         compression_cfg = self._config.policies.conversation_compression
         if compression_cfg.enabled:

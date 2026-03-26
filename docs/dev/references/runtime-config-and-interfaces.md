@@ -25,15 +25,47 @@ Does not cover:
 
 ## Config Files
 
-Primary runtime config:
-- `.lily/config/agent.yaml` or `.lily/config/agent.toml`
+Named-agent runtime config (primary contract):
+- `.lily/agents/<agent-name>/agent.yaml` or `.lily/agents/<agent-name>/agent.toml`
 
-Tool catalog config:
-- `.lily/config/tools.yaml` or `.lily/config/tools.toml`
+Named-agent tool catalog config:
+- `.lily/agents/<agent-name>/tools.yaml` or `.lily/agents/<agent-name>/tools.toml`
+
+Default named agent:
+- `.lily/agents/default/` is selected when `--agent` is omitted.
 
 Default pairing behavior:
 - when runtime config is `agent.yaml`/`agent.yml`, supervisor defaults to `tools.yaml` in the same directory
 - when runtime config is `agent.toml`, supervisor defaults to `tools.toml` in the same directory
+
+Legacy explicit config mode:
+- `--config` still accepts any explicit `agent.*` path.
+- In this mode, session scoping remains rooted at process cwd.
+- `--config` and `--agent` are mutually exclusive.
+
+## Named-Agent Workspace Contract
+
+Each named agent directory under `.lily/agents/<agent-name>/` must contain:
+
+- Required files:
+  - `agent.toml` (or `agent.yaml` / `agent.yml`)
+  - paired `tools.toml` (or `tools.yaml`)
+  - `AGENTS.md`
+  - `IDENTITY.md`
+  - `SOUL.md`
+  - `USER.md`
+  - `TOOLS.md`
+- Required directories:
+  - `skills/`
+  - `memory/`
+
+Validation behavior:
+- Missing required file/dir fails fast with deterministic CLI/runtime error.
+- Agent names are directory identifiers and support values like `pepper-potts`.
+
+Session/memory scoping:
+- In `--agent` mode, conversation sessions are isolated per selected agent workspace
+  (session DB path is rooted under that agent directory).
 
 ## Config Schema (YAML/TOML)
 
@@ -128,8 +160,34 @@ Runtime path:
 3. catalog definition resolution to tool objects (Python/MCP resolver layer)
 4. model profile construction (`ModelFactory`)
 5. dynamic model middleware wiring (`DynamicModelRouter`)
-6. tool registration + `agent.yaml` allowlist filtering (`ToolRegistry.allowlisted`)
-7. LangChain `create_agent` execution (`AgentRuntime`)
+6. agent identity context load from required markdown files (`AGENTS.md`, `IDENTITY.md`, `SOUL.md`, `USER.md`, `TOOLS.md`) when `--agent` mode is active
+7. middleware injection of identity/personality context (`SystemPromptAgentIdentityMiddleware`) right before model invocation
+8. tool registration + `agent.yaml` allowlist filtering (`ToolRegistry.allowlisted`)
+9. LangChain `create_agent` execution (`AgentRuntime`)
+
+### Special Markdown Context Injection Contract
+
+When runtime is launched via named-agent mode (`--agent` or default `default`):
+
+- Required sources:
+  - `AGENTS.md`
+  - `IDENTITY.md`
+  - `SOUL.md`
+  - `USER.md`
+  - `TOOLS.md`
+- Injection order (fixed):
+  1. `AGENTS.md`
+  2. `IDENTITY.md`
+  3. `SOUL.md`
+  4. `USER.md`
+  5. `TOOLS.md`
+- Injection mechanism:
+  - middleware-only via `SystemPromptAgentIdentityMiddleware`
+  - appended to request `system_message` at model-call time
+- Failure semantics:
+  - missing required file -> fail fast
+  - no silent skipping
+  - no nondeterministic filesystem ordering
 
 Policy boundary:
 - `tools.*` defines what exists in the catalog.
@@ -163,39 +221,81 @@ Single prompt contract:
 
 Runs a single prompt through supervisor runtime.
 
-Example (YAML):
+Example (named-agent default):
 ```bash
-uv run lily run --prompt "hello" --config .lily/config/agent.yaml
+uv run lily run --prompt "hello"
 ```
 
-Example (TOML):
+Example (named agent):
 ```bash
-uv run lily run --prompt "hello" --config .lily/config/agent.toml
+uv run lily run --agent pepper-potts --prompt "hello"
+```
+
+Example (explicit config YAML):
+```bash
+uv run lily run --prompt "hello" --config .lily/agents/default/agent.yaml
+```
+
+Example (explicit config TOML):
+```bash
+uv run lily run --prompt "hello" --config .lily/agents/default/agent.toml
 ```
 
 Options:
 - `--prompt` (required)
-- `--config` (defaults to `.lily/config/agent.toml`)
+- `--agent` (optional, defaults to `default` when `--config` is omitted)
+- `--config` (optional explicit runtime config path; mutually exclusive with `--agent`)
 - `--override` (optional runtime override)
 
 ### `lily tui`
 
 Launches Textual app with transcript + input.
 
-Example (YAML):
+Example (named-agent default):
 ```bash
-uv run lily tui --config .lily/config/agent.yaml
+uv run lily tui
 ```
 
-Example (TOML):
+Example (named agent):
 ```bash
-uv run lily tui --config .lily/config/agent.toml
+uv run lily tui --agent pepper-potts
+```
+
+Example (explicit config YAML):
+```bash
+uv run lily tui --config .lily/agents/default/agent.yaml
+```
+
+Example (explicit config TOML):
+```bash
+uv run lily tui --config .lily/agents/default/agent.toml
 ```
 
 Exit keys in TUI:
 - `Ctrl+Q`
 - `Esc`
 - `Ctrl+C`
+
+## Migration: Legacy `.lily/config/*` -> Named Agents
+
+Recommended migration:
+
+1. Create default agent workspace:
+   - `.lily/agents/default/`
+2. Move config/catalog files:
+   - `.lily/config/agent.toml` -> `.lily/agents/default/agent.toml`
+   - `.lily/config/tools.toml` -> `.lily/agents/default/tools.toml`
+   - or YAML equivalents
+3. Add required identity markdown files:
+   - `AGENTS.md`, `IDENTITY.md`, `SOUL.md`, `USER.md`, `TOOLS.md`
+4. Add required directories:
+   - `skills/`, `memory/`
+5. Run named-agent default mode:
+   - `uv run lily run --prompt "hello"`
+
+Compatibility:
+- You can still run legacy-style explicit config path with `--config`.
+- New default behavior prefers named-agent mode and `default` agent.
 
 ## Test Surfaces
 

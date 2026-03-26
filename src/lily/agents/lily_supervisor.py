@@ -7,6 +7,7 @@ from pathlib import Path
 
 from langchain_core.tools import BaseTool, tool
 
+from lily.runtime.agent_identity_context import load_agent_identity_context
 from lily.runtime.agent_runtime import AgentRunResult, AgentRuntime
 from lily.runtime.config_loader import ConfigLoadError, load_runtime_config
 from lily.runtime.config_schema import McpServerConfig, RuntimeConfig
@@ -75,6 +76,7 @@ class LilySupervisor:
         tools_config_path: str | Path | None = None,
         *,
         skill_telemetry_echo: bool = False,
+        agent_workspace_dir: str | Path | None = None,
     ) -> LilySupervisor:
         """Build supervisor from config files.
 
@@ -86,6 +88,9 @@ class LilySupervisor:
                 in the same directory; otherwise `tools.yaml`.
             skill_telemetry_echo: When skills are enabled, mirror F7 JSON telemetry
                 to stderr in addition to the configured log file.
+            agent_workspace_dir: Optional named-agent workspace directory used to
+                load required identity/personality markdown context for middleware
+                injection.
 
         Returns:
             Supervisor with runtime and catalog-resolved tools configured.
@@ -96,6 +101,13 @@ class LilySupervisor:
             else cls._default_tools_config_path(config_path)
         )
         config = load_runtime_config(config_path, override_config_path)
+        workspace_path = (
+            Path(agent_workspace_dir) if agent_workspace_dir is not None else None
+        )
+        config = cls._effective_skills_config(
+            config,
+            agent_workspace_dir=workspace_path,
+        )
         configure_lily_package_logging(config.logging.level)
         skills_cfg = config.skills
         skills_enabled = skills_cfg is not None and skills_cfg.enabled
@@ -121,12 +133,46 @@ class LilySupervisor:
                 skills_cfg,
                 Path(config_path).resolve().parent,
             )
+        identity_context_markdown = ""
+        if workspace_path is not None:
+            identity_context_markdown = load_agent_identity_context(workspace_path)
         runtime = AgentRuntime(
             config=cls._effective_runtime_config(config, skills_enabled=skills_enabled),
             tools=resolved_tools,
             skill_bundle=skill_bundle,
+            agent_identity_context_markdown=identity_context_markdown,
         )
         return cls(runtime=runtime)
+
+    @staticmethod
+    def _effective_skills_config(
+        config: RuntimeConfig,
+        *,
+        agent_workspace_dir: Path | None,
+    ) -> RuntimeConfig:
+        """Inject agent-local skills root when running with named-agent workspace.
+
+        Args:
+            config: Loaded runtime configuration.
+            agent_workspace_dir: Optional named-agent workspace directory.
+
+        Returns:
+            Runtime config with merged skills roots when applicable.
+        """
+        skills_cfg = config.skills
+        if skills_cfg is None or agent_workspace_dir is None:
+            return config
+        local_root = str((Path(agent_workspace_dir) / "skills").resolve())
+        roots = dict(skills_cfg.roots)
+        repository_roots = list(roots.get("repository", []))
+        if local_root not in repository_roots:
+            repository_roots.insert(0, local_root)
+        roots["repository"] = repository_roots
+        return config.model_copy(
+            update={
+                "skills": skills_cfg.model_copy(update={"roots": roots}),
+            }
+        )
 
     @staticmethod
     def _default_tools_config_path(config_path: str | Path) -> Path:

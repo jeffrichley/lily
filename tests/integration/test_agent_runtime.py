@@ -11,6 +11,9 @@ from langchain_core.language_models.fake_chat_models import FakeMessagesListChat
 from langchain_core.messages import AIMessage
 from langchain_core.tools import tool
 
+from lily.runtime.agent_identity_injection_middleware import (
+    SystemPromptAgentIdentityMiddleware,
+)
 from lily.runtime.agent_runtime import AgentRuntime
 from lily.runtime.config_schema import (
     ConversationCompressionConfig,
@@ -537,5 +540,56 @@ def test_agent_runtime_skill_catalog_injection_uses_middleware(
     assert isinstance(middleware_list, list)
     assert any(
         isinstance(m, SystemPromptSkillCatalogMiddleware) for m in middleware_list
+    )
+    assert result.final_output == "SPY"
+
+
+def test_agent_runtime_identity_context_injection_uses_middleware() -> None:
+    """Identity/personality layer should be injected through middleware."""
+
+    # Arrange - runtime with explicit identity context markdown.
+    @tool
+    def ping_tool() -> str:
+        """Return pong."""
+        return "pong"
+
+    captured: dict[str, object] = {}
+    spy_agent = _SpyInvokableAgent()
+
+    def _spy_agent_builder(**kwargs: object) -> _SpyInvokableAgent:
+        captured.clear()
+        captured.update(kwargs)
+        return spy_agent
+
+    runtime = AgentRuntime(
+        config=_runtime_config(allowlist=["ping_tool"], routing_enabled=False),
+        tools=[ping_tool],
+        model_factory=_model_factory(
+            {
+                "default-model": ToolCapableFakeModel(
+                    responses=[AIMessage(content="SPY")]
+                ),
+                "long-model": ToolCapableFakeModel(
+                    responses=[AIMessage(content="ignored")]
+                ),
+            }
+        ),
+        agent_builder=_spy_agent_builder,
+        agent_identity_context_markdown=(
+            "## Agent identity context\n\n### IDENTITY.md\nName: Pepper Potts\n"
+        ),
+    )
+
+    # Act - run once so create_agent captures middleware list.
+    with closing(runtime):
+        result = runtime.run("hello")
+
+    # Assert - base prompt remains stable and identity middleware is registered.
+    assert captured.get("system_prompt") is not None
+    assert "You are Lily." in str(captured["system_prompt"])
+    middleware_list = captured.get("middleware")
+    assert isinstance(middleware_list, list)
+    assert any(
+        isinstance(m, SystemPromptAgentIdentityMiddleware) for m in middleware_list
     )
     assert result.final_output == "SPY"
