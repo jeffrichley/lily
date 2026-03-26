@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import ClassVar
 from uuid import UUID
@@ -85,22 +86,30 @@ def test_cli_run_command_smoke_with_config(
 
 def test_cli_run_smoke_with_skills_fixture_config(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """CLI run accepts the checked-in skills fixture config (fake supervisor)."""
-    # Arrange - fake supervisor and cwd at fixture dir so ./skills roots resolve
+    # Arrange - fake supervisor and isolated temp fixture copy.
     monkeypatch.setattr("lily.cli.LilySupervisor", _FakeSupervisor)
     _FakeSupervisor.captured_conversation_ids = []
     runner = CliRunner()
     fixture_dir = _SKILLS_FIXTURE_AGENT.parent
+    temp_fixture_dir = tmp_path / "skills_retrieval"
+    temp_fixture_dir.mkdir(parents=True)
+    shutil.copy2(fixture_dir / "agent.toml", temp_fixture_dir / "agent.toml")
+    shutil.copy2(fixture_dir / "tools.toml", temp_fixture_dir / "tools.toml")
+    shutil.copytree(fixture_dir / "skills", temp_fixture_dir / "skills")
+    temp_fixture_agent = temp_fixture_dir / "agent.toml"
+
     # Act - invoke run with skills-enabled agent.toml
     with monkeypatch.context() as context:
-        context.chdir(fixture_dir)
+        context.chdir(temp_fixture_dir)
         result = runner.invoke(
             app,
             [
                 "run",
                 "--config",
-                str(_SKILLS_FIXTURE_AGENT),
+                str(temp_fixture_agent),
                 "--prompt",
                 "skills fixture e2e prompt",
             ],
