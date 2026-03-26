@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -126,6 +126,122 @@ class McpServerStreamableHttpConfig(McpServerConfig):
     timeout_seconds: float | None = Field(default=None, gt=0.0)
 
 
+class McpServerSseConfig(McpServerConfig):
+    """SSE MCP transport configuration for legacy endpoint-style servers."""
+
+    transport: Literal["sse"]
+    url: str = Field(min_length=1)
+    headers: dict[str, str] = Field(default_factory=dict)
+    timeout_seconds: float | None = Field(default=None, gt=0.0)
+
+
+class McpServerWebsocketConfig(McpServerConfig):
+    """WebSocket MCP transport configuration."""
+
+    transport: Literal["websocket"]
+    url: str = Field(min_length=1)
+
+
+class McpServerStdioConfig(McpServerConfig):
+    """Local stdio MCP transport configuration."""
+
+    transport: Literal["stdio"]
+    command: str = Field(min_length=1)
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] | None = None
+    cwd: str | None = None
+    encoding: str | None = None
+    encoding_error_handler: Literal["strict", "ignore", "replace"] | None = None
+
+
+class ConversationCompressionTriggerConfig(BaseModel):
+    """Threshold policy for conversation compression summarization."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["tokens", "messages", "fraction"] = "messages"
+    threshold: int | float = 50
+
+    @model_validator(mode="after")
+    def _validate_trigger_threshold(self) -> Self:
+        """Validate and normalize the trigger threshold.
+
+        Returns:
+            This validated config instance.
+
+        Raises:
+            ValueError: If the threshold does not match the selected `kind`.
+        """
+        if isinstance(self.threshold, bool):
+            raise ValueError("threshold must not be a boolean value")
+
+        if self.kind in {"tokens", "messages"}:
+            if not isinstance(self.threshold, int):
+                msg = "threshold must be an integer when kind is 'tokens' or 'messages'"
+                raise ValueError(msg)
+            if self.threshold < 1:
+                raise ValueError("threshold must be >= 1 for 'tokens'/'messages'")
+            return self
+
+        # kind == "fraction"
+        value = float(self.threshold)
+        if value <= 0.0:
+            raise ValueError("threshold must be > 0.0 when kind is 'fraction'")
+        self.threshold = value
+        return self
+
+
+class ConversationCompressionKeepConfig(BaseModel):
+    """Verbatim-tail policy for conversation compression summarization."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["tokens", "messages", "fraction"] = "messages"
+    value: int | float = 20
+
+    @model_validator(mode="after")
+    def _validate_keep_value(self) -> Self:
+        """Validate and normalize the keep value.
+
+        Returns:
+            This validated config instance.
+
+        Raises:
+            ValueError: If the keep value does not match the selected `kind`.
+        """
+        if isinstance(self.value, bool):
+            raise ValueError("value must not be a boolean value")
+
+        if self.kind in {"tokens", "messages"}:
+            if not isinstance(self.value, int):
+                msg = "value must be an integer when kind is 'tokens' or 'messages'"
+                raise ValueError(msg)
+            if self.value < 1:
+                raise ValueError("value must be >= 1 for 'tokens'/'messages'")
+            return self
+
+        # kind == "fraction"
+        v = float(self.value)
+        if v <= 0.0:
+            raise ValueError("value must be > 0.0 when kind is 'fraction'")
+        self.value = v
+        return self
+
+
+class ConversationCompressionConfig(BaseModel):
+    """Conversation compression policy (summarize older history)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    trigger: ConversationCompressionTriggerConfig = Field(
+        default_factory=ConversationCompressionTriggerConfig
+    )
+    keep: ConversationCompressionKeepConfig = Field(
+        default_factory=ConversationCompressionKeepConfig
+    )
+
+
 class PoliciesConfig(BaseModel):
     """Runtime safety and loop policies."""
 
@@ -134,6 +250,9 @@ class PoliciesConfig(BaseModel):
     max_iterations: int = Field(ge=1, le=100)
     max_model_calls: int = Field(ge=1, le=1000)
     max_tool_calls: int = Field(ge=1, le=1000)
+    conversation_compression: ConversationCompressionConfig = Field(
+        default_factory=ConversationCompressionConfig
+    )
 
 
 class LoggingConfig(BaseModel):
@@ -350,7 +469,11 @@ class RuntimeConfig(BaseModel):
     mcp_servers: dict[
         str,
         Annotated[
-            McpServerTestConfig | McpServerStreamableHttpConfig,
+            McpServerTestConfig
+            | McpServerStreamableHttpConfig
+            | McpServerSseConfig
+            | McpServerWebsocketConfig
+            | McpServerStdioConfig,
             Field(discriminator="transport"),
         ],
     ] = Field(default_factory=dict)

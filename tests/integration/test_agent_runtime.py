@@ -13,12 +13,18 @@ from langchain_core.tools import tool
 
 from lily.runtime.agent_runtime import AgentRuntime
 from lily.runtime.config_schema import (
+    ConversationCompressionConfig,
+    ConversationCompressionKeepConfig,
+    ConversationCompressionTriggerConfig,
     ModelProfileConfig,
     ModelProvider,
     RuntimeConfig,
     SkillsConfig,
 )
 from lily.runtime.model_factory import ModelBuilder, ModelFactory
+from lily.runtime.skill_catalog_injection_middleware import (
+    SystemPromptSkillCatalogMiddleware,
+)
 from lily.runtime.skill_loader import build_skill_bundle
 from lily.runtime.tool_registry import ToolRegistryError
 
@@ -395,8 +401,80 @@ def test_agent_runtime_persists_history_for_same_conversation_id(
     assert second.message_count > first.message_count
 
 
-def test_agent_runtime_appends_skill_catalog_to_system_prompt(tmp_path: Path) -> None:
-    """Includes skill index markdown after the base system prompt when bundle is set."""
+def test_agent_runtime_compression_compacts_persisted_history(
+    tmp_path: Path,
+) -> None:
+    """Ensures enabled compression keeps checkpoint history compact.
+
+    This does not attempt to assert exact message list structure (LangChain agent
+    internals may add intermediate messages), but it validates that the persisted
+    history does not grow unbounded across repeated runs for the same
+    conversation_id.
+    """
+
+    # Arrange - enable compression and reuse checkpoint DB.
+    @tool
+    def ping_tool() -> str:
+        """Return pong."""
+        return "pong"
+
+    # Provide enough responses to cover:
+    # - 1 agent model call per turn
+    # - 0-1 summarization model call per turn when thresholds are exceeded
+    fake_model = ToolCapableFakeModel(
+        responses=[AIMessage(content="OK")] * 20,
+    )
+
+    config = _runtime_config(allowlist=["ping_tool"], routing_enabled=False)
+    config = config.model_copy(
+        update={
+            "policies": config.policies.model_copy(
+                update={
+                    "conversation_compression": ConversationCompressionConfig(
+                        enabled=True,
+                        trigger=ConversationCompressionTriggerConfig(
+                            kind="messages",
+                            threshold=3,
+                        ),
+                        keep=ConversationCompressionKeepConfig(
+                            kind="messages",
+                            value=1,
+                        ),
+                    )
+                }
+            )
+        }
+    )
+
+    runtime = AgentRuntime(
+        config=config,
+        tools=[ping_tool],
+        model_factory=_model_factory(
+            {"default-model": fake_model, "long-model": fake_model}
+        ),
+        checkpoint_db_path=tmp_path / "checkpoints.sqlite3",
+    )
+
+    # Act - run multiple turns through the same conversation id.
+    with closing(runtime):
+        first = runtime.run("turn 1", conversation_id="conv-compress")
+        second = runtime.run("turn 2", conversation_id="conv-compress")
+        third = runtime.run("turn 3", conversation_id="conv-compress")
+
+    # Assert - the agent output is stable and the persisted message history
+    # does not expand linearly with number of turns.
+    assert first.final_output == "OK"
+    assert second.final_output == "OK"
+    assert third.final_output == "OK"
+
+    assert second.message_count > first.message_count
+    assert third.message_count <= second.message_count + 2
+
+
+def test_agent_runtime_skill_catalog_injection_uses_middleware(
+    tmp_path: Path,
+) -> None:
+    """Middleware strategy should not mutate build-time system_prompt."""
     # Arrange - filesystem skill package and bundle for one skill
     skills_root = tmp_path / "skills"
     pkg = skills_root / "pkg"
@@ -427,7 +505,9 @@ def test_agent_runtime_appends_skill_catalog_to_system_prompt(tmp_path: Path) ->
         return spy_agent
 
     runtime = AgentRuntime(
-        config=_runtime_config(allowlist=["ping_tool"], routing_enabled=False),
+        config=_runtime_config(
+            allowlist=["ping_tool"], routing_enabled=False
+        ).model_copy(update={"skills": cfg}),
         tools=[ping_tool],
         model_factory=_model_factory(
             {
@@ -447,9 +527,15 @@ def test_agent_runtime_appends_skill_catalog_to_system_prompt(tmp_path: Path) ->
     with closing(runtime):
         result = runtime.run("hello")
 
-    # Assert - create_agent received base prompt plus catalog block
+    # Assert - create_agent received base prompt *without* catalog injection.
     assert captured.get("system_prompt") is not None
     assert "You are Lily." in str(captured["system_prompt"])
-    assert "Skill catalog" in str(captured["system_prompt"])
-    assert "listed-skill" in str(captured["system_prompt"])
+    assert "Skill catalog" not in str(captured["system_prompt"])
+    assert "listed-skill" not in str(captured["system_prompt"])
+
+    middleware_list = captured.get("middleware")
+    assert isinstance(middleware_list, list)
+    assert any(
+        isinstance(m, SystemPromptSkillCatalogMiddleware) for m in middleware_list
+    )
     assert result.final_output == "SPY"

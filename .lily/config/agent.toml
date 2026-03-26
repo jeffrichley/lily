@@ -26,7 +26,7 @@ complexity_threshold = 8000
 allowlist = ["echo_tool", "ping_tool", "search_langgraph_code", "skill_retrieve"]
 
 [mcp_servers.langgraph_docs]
-transport = "streamable_http"
+transport = "sse"
 url = "https://gitmcp.io/langchain-ai/langgraph"
 
 [policies]

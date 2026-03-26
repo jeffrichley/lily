@@ -743,7 +743,7 @@ Docs/status checks:
 | CLI policy diagnostics (Rich, not raw JSON default) | `cli_skills*.py`, `tests/e2e/test_cli_skills_commands.py` |
 | Retrieval policy / deny-before-content | `skill_policies.py`, `test_skill_policies.py`, `test_skills_runtime_flow.py` |
 | Telemetry schema + redaction | `skill_events.py`, `test_skill_events.py` |
-| Trigger heuristics / doctor templates | **Deferred** (not required for retrieval MVP; see `docs/dev/backlog.md` BL-006) |
+| Trigger heuristics / doctor templates | **Deferred** (not required for retrieval MVP) |
 
 ### Phase 0 — intent check and gates
 
@@ -835,7 +835,7 @@ Docs/status checks:
 - None for Phase 5.
 - None for Phase 6 (docs snippets deferred to Phase 8 as planned).
 - None for Phase 7.
-- None for Phase 8. SI-007 closure scope is **retrieval MVP** (Phases 1–8); distribution **runtime implementation** is deferred to `docs/dev/backlog/skills-distribution-packaging.md` / **SI-008**; trigger heuristics (**BL-006**) remain deferred.
+- None for Phase 8. SI-007 closure scope is **retrieval MVP** (Phases 1–8); distribution **runtime implementation** is deferred to `docs/dev/backlog/skills-distribution-packaging.md` / **SI-008**; trigger heuristics remain deferred.
 - None for Phase 9 contract closure; executable phases in that backlog spec are not started.
 
 ### Phase 9 — intent check and gates

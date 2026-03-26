@@ -1,6 +1,6 @@
 ---
 owner: "@jeffrichley"
-last_updated: "2026-03-25"
+last_updated: "2026-03-26"
 status: "active"
 source_of_truth: true
 ---
@@ -9,13 +9,17 @@ source_of_truth: true
 
 ## Current Focus
 
-- Open or refresh the skills retrieval MVP PR using `docs/dev/pr-si007-skills-mvp.md` (branch `feat/005-skills-system-implementation`).
+- Close/review PR for plan `007` conversation compression + middleware injection + debt closure (**DEBT-019**, **DEBT-020**) (`.ai/PLANS/007-conversation-compression-and-skill-injection.md`).
 - When prioritized, implement **SI-008** / backlog **BL-007** against `docs/dev/backlog/skills-distribution-packaging.md` (bundle tooling; not part of retrieval MVP).
 
 ## Recently Completed
 
+- Added test-time live-call guardrails: default deny for outbound sockets + `init_chat_model`, opt-in marker `allows_network`, and sentinel coverage (`tests/conftest.py`, `tests/unit/runtime/test_test_guardrails.py`, `pyproject.toml`).
+- Closed plan `007` Phase 4 hardening/debt close: full gates (`just quality && just test`), transport docs/status sync, DEBT-019 + DEBT-020 closure evidence updated (`.ai/PLANS/007-conversation-compression-and-skill-injection.md`, `docs/dev/debt/debt_tracker.md`).
+- Delivered MCP transport expansion + dispatch refactor: added `sse`/`stdio`/`websocket` runtime support and switched default `langgraph_docs` transport to `sse` to resolve `Unknown SSE event: endpoint` mismatch (`src/lily/runtime/config_schema.py`, `src/lily/runtime/tool_resolvers.py`, `.lily/config/agent.toml`, `.lily/config/agent.yaml`).
+- Added secret-scan defense-in-depth: local commit hook setup/verification guidance + server-side push/PR `gitleaks` workflow (`.ai/COMMANDS/commit.md`, `.github/workflows/secret-scan.yml`).
 - Closed plan **005** Phase 9 (post-MVP distribution **contract**): `docs/dev/backlog/skills-distribution-packaging.md` (`.lily-skill` layout, manifest schema v1, error taxonomy, CLI/API/rollout sketches); roadmap **SI-008**, backlog **BL-007** updated; no runtime code in this slice (`.ai/PLANS/005-skills-system-implementation.md`).
-- Closed SI-007 Phase 8 (hardening): full gates, `docs/dev/references/skills-si007-mvp.md` alignment + verification, PR draft `docs/dev/pr-si007-skills-mvp.md`, roadmap SI-007 → Completed (retrieval MVP), backlog **BL-006**/ **BL-007** for deferred heuristics and Phase 9 distribution; extra tests `test_cli_run_smoke_with_skills_fixture_config`, `test_skill_loader_utf8_non_ascii_body_round_trips` (`.ai/PLANS/005-skills-system-implementation.md`).
+- Closed SI-007 Phase 8 (hardening): full gates, `docs/dev/references/skills-si007-mvp.md` alignment + verification, PR draft `docs/dev/pr-si007-skills-mvp.md`, roadmap SI-007 → Completed (retrieval MVP), backlog **BL-007** for Phase 9 distribution; heuristics remain deferred; extra tests `test_cli_run_smoke_with_skills_fixture_config`, `test_skill_loader_utf8_non_ascii_body_round_trips` (`.ai/PLANS/005-skills-system-implementation.md`).
 - Delivered SI-007 Phase 7 skill telemetry: `skill_events` (`SKILL_EVENT_SCHEMA_VERSION`, JSON on `lily.skill.telemetry`), hooks in `build_skill_bundle`, `AgentRuntime._build_agent`, `SkillLoader`, `skill_retrieve`; `sanitize_telemetry_detail`; unit `tests/unit/runtime/test_skill_events.py`; integration `test_skill_telemetry_emits_retrieval_flow_events` (`.ai/PLANS/005-skills-system-implementation.md`).
 - Delivered SI-007 Phase 6 CLI skills surfaces: `lily skills list|inspect|doctor` (Rich tables/panels), `SkillCliDiagnostics`, filtering/sorting (`--contains`, `--sort`), `cli_options` shared with root CLI; e2e `tests/e2e/test_cli_skills_commands.py`; user doc snippets for skills CLI deferred to Phase 8 (`.ai/PLANS/005-skills-system-implementation.md`).
 - Delivered SI-007 Phase 5 supervisor/runtime integration: `skill_retrieve` omitted from resolved tools when `skills.enabled` is false; `_effective_runtime_config` strips `skill_retrieve` from allowlist when needed; `AgentRunResult.skill_trace` (`SkillInvokeTrace`, `SkillRetrievalTraceEntry`); trace hooks in `skill_retrieve`; integration suite `tests/integration/test_skills_runtime_flow.py`; fixture config `tests/fixtures/config/skills_retrieval/` (`.ai/PLANS/005-skills-system-implementation.md`).
@@ -35,6 +39,8 @@ source_of_truth: true
 
 ## Diary Log
 
+- 2026-03-26: Implemented default test guardrails to prevent accidental paid LLM/network calls in routine test runs; added `allows_network` opt-in marker and guardrail sentinel tests.
+- 2026-03-26: Completed plan 007 Phase 4 closure with full `just quality && just test` green, transport support expansion (`streamable_http` + `sse` + `stdio` + `websocket`), and secret-scan hardening via git hooks + push/PR workflow gate.
 - 2026-03-04: Completed phases 1-4 for kernel/runtime/CLI/TUI and validated warning-clean gates.
 - 2026-03-04: Marked deferred internal items for registry, sub-agent runtime, and evolution logging (SI-002, SI-003, SI-004).
 - 2026-03-05: Completed phases 1-4 for conversation session attach/resume feature and validated full quality/test gates (`.ai/PLANS/002-conversation-session-attach-resume.md`).

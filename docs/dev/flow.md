@@ -1,6 +1,6 @@
 ---
 owner: "@jeffrichley"
-last_updated: "2026-03-05"
+last_updated: "2026-03-26"
 status: "reference"
 source_of_truth: false
 ---
@@ -110,32 +110,32 @@ flowchart TB
 
     %% --- Status: change a node by setting its class to not_started | in_progress | done ---
     class evolution not_started
-    class logging not_started
-    class capability_registry not_started
+    class logging in_progress
+    class capability_registry in_progress
     class kernel done
     class llmadapter done
     class supervisor done
-    class runtime_policies not_started
+    class runtime_policies done
     class knowledge done
     class cli done
     class tui done
     class tools done
-    class tool_registry not_started
+    class tool_registry done
     class procedural_skill not_started
     class playbooks not_started
-    class registry not_started
-    class skill_discovery not_started
+    class registry done
+    class skill_discovery done
     class skill_graph not_started
-    class skill_metadata not_started
+    class skill_metadata done
     class subagents not_started
     class luser done
     class lsa done
-    class lhs not_started
+    class lhs in_progress
     class lps not_started
     class lprs not_started
     class las not_started
-    class lts not_started
-    class lea not_started
+    class lts done
+    class lea in_progress
     class skill_levels not_started
 
 ```

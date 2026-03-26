@@ -457,8 +457,180 @@ level = "INFO"
     assert config.mcp_servers["langgraph_docs"].transport == "streamable_http"
 
 
-def _minimal_runtime_yaml_with_skills(skills_block: str) -> str:
+def test_load_runtime_config_parses_sse_mcp_server(tmp_path: Path) -> None:
+    """Parses SSE MCP server config for endpoint-event transports."""
+    # Arrange - write valid runtime YAML with one SSE MCP server.
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        """
+schema_version: 1
+agent:
+  name: lily
+  system_prompt: "You are Lily."
+models:
+  profiles:
+    default:
+      provider: openai
+      model: gpt-4o-mini
+      temperature: 0.1
+      timeout_seconds: 30
+    long_context:
+      provider: openai
+      model: gpt-4o
+      temperature: 0.1
+      timeout_seconds: 45
+  routing:
+    enabled: true
+    default_profile: default
+    long_context_profile: long_context
+    complexity_threshold: 8
+tools:
+  allowlist:
+    - search_langgraph_code
+mcp_servers:
+  langgraph_docs:
+    transport: sse
+    url: https://gitmcp.io/langchain-ai/langgraph
+policies:
+  max_iterations: 12
+  max_model_calls: 20
+  max_tool_calls: 20
+logging:
+  level: INFO
+""",
+    )
+
+    # Act - load config with SSE MCP server mapping.
+    config = load_runtime_config(config_file)
+
+    # Assert - SSE server mapping is parsed with expected fields.
+    assert "langgraph_docs" in config.mcp_servers
+    assert config.mcp_servers["langgraph_docs"].transport == "sse"
+
+
+def test_load_runtime_config_parses_websocket_mcp_server(tmp_path: Path) -> None:
+    """Parses WebSocket MCP server config."""
+    # Arrange - write valid runtime YAML with one websocket MCP server.
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        """
+schema_version: 1
+agent:
+  name: lily
+  system_prompt: "You are Lily."
+models:
+  profiles:
+    default:
+      provider: openai
+      model: gpt-4o-mini
+      temperature: 0.1
+      timeout_seconds: 30
+    long_context:
+      provider: openai
+      model: gpt-4o
+      temperature: 0.1
+      timeout_seconds: 45
+  routing:
+    enabled: true
+    default_profile: default
+    long_context_profile: long_context
+    complexity_threshold: 8
+tools:
+  allowlist:
+    - search_langgraph_code
+mcp_servers:
+  websocket_docs:
+    transport: websocket
+    url: wss://example.com/mcp
+policies:
+  max_iterations: 12
+  max_model_calls: 20
+  max_tool_calls: 20
+logging:
+  level: INFO
+""",
+    )
+
+    # Act - load config with websocket MCP server mapping.
+    config = load_runtime_config(config_file)
+
+    # Assert - websocket server mapping is parsed with expected fields.
+    assert "websocket_docs" in config.mcp_servers
+    assert config.mcp_servers["websocket_docs"].transport == "websocket"
+
+
+def test_load_runtime_config_parses_stdio_mcp_server(tmp_path: Path) -> None:
+    """Parses stdio MCP server config for local process transports."""
+    # Arrange - write valid runtime YAML with one stdio MCP server.
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        """
+schema_version: 1
+agent:
+  name: lily
+  system_prompt: "You are Lily."
+models:
+  profiles:
+    default:
+      provider: openai
+      model: gpt-4o-mini
+      temperature: 0.1
+      timeout_seconds: 30
+    long_context:
+      provider: openai
+      model: gpt-4o
+      temperature: 0.1
+      timeout_seconds: 45
+  routing:
+    enabled: true
+    default_profile: default
+    long_context_profile: long_context
+    complexity_threshold: 8
+tools:
+  allowlist:
+    - search_langgraph_code
+mcp_servers:
+  local_stdio:
+    transport: stdio
+    command: uvx
+    args:
+      - mcp-server-example
+policies:
+  max_iterations: 12
+  max_model_calls: 20
+  max_tool_calls: 20
+logging:
+  level: INFO
+""",
+    )
+
+    # Act - load config with stdio MCP server mapping.
+    config = load_runtime_config(config_file)
+
+    # Assert - stdio server mapping is parsed with expected fields.
+    assert "local_stdio" in config.mcp_servers
+    assert config.mcp_servers["local_stdio"].transport == "stdio"
+
+
+def _minimal_runtime_yaml_with_skills(
+    skills_block: str,
+    *,
+    policies_block: str | None = None,
+) -> str:
     """Return a valid runtime YAML document with an optional ``skills`` section."""
+    effective_policies = (
+        policies_block
+        or """
+policies:
+  max_iterations: 12
+  max_model_calls: 20
+  max_tool_calls: 20
+"""
+    )
+
     return f"""
 schema_version: 1
 agent:
@@ -484,10 +656,7 @@ models:
 tools:
   allowlist:
     - filesystem_read
-policies:
-  max_iterations: 12
-  max_model_calls: 20
-  max_tool_calls: 20
+{effective_policies}
 logging:
   level: INFO
 {skills_block}
@@ -538,6 +707,48 @@ skills:
     assert config.skills.scopes_precedence == ["repository", "user", "system"]
     assert "core" in config.skills.tools.packs
     assert config.skills.tools.packs["core"] == ["filesystem_read"]
+
+
+def test_load_runtime_config_parses_conversation_compression_config(
+    tmp_path: Path,
+) -> None:
+    """Parses ``policies.conversation_compression`` when enabled."""
+    # Arrange - write runtime YAML with compression policy enabled.
+    config_file = tmp_path / "agent.yaml"
+    _write(
+        config_file,
+        _minimal_runtime_yaml_with_skills(
+            """
+skills:
+  enabled: true
+  roots: [".skills"]
+""",
+            policies_block="""
+policies:
+  max_iterations: 12
+  max_model_calls: 20
+  max_tool_calls: 20
+  conversation_compression:
+    enabled: true
+    trigger:
+      kind: messages
+      threshold: 3
+    keep:
+      kind: messages
+      value: 1
+""",
+        ),
+    )
+
+    # Act - load and validate runtime config.
+    config = load_runtime_config(config_file)
+
+    # Assert - compression policy fields are parsed and typed.
+    assert config.policies.conversation_compression.enabled is True
+    assert config.policies.conversation_compression.trigger.kind == "messages"
+    assert config.policies.conversation_compression.trigger.threshold == 3
+    assert config.policies.conversation_compression.keep.kind == "messages"
+    assert config.policies.conversation_compression.keep.value == 1
 
 
 def test_load_runtime_config_rejects_skills_tools_unknown_default_pack(

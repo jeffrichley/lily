@@ -20,8 +20,14 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel, ConfigDict, Field
 
 from lily.runtime.config_schema import RuntimeConfig
+from lily.runtime.conversation_compression import (
+    build_conversation_compression_middleware,
+)
 from lily.runtime.model_factory import ModelFactory
 from lily.runtime.model_router import DynamicModelRouter
+from lily.runtime.skill_catalog_injection_middleware import (
+    SystemPromptSkillCatalogMiddleware,
+)
 from lily.runtime.skill_events import emit_skill_catalog_injected
 from lily.runtime.skill_invoke_trace import (
     SkillInvokeTrace,
@@ -235,13 +241,22 @@ class AgentRuntime:
         )
         registry = ToolRegistry.from_tools(self._tools)
         allowlisted_tools = registry.allowlisted(self._config.tools.allowlist)
-        middleware = [
-            router.build_middleware(),
-            ModelCallLimitMiddleware(run_limit=self._config.policies.max_model_calls),
-            ToolCallLimitMiddleware(run_limit=self._config.policies.max_tool_calls),
-        ]
 
         system_prompt = self._config.agent.system_prompt
+        middleware = [router.build_middleware()]
+
+        compression_cfg = self._config.policies.conversation_compression
+        if compression_cfg.enabled:
+            # Use the default-profile model for summarization to keep
+            # middleware initialization deterministic.
+            compression_model = model_map[self._config.models.routing.default_profile]
+            middleware.append(
+                build_conversation_compression_middleware(
+                    compression_cfg,
+                    model=compression_model,
+                ),
+            )
+
         if (
             self._skill_bundle is not None
             and self._skill_bundle.catalog_markdown.strip()
@@ -251,7 +266,20 @@ class AgentRuntime:
                 skills_count=len(self._skill_bundle.registry.canonical_keys()),
                 catalog_char_count=len(catalog),
             )
-            system_prompt = f"{system_prompt.rstrip()}\n\n{catalog}"
+            # Middleware strategy: do not mutate build-time system_prompt; instead
+            # rewrite the model request system_message right before invocation.
+            middleware.append(
+                SystemPromptSkillCatalogMiddleware(catalog_markdown=catalog)
+            )
+
+        middleware.extend(
+            [
+                ModelCallLimitMiddleware(
+                    run_limit=self._config.policies.max_model_calls
+                ),
+                ToolCallLimitMiddleware(run_limit=self._config.policies.max_tool_calls),
+            ]
+        )
 
         built = self._agent_builder(
             model=model_map[self._config.models.routing.default_profile],

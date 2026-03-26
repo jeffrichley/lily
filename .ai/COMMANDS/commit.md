@@ -29,6 +29,16 @@ Branch safety check (required):
 - Confirm the commit scope is coherent and atomic.
 - If unrelated changes are present, do not include them.
 
+### 1.5 Verify commit hooks are installed (required)
+
+Secret scanning must run on every `git commit` via the git hook path.
+
+- One-time setup (required per clone/environment):
+  - `just pre-commit-install`
+- Verify hook wiring before committing:
+  - `uv run pre-commit run gitleaks --all-files`
+- If this command fails, stop and resolve findings before staging/committing.
+
 ### 2. Stage only intended files
 
 - Add modified and untracked files that belong to this commit.
