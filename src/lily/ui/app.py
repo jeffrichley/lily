@@ -1,4 +1,5 @@
 """Top-level Textual application for Lily interactive sessions."""
+# ruff: noqa: PLR0913
 
 from __future__ import annotations
 
@@ -30,13 +31,16 @@ class _SupervisorProtocol(Protocol):
         """
 
 
-type SupervisorFactory = Callable[[Path, Path | None, bool], _SupervisorProtocol]
+type SupervisorFactory = Callable[
+    [Path, Path | None, bool, Path | None], _SupervisorProtocol
+]
 
 
 def _default_supervisor_factory(
     config_path: Path,
     override_config_path: Path | None,
     skill_telemetry_echo: bool = False,
+    agent_workspace_dir: Path | None = None,
 ) -> _SupervisorProtocol:
     """Build default supervisor from config paths.
 
@@ -44,6 +48,8 @@ def _default_supervisor_factory(
         config_path: Base runtime config path.
         override_config_path: Optional runtime override config path.
         skill_telemetry_echo: Mirror skill telemetry JSON to stderr when true.
+        agent_workspace_dir: Optional named-agent workspace directory used to load
+            middleware-injected identity context.
 
     Returns:
         Configured Lily supervisor instance.
@@ -52,6 +58,7 @@ def _default_supervisor_factory(
         config_path,
         override_config_path,
         skill_telemetry_echo=skill_telemetry_echo,
+        agent_workspace_dir=agent_workspace_dir,
     )
 
 
@@ -74,6 +81,7 @@ class LilyTuiApp(App[None]):
         conversation_id: str | None = None,
         supervisor_factory: SupervisorFactory = _default_supervisor_factory,
         skill_telemetry_echo: bool = False,
+        agent_workspace_dir: Path | None = None,
     ) -> None:
         """Initialize TUI app with config-driven supervisor factory.
 
@@ -83,6 +91,8 @@ class LilyTuiApp(App[None]):
             conversation_id: Active conversation id for this TUI process.
             supervisor_factory: Factory building supervisor runtime object.
             skill_telemetry_echo: Passed through when constructing the supervisor.
+            agent_workspace_dir: Optional named-agent workspace directory used for
+                identity context middleware injection.
         """
         super().__init__()
         self._config_path = config_path
@@ -90,6 +100,7 @@ class LilyTuiApp(App[None]):
         self._conversation_id = conversation_id
         self._supervisor_factory = supervisor_factory
         self._skill_telemetry_echo = skill_telemetry_echo
+        self._agent_workspace_dir = agent_workspace_dir
         self._supervisor: _SupervisorProtocol | None = None
 
     def on_mount(self) -> None:
@@ -107,6 +118,7 @@ class LilyTuiApp(App[None]):
                 self._config_path,
                 self._override_config_path,
                 self._skill_telemetry_echo,
+                self._agent_workspace_dir,
             )
         return self._supervisor
 

@@ -1,4 +1,5 @@
 """End-to-end smoke tests for Lily Textual TUI."""
+# ruff: noqa: PLR0913
 
 from __future__ import annotations
 
@@ -46,6 +47,7 @@ def _fake_supervisor_factory(
     config_path: Path,
     override_config_path: Path | None,
     skill_telemetry_echo: bool = False,
+    agent_workspace_dir: Path | None = None,
 ) -> _FakeSupervisor:
     """Build fake supervisor while validating config arguments are plumbed.
 
@@ -53,11 +55,12 @@ def _fake_supervisor_factory(
         config_path: Base config path from app startup.
         override_config_path: Optional override path.
         skill_telemetry_echo: Echo flag from TUI (unused by fake).
+        agent_workspace_dir: Optional named-agent workspace path (unused by fake).
 
     Returns:
         Fake supervisor instance.
     """
-    _ = (config_path, override_config_path, skill_telemetry_echo)
+    _ = (config_path, override_config_path, skill_telemetry_echo, agent_workspace_dir)
     return _FakeSupervisor()
 
 
@@ -101,6 +104,7 @@ class _FakeTuiApp:
     """Fake TUI app class used to validate CLI tui command wiring."""
 
     created_conversation_ids: ClassVar[list[str | None]] = []
+    created_config_paths: ClassVar[list[Path]] = []
 
     def __init__(
         self,
@@ -109,16 +113,18 @@ class _FakeTuiApp:
         conversation_id: str | None = None,
         supervisor_factory: object | None = None,
         skill_telemetry_echo: bool = False,
+        agent_workspace_dir: Path | None = None,
     ) -> None:
         """Capture constructor arguments for assertions."""
         _ = (
-            config_path,
             override_config_path,
             supervisor_factory,
             skill_telemetry_echo,
+            agent_workspace_dir,
         )
         self._conversation_id = conversation_id
         self.created_conversation_ids.append(conversation_id)
+        self.created_config_paths.append(config_path)
 
     def run(self) -> None:
         """No-op fake run method used by command test."""
@@ -132,6 +138,7 @@ def test_cli_tui_command_supports_default_explicit_and_last_attach(
     # Arrange - patch TUI app class and isolate cwd for session DB.
     monkeypatch.setattr("lily.cli.LilyTuiApp", _FakeTuiApp)
     _FakeTuiApp.created_conversation_ids = []
+    _FakeTuiApp.created_config_paths = []
     config_file = tmp_path / "agent.yaml"
     config_file.write_text("schema_version: 1\n", encoding="utf-8")
     runner = CliRunner()
@@ -187,3 +194,42 @@ def test_cli_tui_command_supports_default_explicit_and_last_attach(
     assert len(_FakeTuiApp.created_conversation_ids) == 3
     assert _FakeTuiApp.created_conversation_ids[1] == seeded_id
     assert _FakeTuiApp.created_conversation_ids[2] == seeded_id
+
+
+def test_cli_tui_command_accepts_named_agent_without_config(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Resolves `.lily/agents/<name>` config path for --agent mode."""
+    # Arrange - patch fake TUI app and create named-agent workspace.
+    monkeypatch.setattr("lily.cli.LilyTuiApp", _FakeTuiApp)
+    _FakeTuiApp.created_conversation_ids = []
+    _FakeTuiApp.created_config_paths = []
+    agent_dir = tmp_path / ".lily" / "agents" / "pepper-potts"
+    agent_dir.mkdir(parents=True)
+    (agent_dir / "agent.toml").write_text("schema_version = 1\n", encoding="utf-8")
+    (agent_dir / "tools.toml").write_text("[[definitions]]\n", encoding="utf-8")
+    for filename in ("AGENTS.md", "IDENTITY.md", "SOUL.md", "USER.md", "TOOLS.md"):
+        (agent_dir / filename).write_text(f"# {filename}\n", encoding="utf-8")
+    (agent_dir / "skills").mkdir()
+    (agent_dir / "memory").mkdir()
+    runner = CliRunner()
+
+    # Act - invoke TUI in named-agent mode without explicit --config.
+    with monkeypatch.context() as context:
+        context.chdir(tmp_path)
+        result = runner.invoke(
+            app,
+            ["tui", "--agent", "pepper-potts"],
+        )
+
+    # Assert - resolved config path points at selected agent workspace.
+    assert result.exit_code == 0
+    assert len(_FakeTuiApp.created_config_paths) == 1
+    assert (
+        _FakeTuiApp.created_config_paths[0]
+        .as_posix()
+        .endswith(
+            ".lily/agents/pepper-potts/agent.toml",
+        )
+    )

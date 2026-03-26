@@ -7,6 +7,7 @@ from pathlib import Path
 
 from langchain_core.tools import BaseTool, tool
 
+from lily.runtime.agent_identity_context import load_agent_identity_context
 from lily.runtime.agent_runtime import AgentRunResult, AgentRuntime
 from lily.runtime.config_loader import ConfigLoadError, load_runtime_config
 from lily.runtime.config_schema import McpServerConfig, RuntimeConfig
@@ -75,6 +76,7 @@ class LilySupervisor:
         tools_config_path: str | Path | None = None,
         *,
         skill_telemetry_echo: bool = False,
+        agent_workspace_dir: str | Path | None = None,
     ) -> LilySupervisor:
         """Build supervisor from config files.
 
@@ -86,6 +88,9 @@ class LilySupervisor:
                 in the same directory; otherwise `tools.yaml`.
             skill_telemetry_echo: When skills are enabled, mirror F7 JSON telemetry
                 to stderr in addition to the configured log file.
+            agent_workspace_dir: Optional named-agent workspace directory used to
+                load required identity/personality markdown context for middleware
+                injection.
 
         Returns:
             Supervisor with runtime and catalog-resolved tools configured.
@@ -121,10 +126,16 @@ class LilySupervisor:
                 skills_cfg,
                 Path(config_path).resolve().parent,
             )
+        identity_context_markdown = ""
+        if agent_workspace_dir is not None:
+            identity_context_markdown = load_agent_identity_context(
+                Path(agent_workspace_dir)
+            )
         runtime = AgentRuntime(
             config=cls._effective_runtime_config(config, skills_enabled=skills_enabled),
             tools=resolved_tools,
             skill_bundle=skill_bundle,
+            agent_identity_context_markdown=identity_context_markdown,
         )
         return cls(runtime=runtime)
 

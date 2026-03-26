@@ -1,4 +1,5 @@
 """CLI entrypoint for Lily supervisor runtime."""
+# ruff: noqa: PLR0913
 
 from __future__ import annotations
 
@@ -11,8 +12,9 @@ from rich.panel import Panel
 from rich.table import Table
 
 from lily.agents.lily_supervisor import LilySupervisor
-from lily.cli_options import ConfigOption, OverrideOption
+from lily.cli_options import OverrideOption
 from lily.cli_skills import skills_app
+from lily.runtime.agent_locator import AgentLocatorError, resolve_agent_workspace
 from lily.runtime.agent_runtime import AgentRuntimeError
 from lily.runtime.config_loader import ConfigLoadError
 from lily.runtime.conversation_sessions import (
@@ -32,6 +34,28 @@ _console = Console()
 PromptOption = Annotated[
     str,
     typer.Option(..., "--prompt", help="Prompt text to send to Lily."),
+]
+AgentOption = Annotated[
+    str | None,
+    typer.Option(
+        "--agent",
+        help="Named agent directory under .lily/agents (defaults to 'default').",
+    ),
+]
+RunConfigOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--config",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=False,
+        help=(
+            "Optional explicit base runtime config (.yaml/.yml/.toml). "
+            "Cannot be used with --agent."
+        ),
+    ),
 ]
 ConversationIdOption = Annotated[
     str | None,
@@ -66,12 +90,15 @@ class ConversationResolutionError(ValueError):
 def _resolve_conversation_id(
     conversation_id: str | None,
     last_conversation: bool,
+    *,
+    workspace_root: Path,
 ) -> str:
     """Resolve conversation mode to one active conversation id.
 
     Args:
         conversation_id: Explicit conversation id from CLI options.
         last_conversation: Whether to attach to most-recent conversation id.
+        workspace_root: Workspace root path used for session store scoping.
 
     Returns:
         Resolved active conversation id for this process run.
@@ -83,7 +110,7 @@ def _resolve_conversation_id(
         msg = "Choose only one attach mode: --conversation-id or --last-conversation."
         raise ConversationResolutionError(msg)
 
-    store = ConversationSessionStore(default_sessions_db_path(Path.cwd()))
+    store = ConversationSessionStore(default_sessions_db_path(workspace_root))
     try:
         if conversation_id is not None:
             return store.attach(conversation_id)
@@ -92,6 +119,37 @@ def _resolve_conversation_id(
         return store.start_new()
     except ConversationSessionStoreError as exc:
         raise ConversationResolutionError(str(exc)) from exc
+
+
+def _resolve_runtime_paths(
+    *,
+    agent: str | None,
+    config: Path | None,
+) -> tuple[Path, Path, Path | None]:
+    """Resolve runtime config path and session workspace root.
+
+    Args:
+        agent: Optional named-agent identifier.
+        config: Optional explicit runtime config path.
+
+    Returns:
+        Tuple of `(config_path, session_workspace_root, agent_workspace_dir)`.
+
+    Raises:
+        ConversationResolutionError: If option selection is ambiguous.
+        AgentLocatorError: If named-agent workspace cannot be resolved.
+    """
+    if config is not None and agent is not None:
+        msg = "Choose only one runtime mode: --config or --agent."
+        raise ConversationResolutionError(msg)
+    if config is not None:
+        return config, Path.cwd(), None
+    try:
+        workspace = resolve_agent_workspace(agent_name=agent)
+    except AgentLocatorError as exc:
+        # Re-raise explicitly so runtime-mode resolution has deterministic error type.
+        raise AgentLocatorError(str(exc)) from exc
+    return workspace.config_path, workspace.agent_dir, workspace.agent_dir
 
 
 def _print_success_panel(
@@ -123,9 +181,10 @@ def app_callback() -> None:
 
 
 @app.command("run")
-def run_command(  # noqa: PLR0913
+def run_command(
     prompt: PromptOption,
-    config: ConfigOption = Path(".lily/config/agent.toml"),
+    config: RunConfigOption = None,
+    agent: AgentOption = None,
     override: OverrideOption = None,
     conversation_id: ConversationIdOption = None,
     last_conversation: LastConversationOption = False,
@@ -135,7 +194,8 @@ def run_command(  # noqa: PLR0913
 
     Args:
         prompt: Prompt text to execute.
-        config: Base runtime config path.
+        config: Optional explicit base runtime config path.
+        agent: Optional named-agent identifier under `.lily/agents/`.
         override: Optional override runtime config path.
         conversation_id: Optional explicit conversation id attach target.
         last_conversation: Whether to attach to most-recent conversation.
@@ -145,14 +205,24 @@ def run_command(  # noqa: PLR0913
         Exit: Raised with non-zero code when runtime/config fails.
     """
     try:
+        (
+            resolved_config_path,
+            session_workspace_root,
+            agent_workspace_dir,
+        ) = _resolve_runtime_paths(
+            agent=agent,
+            config=config,
+        )
         resolved_conversation_id = _resolve_conversation_id(
             conversation_id=conversation_id,
             last_conversation=last_conversation,
+            workspace_root=session_workspace_root,
         )
         supervisor = LilySupervisor.from_config_paths(
-            config,
+            resolved_config_path,
             override,
             skill_telemetry_echo=show_skill_telemetry,
+            agent_workspace_dir=agent_workspace_dir,
         )
         result = supervisor.run_prompt(
             prompt,
@@ -160,6 +230,7 @@ def run_command(  # noqa: PLR0913
         )
     except (
         ConfigLoadError,
+        AgentLocatorError,
         ConversationResolutionError,
         ConversationSessionStoreError,
         ToolRegistryError,
@@ -180,7 +251,8 @@ def run_command(  # noqa: PLR0913
 
 @app.command("tui")
 def tui_command(
-    config: ConfigOption = Path(".lily/config/agent.toml"),
+    config: RunConfigOption = None,
+    agent: AgentOption = None,
     override: OverrideOption = None,
     conversation_id: ConversationIdOption = None,
     last_conversation: LastConversationOption = False,
@@ -189,7 +261,8 @@ def tui_command(
     """Launch Textual TUI using config-driven Lily supervisor runtime.
 
     Args:
-        config: Base runtime config path.
+        config: Optional explicit base runtime config path.
+        agent: Optional named-agent identifier under `.lily/agents/`.
         override: Optional override runtime config path.
         conversation_id: Optional explicit conversation id attach target.
         last_conversation: Whether to attach to most-recent conversation.
@@ -199,19 +272,30 @@ def tui_command(
         Exit: Raised with non-zero code when runtime/config fails.
     """
     try:
+        (
+            resolved_config_path,
+            session_workspace_root,
+            agent_workspace_dir,
+        ) = _resolve_runtime_paths(
+            agent=agent,
+            config=config,
+        )
         resolved_conversation_id = _resolve_conversation_id(
             conversation_id=conversation_id,
             last_conversation=last_conversation,
+            workspace_root=session_workspace_root,
         )
         app = LilyTuiApp(
-            config_path=config,
+            config_path=resolved_config_path,
             override_config_path=override,
             conversation_id=resolved_conversation_id,
             skill_telemetry_echo=show_skill_telemetry,
+            agent_workspace_dir=agent_workspace_dir,
         )
         app.run()
     except (
         ConfigLoadError,
+        AgentLocatorError,
         ConversationResolutionError,
         ConversationSessionStoreError,
         ToolRegistryError,
