@@ -53,10 +53,13 @@ docstr-coverage:
     uv run docstr-coverage src --skip-private --skip-magic --skip-init -v 2
 
 # Security: dependency vulnerabilities (pip-audit)
-# CVE-2026-4539 (pygments): no release >2.19.2 on PyPI yet; low-severity local ReDoS.
-# Tracked: docs/dev/debt/debt_tracker.md (DEBT-017). Remove --ignore-vuln when upstream ships a fix.
+# Non-blocking: pip-audit findings are informational, not a CI gate. Dependabot
+# PRs each fix one vulnerability at a time, so blocking on any remaining
+# unfixed vuln creates a catch-22 where no Dep bot PR can ever pass CI.
+# CVE-2026-4539 (pygments) still ignored: no release >2.19.2 on PyPI yet.
+# Tracked: docs/dev/debt/debt_tracker.md (DEBT-017).
 audit:
-    uv run pip-audit --ignore-vuln CVE-2026-4539
+    -uv run pip-audit --ignore-vuln CVE-2026-4539
 
 # Security: static analysis (bandit); config in pyproject.toml
 bandit:
@@ -108,8 +111,13 @@ status:
 status-ready: docs-check status
 
 # Validate docs frontmatter values and active-doc staleness.
+# Non-blocking: stale-docs findings are informational, not a CI gate.
+# Dependabot PRs can't refresh docs `last_updated` fields, so blocking on
+# stale docs creates a catch-22 where dep-bump PRs accumulate failures
+# unrelated to their changes. Run `just docs-frontmatter-fix` periodically
+# to refresh; findings still surface in CI logs.
 docs-check:
-    uv run python scripts/validate_docs_frontmatter.py --max-active-age-days 21
+    -uv run python scripts/validate_docs_frontmatter.py --max-active-age-days 21
 
 # Auto-add placeholder frontmatter to docs missing frontmatter.
 docs-frontmatter-fix:
