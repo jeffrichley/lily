@@ -111,8 +111,13 @@ status:
 status-ready: docs-check status
 
 # Validate docs frontmatter values and active-doc staleness.
+# Non-blocking: stale-docs findings are informational, not a CI gate.
+# Dependabot PRs can't refresh docs `last_updated` fields, so blocking on
+# stale docs creates a catch-22 where dep-bump PRs accumulate failures
+# unrelated to their changes. Run `just docs-frontmatter-fix` periodically
+# to refresh; findings still surface in CI logs.
 docs-check:
-    uv run python scripts/validate_docs_frontmatter.py --max-active-age-days 21
+    -uv run python scripts/validate_docs_frontmatter.py --max-active-age-days 21
 
 # Auto-add placeholder frontmatter to docs missing frontmatter.
 docs-frontmatter-fix:
